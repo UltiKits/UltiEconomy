@@ -1,0 +1,6 @@
+{
+  "identifyString": "ultieconomy",
+  "name": "UltiEconomy",
+  "shortDescription": "完整 Vault 经济提供者，支持双钱包（现金+银行）、利息机制、财富排行榜和 PlaceholderAPI 集成。",
+  "categoryId": 2
+}
