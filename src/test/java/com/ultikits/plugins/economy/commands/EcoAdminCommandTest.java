@@ -170,6 +170,66 @@ class EcoAdminCommandTest {
     }
 
     @Nested
+    @DisplayName("HandleHelp")
+    class HelpTests {
+
+        @Test
+        @DisplayName("handleHelp sends command usage")
+        void handleHelp() {
+            command.handleHelp(sender);
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender, atLeast(4)).sendMessage(captor.capture());
+            assertThat(captor.getAllValues().get(0)).contains("UltiEconomy Admin");
+        }
+    }
+
+    @Nested
+    @DisplayName("Failure paths")
+    class FailurePaths {
+
+        @Test
+        @DisplayName("give failure sends error message")
+        void giveFailure() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.addCash(TARGET_UUID, 500.0)).thenReturn(false);
+
+                command.onGive(sender, "Steve", "500");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("操作失败");
+            }
+        }
+
+        @Test
+        @DisplayName("set failure sends error message")
+        void setFailure() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.setCash(TARGET_UUID, 100.0)).thenReturn(false);
+
+                command.onSet(sender, "Steve", "100");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("操作失败");
+            }
+        }
+
+        @Test
+        @DisplayName("give with negative amount shows error")
+        void giveNegative() {
+            command.onGive(sender, "Steve", "-50");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("无效的金额");
+        }
+    }
+
+    @Nested
     @DisplayName("Check")
     class CheckTests {
 
