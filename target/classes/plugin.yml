@@ -1,0 +1,8 @@
+name: UltiTools-Economy
+version: '1.0.0'
+main: com.ultikits.plugins.economy.UltiEconomy
+base-package: com.ultikits.plugins.economy
+api-version: 620
+authors: [ wisdomme ]
+depend: [ Vault ]
+softdepend: [ PlaceholderAPI ]
