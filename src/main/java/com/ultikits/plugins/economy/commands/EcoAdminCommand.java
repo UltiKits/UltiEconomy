@@ -1,6 +1,8 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.plugins.economy.service.TaxService;
 import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
@@ -18,10 +20,20 @@ public class EcoAdminCommand extends AbstractCommandExecutor {
 
     private final UltiToolsPlugin plugin;
     private final EconomyService economyService;
+    private TaxService taxService;
+    private CurrencyManager currencyManager;
 
     public EcoAdminCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
+    }
+
+    public EcoAdminCommand(UltiToolsPlugin plugin, EconomyService economyService,
+                           TaxService taxService, CurrencyManager currencyManager) {
+        this.plugin = plugin;
+        this.economyService = economyService;
+        this.taxService = taxService;
+        this.currencyManager = currencyManager;
     }
 
     @CmdMapping(format = "give <player> <amount>")
@@ -204,6 +216,71 @@ public class EcoAdminCommand extends AbstractCommandExecutor {
                 plugin.i18n("总资产: %s"), economyService.formatAmount(total, currencyId)));
     }
 
+    @CmdMapping(format = "treasury")
+    public void onTreasury(@CmdSender CommandSender sender) {
+        if (taxService == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            return;
+        }
+        if (currencyManager != null) {
+            for (com.ultikits.plugins.economy.model.CurrencyDefinition def : currencyManager.getAllCurrencies()) {
+                double balance = taxService.getTreasuryBalance(def.getId());
+                String formatted = economyService.formatAmount(balance, def.getId());
+                sender.sendMessage(ChatColor.YELLOW + def.getDisplayName() + ": " + formatted);
+            }
+        }
+    }
+
+    @CmdMapping(format = "treasury withdraw <amount>")
+    public void onTreasuryWithdraw(
+            @CmdSender CommandSender sender,
+            @CmdParam("amount") String amountStr) {
+        if (taxService == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            return;
+        }
+        double amount = parseAmount(sender, amountStr);
+        if (amount <= 0) return;
+        String primaryId = currencyManager.getPrimaryCurrency().getId();
+        try {
+            boolean success = taxService.withdrawFromTreasury(amount, primaryId);
+            if (success) {
+                String formatted = economyService.formatAmount(amount, primaryId);
+                sender.sendMessage(ChatColor.GREEN + String.format(
+                        plugin.i18n("已从国库提取 %s"), formatted));
+            } else {
+                sender.sendMessage(ChatColor.RED + plugin.i18n("国库余额不足"));
+            }
+        } catch (IllegalAccessException e) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+        }
+    }
+
+    @CmdMapping(format = "treasury withdraw <amount> <currency>")
+    public void onTreasuryWithdrawCurrency(
+            @CmdSender CommandSender sender,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+        if (taxService == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            return;
+        }
+        double amount = parseAmount(sender, amountStr);
+        if (amount <= 0) return;
+        try {
+            boolean success = taxService.withdrawFromTreasury(amount, currencyId);
+            if (success) {
+                String formatted = economyService.formatAmount(amount, currencyId);
+                sender.sendMessage(ChatColor.GREEN + String.format(
+                        plugin.i18n("已从国库提取 %s"), formatted));
+            } else {
+                sender.sendMessage(ChatColor.RED + plugin.i18n("国库余额不足"));
+            }
+        } catch (IllegalAccessException e) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+        }
+    }
+
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Admin ===");
@@ -211,6 +288,8 @@ public class EcoAdminCommand extends AbstractCommandExecutor {
         sender.sendMessage(ChatColor.YELLOW + "/eco take <player> <amount> [currency]");
         sender.sendMessage(ChatColor.YELLOW + "/eco set <player> <amount> [currency]");
         sender.sendMessage(ChatColor.YELLOW + "/eco check <player> [currency]");
+        sender.sendMessage(ChatColor.YELLOW + "/eco treasury");
+        sender.sendMessage(ChatColor.YELLOW + "/eco treasury withdraw <amount> [currency]");
     }
 
     @SuppressWarnings("deprecation")

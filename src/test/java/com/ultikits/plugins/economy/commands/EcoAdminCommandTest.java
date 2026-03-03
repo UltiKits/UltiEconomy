@@ -1,6 +1,9 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.plugins.economy.service.TaxService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -12,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -330,6 +334,100 @@ class EcoAdminCommandTest {
                 assertThat(messages.get(0)).contains("gems");
                 assertThat(messages.get(1)).contains("G250.00");
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("Treasury")
+    class TreasuryTests {
+
+        @Mock private TaxService taxService;
+        @Mock private CurrencyManager currencyManager;
+
+        private EcoAdminCommand treasuryCommand;
+
+        @BeforeEach
+        void setUp() {
+            lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            treasuryCommand = new EcoAdminCommand(plugin, economyService, taxService, currencyManager);
+        }
+
+        @Test
+        @DisplayName("treasury shows balances for all currencies")
+        void treasuryShowsBalances() {
+            CurrencyDefinition coins = CurrencyDefinition.builder()
+                    .id("coins").displayName("Coins").symbol("$").initialCash(1000.0)
+                    .bankEnabled(true).minDeposit(100.0).primary(true).build();
+            CurrencyDefinition gems = CurrencyDefinition.builder()
+                    .id("gems").displayName("Gems").symbol("G").build();
+            when(currencyManager.getAllCurrencies()).thenReturn(Arrays.asList(coins, gems));
+            when(taxService.getTreasuryBalance("coins")).thenReturn(5000.0);
+            when(taxService.getTreasuryBalance("gems")).thenReturn(100.0);
+            when(economyService.formatAmount(5000.0, "coins")).thenReturn("$5,000.00");
+            when(economyService.formatAmount(100.0, "gems")).thenReturn("G100.00");
+
+            treasuryCommand.onTreasury(sender);
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender, times(2)).sendMessage(captor.capture());
+            assertThat(captor.getAllValues().get(0)).contains("Coins").contains("$5,000.00");
+            assertThat(captor.getAllValues().get(1)).contains("Gems").contains("G100.00");
+        }
+
+        @Test
+        @DisplayName("treasury withdraw from primary currency")
+        void treasuryWithdrawPrimary() throws Exception {
+            CurrencyDefinition coins = CurrencyDefinition.builder()
+                    .id("coins").displayName("Coins").symbol("$").primary(true).build();
+            when(currencyManager.getPrimaryCurrency()).thenReturn(coins);
+            when(taxService.withdrawFromTreasury(500.0, "coins")).thenReturn(true);
+            when(economyService.formatAmount(500.0, "coins")).thenReturn("$500.00");
+
+            treasuryCommand.onTreasuryWithdraw(sender, "500");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("已从国库提取").contains("$500.00");
+        }
+
+        @Test
+        @DisplayName("treasury withdraw fails on insufficient balance")
+        void treasuryWithdrawInsufficient() throws Exception {
+            CurrencyDefinition coins = CurrencyDefinition.builder()
+                    .id("coins").displayName("Coins").symbol("$").primary(true).build();
+            when(currencyManager.getPrimaryCurrency()).thenReturn(coins);
+            when(taxService.withdrawFromTreasury(999999.0, "coins")).thenReturn(false);
+
+            treasuryCommand.onTreasuryWithdraw(sender, "999999");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("国库余额不足");
+        }
+
+        @Test
+        @DisplayName("treasury withdraw with specific currency")
+        void treasuryWithdrawCurrency() throws Exception {
+            when(taxService.withdrawFromTreasury(200.0, "gems")).thenReturn(true);
+            when(economyService.formatAmount(200.0, "gems")).thenReturn("G200.00");
+
+            treasuryCommand.onTreasuryWithdrawCurrency(sender, "200", "gems");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("已从国库提取").contains("G200.00");
+        }
+
+        @Test
+        @DisplayName("treasury commands show error when tax disabled")
+        void treasuryDisabled() {
+            EcoAdminCommand noTaxCommand = new EcoAdminCommand(plugin, economyService);
+
+            noTaxCommand.onTreasury(sender);
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("税收系统未启用");
         }
     }
 }
