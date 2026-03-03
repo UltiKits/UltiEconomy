@@ -1,0 +1,13 @@
+# Currency definitions / 货币定义
+# Each currency has its own wallet. One must be primary (maps to Vault).
+# 每种货币有独立的钱包。必须有一个设为 primary（映射到 Vault）。
+
+currencies:
+  coins:
+    display-name: 'Coins'
+    symbol: '$'
+    initial-cash: 1000.0
+    bank-enabled: true
+    min-deposit: 100.0
+    max-bank-balance: -1
+    primary: true
