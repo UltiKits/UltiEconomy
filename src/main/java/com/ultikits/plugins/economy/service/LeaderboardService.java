@@ -15,6 +15,7 @@ public class LeaderboardService {
     private final EconomyConfig config;
     private final DataOperator<PlayerAccountEntity> dataOperator;
     private volatile List<LeaderboardEntry> cachedLeaderboard = Collections.emptyList();
+    private volatile Map<String, List<LeaderboardEntry>> currencyLeaderboards = Collections.emptyMap();
 
     public LeaderboardService(EconomyConfig config,
                               DataOperator<PlayerAccountEntity> dataOperator) {
@@ -51,6 +52,38 @@ public class LeaderboardService {
     public int getPlayerRank(UUID playerUuid) {
         String uuidStr = playerUuid.toString();
         List<LeaderboardEntry> snapshot = cachedLeaderboard;
+        for (int i = 0; i < snapshot.size(); i++) {
+            if (uuidStr.equals(snapshot.get(i).getUuid())) {
+                return i + 1;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Returns the top N players for a specific currency from the cached leaderboard.
+     * Falls back to primary leaderboard if no per-currency data available.
+     */
+    public List<LeaderboardEntry> getTopPlayers(int count, String currencyId) {
+        List<LeaderboardEntry> snapshot = currencyLeaderboards.getOrDefault(currencyId, Collections.emptyList());
+        if (snapshot.isEmpty()) {
+            return getTopPlayers(count);
+        }
+        if (count >= snapshot.size()) {
+            return new ArrayList<>(snapshot);
+        }
+        return new ArrayList<>(snapshot.subList(0, count));
+    }
+
+    /**
+     * Returns a player's 1-based rank for a specific currency, or -1 if not found.
+     */
+    public int getPlayerRank(UUID playerUuid, String currencyId) {
+        String uuidStr = playerUuid.toString();
+        List<LeaderboardEntry> snapshot = currencyLeaderboards.getOrDefault(currencyId, Collections.emptyList());
+        if (snapshot.isEmpty()) {
+            return getPlayerRank(playerUuid);
+        }
         for (int i = 0; i < snapshot.size(); i++) {
             if (uuidStr.equals(snapshot.get(i).getUuid())) {
                 return i + 1;

@@ -1,13 +1,16 @@
 package com.ultikits.plugins.economy.placeholder;
 
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.LeaderboardService;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
@@ -24,13 +27,27 @@ class EconomyPlaceholderExpansionTest {
     @Mock private LeaderboardService leaderboardService;
     @Mock private OfflinePlayer player;
 
+    private CurrencyManager currencyManager;
     private EconomyPlaceholderExpansion expansion;
 
     private static final UUID PLAYER_UUID = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
 
+    private static final String CURRENCIES_YAML =
+            "currencies:\n" +
+            "  coins:\n" +
+            "    display-name: 'Coins'\n" +
+            "    symbol: '$'\n" +
+            "    primary: true\n" +
+            "  gems:\n" +
+            "    display-name: 'Gems'\n" +
+            "    symbol: 'G'\n" +
+            "    primary: false\n";
+
     @BeforeEach
     void setUp() {
-        expansion = new EconomyPlaceholderExpansion(economyService, leaderboardService);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
+        currencyManager = new CurrencyManager(yaml);
+        expansion = new EconomyPlaceholderExpansion(economyService, leaderboardService, currencyManager);
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
     }
 
@@ -168,6 +185,58 @@ class EconomyPlaceholderExpansionTest {
         void caseInsensitive() {
             when(economyService.getCash(PLAYER_UUID)).thenReturn(100.0);
             assertThat(expansion.onRequest(player, "CASH")).isEqualTo("100.00");
+        }
+    }
+
+    @Nested
+    @DisplayName("Currency-specific placeholders")
+    class CurrencyPlaceholders {
+
+        @Test
+        @DisplayName("currency-specific cash placeholder")
+        void currencySpecificCash() {
+            when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
+            String result = expansion.onRequest(player, "gems_cash");
+            assertThat(result).isEqualTo("250.00");
+        }
+
+        @Test
+        @DisplayName("currency-specific bank placeholder")
+        void currencySpecificBank() {
+            when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(100.0);
+            String result = expansion.onRequest(player, "gems_bank");
+            assertThat(result).isEqualTo("100.00");
+        }
+
+        @Test
+        @DisplayName("currency-specific total placeholder")
+        void currencySpecificTotal() {
+            when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(350.0);
+            String result = expansion.onRequest(player, "gems_total");
+            assertThat(result).isEqualTo("350.00");
+        }
+
+        @Test
+        @DisplayName("currency-specific cash_formatted placeholder")
+        void currencySpecificFormatted() {
+            when(economyService.getCash(PLAYER_UUID, "coins")).thenReturn(1234.56);
+            when(economyService.formatAmount(1234.56, "coins")).thenReturn("$1,234.56");
+            String result = expansion.onRequest(player, "coins_cash_formatted");
+            assertThat(result).isEqualTo("$1,234.56");
+        }
+
+        @Test
+        @DisplayName("currency-specific rank placeholder")
+        void currencySpecificRank() {
+            when(leaderboardService.getPlayerRank(PLAYER_UUID, "gems")).thenReturn(3);
+            String result = expansion.onRequest(player, "gems_rank");
+            assertThat(result).isEqualTo("3");
+        }
+
+        @Test
+        @DisplayName("unknown currency falls through to default handling")
+        void unknownCurrencyFallsThrough() {
+            assertThat(expansion.onRequest(player, "unknown_cash")).isNull();
         }
     }
 }
