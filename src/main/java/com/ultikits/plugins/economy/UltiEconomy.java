@@ -1,6 +1,7 @@
 package com.ultikits.plugins.economy;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.placeholder.EconomyPlaceholderExpansion;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
@@ -23,6 +24,7 @@ public class UltiEconomy extends UltiToolsPlugin {
 
     private VaultEconomyProvider vaultProvider;
     private volatile CurrencyManager currencyManager;
+    private volatile MoneyNoteFactory noteFactory;
 
     public CurrencyManager getCurrencyManager() {
         if (currencyManager == null) {
@@ -35,6 +37,18 @@ public class UltiEconomy extends UltiToolsPlugin {
             }
         }
         return currencyManager;
+    }
+
+    public MoneyNoteFactory getMoneyNoteFactory() {
+        if (noteFactory == null) {
+            synchronized (this) {
+                if (noteFactory == null) {
+                    Plugin bukkitPlugin = Bukkit.getPluginManager().getPlugin("UltiTools");
+                    noteFactory = new MoneyNoteFactory(bukkitPlugin);
+                }
+            }
+        }
+        return noteFactory;
     }
 
     @Override

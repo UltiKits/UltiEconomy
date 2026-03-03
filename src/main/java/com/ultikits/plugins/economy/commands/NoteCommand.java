@@ -1,9 +1,11 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -25,6 +27,13 @@ public class NoteCommand extends AbstractCommandExecutor {
         this.plugin = plugin;
         this.economyService = economyService;
         this.noteFactory = noteFactory;
+    }
+
+    @Autowired
+    public NoteCommand(UltiToolsPlugin plugin) {
+        this(plugin,
+             plugin.getContext().getBean(EconomyService.class),
+             ((UltiEconomy) plugin).getMoneyNoteFactory());
     }
 
     @CmdMapping(format = "<amount>")

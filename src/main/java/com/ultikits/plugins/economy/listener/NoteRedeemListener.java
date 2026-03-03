@@ -1,8 +1,10 @@
 package com.ultikits.plugins.economy.listener;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.EventListener;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -23,6 +25,13 @@ public class NoteRedeemListener implements Listener {
         this.plugin = plugin;
         this.economyService = economyService;
         this.noteFactory = noteFactory;
+    }
+
+    @Autowired
+    public NoteRedeemListener(UltiToolsPlugin plugin) {
+        this(plugin,
+             plugin.getContext().getBean(EconomyService.class),
+             ((UltiEconomy) plugin).getMoneyNoteFactory());
     }
 
     @EventHandler

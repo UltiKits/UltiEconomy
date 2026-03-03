@@ -28,5 +28,11 @@
   "货币不存在": "Currency not found",
   "当前货币: %s": "Currency: %s",
   "该货币不支持银行功能": "This currency does not support banking",
-  "%s 银行利息到账: %s": "%s bank interest received: %s"
+  "%s 银行利息到账: %s": "%s bank interest received: %s",
+  "纸币已创建: %s": "Money note created: %s",
+  "纸币已兑换: %s": "Money note redeemed: %s",
+  "手中没有纸币": "You are not holding a money note",
+  "创建纸币": "Create money note",
+  "创建指定货币纸币": "Create money note (specific currency)",
+  "兑换手中纸币": "Redeem held money note"
 }
