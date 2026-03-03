@@ -4,6 +4,7 @@ import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
@@ -22,6 +23,7 @@ public class EconomyServiceImpl implements EconomyService {
     private final EconomyConfig config;
     private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
     private final CurrencyManager currencyManager;
+    private TaxService taxService;
     private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
 
     // Full test-friendly constructor
@@ -44,6 +46,13 @@ public class EconomyServiceImpl implements EconomyService {
              plugin.getConfig(EconomyConfig.class),
              plugin.getDataOperator(CurrencyBalanceEntity.class),
              ((UltiEconomy) plugin).getCurrencyManager());
+        this.taxService = new TaxService(
+                plugin.getConfig(EconomyConfig.class),
+                plugin.getDataOperator(TreasuryEntity.class));
+    }
+
+    public void setTaxService(TaxService taxService) {
+        this.taxService = taxService;
     }
 
     // --- Legacy single-currency methods (delegate to primary) ---
@@ -186,8 +195,10 @@ public class EconomyServiceImpl implements EconomyService {
         if (receiver == null) {
             return false;
         }
+        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
-        receiver.setCash(receiver.getCash() + amount);
+        receiver.setCash(receiver.getCash() + received);
         if (!updateAccount(sender)) {
             sender.setCash(sender.getCash() + amount);
             return false;
@@ -196,6 +207,12 @@ public class EconomyServiceImpl implements EconomyService {
             sender.setCash(sender.getCash() + amount);
             updateAccount(sender);
             return false;
+        }
+        if (tax > 0 && taxService != null) {
+            try {
+                taxService.depositToTreasury(tax, currencyManager.getPrimaryCurrency().getId());
+            } catch (IllegalAccessException ignored) {
+            }
         }
         return true;
     }
@@ -388,8 +405,10 @@ public class EconomyServiceImpl implements EconomyService {
         if (receiver == null) {
             return false;
         }
+        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
-        receiver.setCash(receiver.getCash() + amount);
+        receiver.setCash(receiver.getCash() + received);
         if (!updateBalance(sender)) {
             sender.setCash(sender.getCash() + amount);
             return false;
@@ -398,6 +417,12 @@ public class EconomyServiceImpl implements EconomyService {
             sender.setCash(sender.getCash() + amount);
             updateBalance(sender);
             return false;
+        }
+        if (tax > 0 && taxService != null) {
+            try {
+                taxService.depositToTreasury(tax, currencyId);
+            } catch (IllegalAccessException ignored) {
+            }
         }
         return true;
     }

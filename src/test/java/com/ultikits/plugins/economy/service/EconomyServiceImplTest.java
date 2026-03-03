@@ -439,6 +439,60 @@ class EconomyServiceImplTest {
 
             assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 300)).isFalse();
         }
+
+        @Test
+        @DisplayName("transfer applies transaction tax when TaxService present")
+        void transferWithTax() throws Exception {
+            TaxService taxService = mock(TaxService.class);
+            when(taxService.calculateTransactionTax(100.0)).thenReturn(5.0);
+            service.setTaxService(taxService);
+
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 0, 0);
+
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 100);
+            assertThat(result).isTrue();
+            assertThat(sender.getCash()).isEqualTo(900.0);
+            assertThat(receiver.getCash()).isEqualTo(95.0);
+            verify(taxService).depositToTreasury(5.0, "coins");
+        }
+
+        @Test
+        @DisplayName("transfer with currency applies transaction tax")
+        void transferWithCurrencyTax() throws Exception {
+            TaxService taxService = mock(TaxService.class);
+            when(taxService.calculateTransactionTax(200.0)).thenReturn(10.0);
+            service.setTaxService(taxService);
+
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
+            assertThat(result).isTrue();
+            assertThat(sender.getCash()).isEqualTo(300.0);
+            assertThat(receiver.getCash()).isEqualTo(290.0);
+            verify(taxService).depositToTreasury(10.0, "gems");
+        }
     }
 
     @Nested
