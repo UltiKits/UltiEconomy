@@ -1,7 +1,9 @@
 package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.Service;
@@ -17,23 +19,33 @@ public class EconomyServiceImpl implements EconomyService {
     private final UltiToolsPlugin plugin;
     private final DataOperator<PlayerAccountEntity> dataOperator;
     private final EconomyConfig config;
+    private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
+    private final CurrencyManager currencyManager;
     private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
 
-    // Test-friendly constructor
+    // Full test-friendly constructor
     public EconomyServiceImpl(UltiToolsPlugin plugin,
                               DataOperator<PlayerAccountEntity> dataOperator,
-                              EconomyConfig config) {
+                              EconomyConfig config,
+                              DataOperator<CurrencyBalanceEntity> currencyDataOperator,
+                              CurrencyManager currencyManager) {
         this.plugin = plugin;
         this.dataOperator = dataOperator;
         this.config = config;
+        this.currencyDataOperator = currencyDataOperator;
+        this.currencyManager = currencyManager;
     }
 
     @Autowired
     public EconomyServiceImpl(UltiToolsPlugin plugin) {
         this(plugin,
              plugin.getDataOperator(PlayerAccountEntity.class),
-             plugin.getConfig(EconomyConfig.class));
+             plugin.getConfig(EconomyConfig.class),
+             plugin.getDataOperator(CurrencyBalanceEntity.class),
+             null);
     }
+
+    // --- Legacy single-currency methods (delegate to primary) ---
 
     @Override
     public PlayerAccountEntity getAccount(UUID playerUuid) {
@@ -227,12 +239,247 @@ public class EconomyServiceImpl implements EconomyService {
         return config.getCurrencySymbol() + decimalFormat.format(amount);
     }
 
+    // --- Currency-aware methods ---
+
+    @Override
+    public CurrencyBalanceEntity getBalance(UUID playerUuid, String currencyId) {
+        List<CurrencyBalanceEntity> results = currencyDataOperator.query()
+                .where("uuid").eq(playerUuid.toString())
+                .and("currency_id").eq(currencyId)
+                .list();
+        return results.isEmpty() ? null : results.get(0);
+    }
+
+    @Override
+    public CurrencyBalanceEntity getOrCreateBalance(UUID playerUuid, String playerName, String currencyId) {
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance != null) {
+            return balance;
+        }
+        double initialCash = 0.0;
+        if (currencyManager != null) {
+            CurrencyDefinition def = currencyManager.getCurrency(currencyId);
+            if (def != null) {
+                initialCash = def.getInitialCash();
+            }
+        }
+        balance = CurrencyBalanceEntity.builder()
+                .uuid(playerUuid.toString())
+                .currencyId(currencyId)
+                .cash(initialCash)
+                .bank(0.0)
+                .build();
+        currencyDataOperator.insert(balance);
+        return balance;
+    }
+
+    @Override
+    public boolean hasBalance(UUID playerUuid, String currencyId) {
+        return getBalance(playerUuid, currencyId) != null;
+    }
+
+    @Override
+    public double getCash(UUID playerUuid, String currencyId) {
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        return balance != null ? balance.getCash() : 0.0;
+    }
+
+    @Override
+    public double getBank(UUID playerUuid, String currencyId) {
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        return balance != null ? balance.getBank() : 0.0;
+    }
+
+    @Override
+    public double getTotalWealth(UUID playerUuid, String currencyId) {
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        return balance != null ? balance.getTotalWealth() : 0.0;
+    }
+
+    @Override
+    public boolean setCash(UUID playerUuid, double amount, String currencyId) {
+        if (amount < 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null) {
+            return false;
+        }
+        balance.setCash(amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean setBank(UUID playerUuid, double amount, String currencyId) {
+        if (amount < 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null) {
+            return false;
+        }
+        balance.setBank(amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean addCash(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null) {
+            return false;
+        }
+        balance.setCash(balance.getCash() + amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean addBank(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null) {
+            return false;
+        }
+        balance.setBank(balance.getBank() + amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean takeCash(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null || balance.getCash() < amount) {
+            return false;
+        }
+        balance.setCash(balance.getCash() - amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean takeBank(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null || balance.getBank() < amount) {
+            return false;
+        }
+        balance.setBank(balance.getBank() - amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean transfer(UUID from, UUID to, double amount, String currencyId) {
+        if (amount <= 0 || from.equals(to)) {
+            return false;
+        }
+        CurrencyBalanceEntity sender = getBalance(from, currencyId);
+        if (sender == null || sender.getCash() < amount) {
+            return false;
+        }
+        CurrencyBalanceEntity receiver = getBalance(to, currencyId);
+        if (receiver == null) {
+            return false;
+        }
+        sender.setCash(sender.getCash() - amount);
+        receiver.setCash(receiver.getCash() + amount);
+        if (!updateBalance(sender)) {
+            sender.setCash(sender.getCash() + amount);
+            return false;
+        }
+        if (!updateBalance(receiver)) {
+            sender.setCash(sender.getCash() + amount);
+            updateBalance(sender);
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public boolean depositToBank(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyDefinition def = currencyManager != null ? currencyManager.getCurrency(currencyId) : null;
+        if (def != null) {
+            if (!def.isBankEnabled()) {
+                return false;
+            }
+            if (amount < def.getMinDeposit()) {
+                return false;
+            }
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null || balance.getCash() < amount) {
+            return false;
+        }
+        if (def != null) {
+            double maxBalance = def.getMaxBankBalance();
+            if (maxBalance > 0 && balance.getBank() + amount > maxBalance) {
+                return false;
+            }
+        }
+        balance.setCash(balance.getCash() - amount);
+        balance.setBank(balance.getBank() + amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId) {
+        if (amount <= 0) {
+            return false;
+        }
+        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
+        if (balance == null || balance.getBank() < amount) {
+            return false;
+        }
+        balance.setBank(balance.getBank() - amount);
+        balance.setCash(balance.getCash() + amount);
+        return updateBalance(balance);
+    }
+
+    @Override
+    public String formatAmount(double amount, String currencyId) {
+        if (currencyManager != null) {
+            CurrencyDefinition def = currencyManager.getCurrency(currencyId);
+            if (def != null) {
+                return def.getSymbol() + decimalFormat.format(amount);
+            }
+        }
+        return decimalFormat.format(amount);
+    }
+
+    @Override
+    public String getPrimaryCurrencyId() {
+        return currencyManager != null ? currencyManager.getPrimaryCurrencyId() : "coins";
+    }
+
+    public CurrencyManager getCurrencyManager() {
+        return currencyManager;
+    }
+
     private boolean updateAccount(PlayerAccountEntity account) {
         try {
             dataOperator.update(account);
             return true;
         } catch (IllegalAccessException e) {
             plugin.getLogger().error("Failed to update account: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean updateBalance(CurrencyBalanceEntity balance) {
+        try {
+            currencyDataOperator.update(balance);
+            return true;
+        } catch (IllegalAccessException e) {
+            plugin.getLogger().error("Failed to update balance: " + e.getMessage());
             return false;
         }
     }
