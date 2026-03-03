@@ -67,9 +67,54 @@ public class PayCommand extends AbstractCommandExecutor {
         }
     }
 
+    @CmdMapping(format = "<player> <amount> <currency>")
+    @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
+    public void onPayWithCurrency(
+            @CmdSender Player sender,
+            @CmdParam("player") String targetName,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+
+        double amount;
+        try {
+            amount = Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            return;
+        }
+
+        if (amount <= 0) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("金额必须大于零"));
+            return;
+        }
+
+        Player target = Bukkit.getPlayer(targetName);
+        if (target == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("玩家不存在"));
+            return;
+        }
+
+        if (target.getUniqueId().equals(sender.getUniqueId())) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            return;
+        }
+
+        boolean success = economyService.transfer(sender.getUniqueId(), target.getUniqueId(), amount, currencyId);
+        if (success) {
+            String formatted = economyService.formatAmount(amount, currencyId);
+            sender.sendMessage(ChatColor.GREEN + String.format(
+                    plugin.i18n("成功转账 %s 给 %s"), formatted, target.getName()));
+            target.sendMessage(ChatColor.GREEN + String.format(
+                    plugin.i18n("%s 向你转账了 %s"), sender.getName(), formatted));
+        } else {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+        }
+    }
+
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Pay ===");
         sender.sendMessage(ChatColor.YELLOW + "/pay <player> <amount>" + ChatColor.GRAY + " - " + plugin.i18n("转账"));
+        sender.sendMessage(ChatColor.YELLOW + "/pay <player> <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("指定货币转账"));
     }
 }

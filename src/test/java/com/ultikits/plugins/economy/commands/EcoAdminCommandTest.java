@@ -258,4 +258,78 @@ class EcoAdminCommandTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Currency-aware operations")
+    class CurrencyOps {
+
+        @Test
+        @DisplayName("give with currency adds to specific currency")
+        void giveCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.addCash(TARGET_UUID, 500.0, "gems")).thenReturn(true);
+                when(economyService.formatAmount(500.0, "gems")).thenReturn("G500.00");
+
+                command.onGiveCurrency(sender, "Steve", "500", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("已给予").contains("G500.00");
+            }
+        }
+
+        @Test
+        @DisplayName("take with currency removes from specific currency")
+        void takeCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.takeCash(TARGET_UUID, 200.0, "gems")).thenReturn(true);
+                when(economyService.formatAmount(200.0, "gems")).thenReturn("G200.00");
+
+                command.onTakeCurrency(sender, "Steve", "200", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("已扣除").contains("G200.00");
+            }
+        }
+
+        @Test
+        @DisplayName("set with currency sets specific currency")
+        void setCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.setCash(TARGET_UUID, 1000.0, "gems")).thenReturn(true);
+                when(economyService.formatAmount(1000.0, "gems")).thenReturn("G1,000.00");
+
+                command.onSetCurrency(sender, "Steve", "1000", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("已设置").contains("G1,000.00");
+            }
+        }
+
+        @Test
+        @DisplayName("check with currency shows specific currency info")
+        void checkCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                when(economyService.getCash(TARGET_UUID, "gems")).thenReturn(250.0);
+                when(economyService.getBank(TARGET_UUID, "gems")).thenReturn(0.0);
+                when(economyService.getTotalWealth(TARGET_UUID, "gems")).thenReturn(250.0);
+                when(economyService.formatAmount(250.0, "gems")).thenReturn("G250.00");
+                when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+                command.onCheckCurrency(sender, "Steve", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender, times(4)).sendMessage(captor.capture());
+                List<String> messages = captor.getAllValues();
+                assertThat(messages.get(0)).contains("gems");
+                assertThat(messages.get(1)).contains("G250.00");
+            }
+        }
+    }
 }

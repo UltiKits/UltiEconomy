@@ -120,4 +120,17 @@ class DepositCommandTest {
         verify(player).sendMessage(captor.capture());
         assertThat(captor.getValue()).contains("银行余额已达上限");
     }
+
+    @Test
+    @DisplayName("successful deposit with specific currency")
+    void depositWithCurrency() {
+        when(economyService.depositToBank(PLAYER_UUID, 500.0, "gems")).thenReturn(true);
+        when(economyService.formatAmount(500.0, "gems")).thenReturn("G500.00");
+
+        command.onDepositCurrency(player, "500", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("成功存入").contains("G500.00");
+    }
 }

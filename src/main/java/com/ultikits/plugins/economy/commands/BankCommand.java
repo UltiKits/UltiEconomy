@@ -39,9 +39,18 @@ public class BankCommand extends AbstractCommandExecutor {
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formatted));
     }
 
+    @CmdMapping(format = "<currency>")
+    @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
+    public void onBankCurrency(@CmdSender Player player, @CmdParam("currency") String currencyId) {
+        double bank = economyService.getBank(player.getUniqueId(), currencyId);
+        String formatted = economyService.formatAmount(bank, currencyId);
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formatted));
+    }
+
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Bank ===");
         sender.sendMessage(ChatColor.YELLOW + "/bank" + ChatColor.GRAY + " - " + plugin.i18n("查看银行存款"));
+        sender.sendMessage(ChatColor.YELLOW + "/bank <currency>" + ChatColor.GRAY + " - " + plugin.i18n("查看指定货币银行存款"));
     }
 }

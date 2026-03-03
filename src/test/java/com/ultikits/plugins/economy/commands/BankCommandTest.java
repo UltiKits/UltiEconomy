@@ -61,4 +61,17 @@ class BankCommandTest {
         assertThat(captor.getValue()).contains("银行功能未启用");
         verify(economyService, never()).getBank(any());
     }
+
+    @Test
+    @DisplayName("shows bank balance for specific currency")
+    void showsCurrencyBankBalance() {
+        when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(300.0);
+        when(economyService.formatAmount(300.0, "gems")).thenReturn("G300.00");
+
+        command.onBankCurrency(player, "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("G300.00");
+    }
 }

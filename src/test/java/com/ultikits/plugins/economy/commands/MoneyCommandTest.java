@@ -71,4 +71,22 @@ class MoneyCommandTest {
         List<String> messages = captor.getAllValues();
         assertThat(messages.get(1)).contains("$0.00");
     }
+
+    @Test
+    @DisplayName("shows balance for specific currency")
+    void showsCurrencyBalance() {
+        when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
+        when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
+        when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(250.0);
+        when(economyService.formatAmount(250.0, "gems")).thenReturn("G250.00");
+        when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+        command.onCurrencyBalance(player, "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player, times(4)).sendMessage(captor.capture());
+        List<String> messages = captor.getAllValues();
+        assertThat(messages.get(0)).contains("gems");
+        assertThat(messages.get(1)).contains("G250.00");
+    }
 }

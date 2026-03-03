@@ -111,13 +111,106 @@ public class EcoAdminCommand extends AbstractCommandExecutor {
                 plugin.i18n("总资产: %s"), economyService.formatAmount(total)));
     }
 
+    // --- Currency-aware overloads ---
+
+    @CmdMapping(format = "give <player> <amount> <currency>")
+    public void onGiveCurrency(
+            @CmdSender CommandSender sender,
+            @CmdParam("player") String playerName,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+
+        double amount = parseAmount(sender, amountStr);
+        if (amount <= 0) return;
+
+        OfflinePlayer target = resolvePlayer(sender, playerName);
+        if (target == null) return;
+
+        boolean success = economyService.addCash(target.getUniqueId(), amount, currencyId);
+        if (success) {
+            String formatted = economyService.formatAmount(amount, currencyId);
+            sender.sendMessage(ChatColor.GREEN + String.format(
+                    plugin.i18n("已给予 %s %s"), target.getName(), formatted));
+        } else {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+        }
+    }
+
+    @CmdMapping(format = "take <player> <amount> <currency>")
+    public void onTakeCurrency(
+            @CmdSender CommandSender sender,
+            @CmdParam("player") String playerName,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+
+        double amount = parseAmount(sender, amountStr);
+        if (amount <= 0) return;
+
+        OfflinePlayer target = resolvePlayer(sender, playerName);
+        if (target == null) return;
+
+        boolean success = economyService.takeCash(target.getUniqueId(), amount, currencyId);
+        if (success) {
+            String formatted = economyService.formatAmount(amount, currencyId);
+            sender.sendMessage(ChatColor.GREEN + String.format(
+                    plugin.i18n("已扣除 %s %s"), target.getName(), formatted));
+        } else {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+        }
+    }
+
+    @CmdMapping(format = "set <player> <amount> <currency>")
+    public void onSetCurrency(
+            @CmdSender CommandSender sender,
+            @CmdParam("player") String playerName,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+
+        double amount = parseAmount(sender, amountStr);
+        if (amount < 0) return;
+
+        OfflinePlayer target = resolvePlayer(sender, playerName);
+        if (target == null) return;
+
+        boolean success = economyService.setCash(target.getUniqueId(), amount, currencyId);
+        if (success) {
+            String formatted = economyService.formatAmount(amount, currencyId);
+            sender.sendMessage(ChatColor.GREEN + String.format(
+                    plugin.i18n("已设置 %s 的余额为 %s"), target.getName(), formatted));
+        } else {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+        }
+    }
+
+    @CmdMapping(format = "check <player> <currency>")
+    public void onCheckCurrency(
+            @CmdSender CommandSender sender,
+            @CmdParam("player") String playerName,
+            @CmdParam("currency") String currencyId) {
+
+        OfflinePlayer target = resolvePlayer(sender, playerName);
+        if (target == null) return;
+
+        double cash = economyService.getCash(target.getUniqueId(), currencyId);
+        double bank = economyService.getBank(target.getUniqueId(), currencyId);
+        double total = economyService.getTotalWealth(target.getUniqueId(), currencyId);
+
+        sender.sendMessage(ChatColor.GOLD + "=== " + target.getName() + " (" + currencyId + ") ===");
+        sender.sendMessage(ChatColor.YELLOW + String.format(
+                plugin.i18n("%s 的余额: %s"), target.getName(), economyService.formatAmount(cash, currencyId)));
+        sender.sendMessage(ChatColor.YELLOW + String.format(
+                plugin.i18n("%s 的银行存款: %s"), target.getName(), economyService.formatAmount(bank, currencyId)));
+        sender.sendMessage(ChatColor.GREEN + String.format(
+                plugin.i18n("总资产: %s"), economyService.formatAmount(total, currencyId)));
+    }
+
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Admin ===");
-        sender.sendMessage(ChatColor.YELLOW + "/eco give <player> <amount>");
-        sender.sendMessage(ChatColor.YELLOW + "/eco take <player> <amount>");
-        sender.sendMessage(ChatColor.YELLOW + "/eco set <player> <amount>");
-        sender.sendMessage(ChatColor.YELLOW + "/eco check <player>");
+        sender.sendMessage(ChatColor.YELLOW + "/eco give <player> <amount> [currency]");
+        sender.sendMessage(ChatColor.YELLOW + "/eco take <player> <amount> [currency]");
+        sender.sendMessage(ChatColor.YELLOW + "/eco set <player> <amount> [currency]");
+        sender.sendMessage(ChatColor.YELLOW + "/eco check <player> [currency]");
     }
 
     @SuppressWarnings("deprecation")

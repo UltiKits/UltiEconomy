@@ -148,4 +148,21 @@ class PayCommandTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("successful transfer with specific currency")
+    void successfulTransferWithCurrency() {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
+
+            when(economyService.transfer(SENDER_UUID, TARGET_UUID, 500.0, "gems")).thenReturn(true);
+            when(economyService.formatAmount(500.0, "gems")).thenReturn("G500.00");
+
+            command.onPayWithCurrency(sender, "Bob", "500", "gems");
+
+            ArgumentCaptor<String> senderCaptor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(senderCaptor.capture());
+            assertThat(senderCaptor.getValue()).contains("成功转账").contains("G500.00").contains("Bob");
+        }
+    }
 }

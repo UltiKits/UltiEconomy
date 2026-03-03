@@ -92,4 +92,17 @@ class WithdrawCommandTest {
         verify(player).sendMessage(captor.capture());
         assertThat(captor.getValue()).contains("银行存款不足");
     }
+
+    @Test
+    @DisplayName("successful withdrawal with specific currency")
+    void withdrawWithCurrency() {
+        when(economyService.withdrawFromBank(PLAYER_UUID, 300.0, "gems")).thenReturn(true);
+        when(economyService.formatAmount(300.0, "gems")).thenReturn("G300.00");
+
+        command.onWithdrawCurrency(player, "300", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("成功从银行取出").contains("G300.00");
+    }
 }

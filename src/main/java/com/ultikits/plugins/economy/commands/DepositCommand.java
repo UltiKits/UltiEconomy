@@ -69,9 +69,39 @@ public class DepositCommand extends AbstractCommandExecutor {
         }
     }
 
+    @CmdMapping(format = "<amount> <currency>")
+    @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
+    public void onDepositCurrency(
+            @CmdSender Player player,
+            @CmdParam("amount") String amountStr,
+            @CmdParam("currency") String currencyId) {
+
+        double amount;
+        try {
+            amount = Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            return;
+        }
+
+        if (amount <= 0) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("金额必须大于零"));
+            return;
+        }
+
+        boolean success = economyService.depositToBank(player.getUniqueId(), amount, currencyId);
+        if (success) {
+            String formatted = economyService.formatAmount(amount, currencyId);
+            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("成功存入 %s 到银行"), formatted));
+        } else {
+            player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+        }
+    }
+
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Deposit ===");
         sender.sendMessage(ChatColor.YELLOW + "/deposit <amount>" + ChatColor.GRAY + " - " + plugin.i18n("存款到银行"));
+        sender.sendMessage(ChatColor.YELLOW + "/deposit <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("指定货币存款"));
     }
 }
