@@ -1,10 +1,13 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 
 import java.util.UUID;
 
 public interface EconomyService {
+
+    // --- Legacy single-currency methods (delegate to primary currency) ---
 
     PlayerAccountEntity getAccount(UUID playerUuid);
 
@@ -37,4 +40,40 @@ public interface EconomyService {
     boolean withdrawFromBank(UUID playerUuid, double amount);
 
     String formatAmount(double amount);
+
+    // --- Currency-aware methods ---
+
+    CurrencyBalanceEntity getBalance(UUID playerUuid, String currencyId);
+
+    CurrencyBalanceEntity getOrCreateBalance(UUID playerUuid, String playerName, String currencyId);
+
+    boolean hasBalance(UUID playerUuid, String currencyId);
+
+    double getCash(UUID playerUuid, String currencyId);
+
+    double getBank(UUID playerUuid, String currencyId);
+
+    double getTotalWealth(UUID playerUuid, String currencyId);
+
+    boolean setCash(UUID playerUuid, double amount, String currencyId);
+
+    boolean setBank(UUID playerUuid, double amount, String currencyId);
+
+    boolean addCash(UUID playerUuid, double amount, String currencyId);
+
+    boolean addBank(UUID playerUuid, double amount, String currencyId);
+
+    boolean takeCash(UUID playerUuid, double amount, String currencyId);
+
+    boolean takeBank(UUID playerUuid, double amount, String currencyId);
+
+    boolean transfer(UUID from, UUID to, double amount, String currencyId);
+
+    boolean depositToBank(UUID playerUuid, double amount, String currencyId);
+
+    boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId);
+
+    String formatAmount(double amount, String currencyId);
+
+    String getPrimaryCurrencyId();
 }
