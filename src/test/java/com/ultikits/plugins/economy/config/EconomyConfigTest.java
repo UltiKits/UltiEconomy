@@ -24,6 +24,13 @@ class EconomyConfigTest {
         assertThat(config.getMaxInterest()).isEqualTo(10000.0);
         assertThat(config.getLeaderboardUpdateInterval()).isEqualTo(60);
         assertThat(config.getLeaderboardDisplayCount()).isEqualTo(10);
+        assertThat(config.isTaxEnabled()).isFalse();
+        assertThat(config.isTransactionTaxEnabled()).isTrue();
+        assertThat(config.getTransactionTaxRate()).isEqualTo(0.05);
+        assertThat(config.getTransactionTaxExemptPermission()).isEqualTo("ultieconomy.tax.exempt");
+        assertThat(config.isWealthTaxEnabled()).isFalse();
+        assertThat(config.getWealthTaxInterval()).isEqualTo(3600);
+        assertThat(config.getWealthTaxExemptPermission()).isEqualTo("ultieconomy.wealthtax.exempt");
     }
 
     @Test

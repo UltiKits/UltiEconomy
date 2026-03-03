@@ -50,4 +50,25 @@ public class EconomyConfig extends AbstractConfigEntity {
 
     @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
     private int leaderboardDisplayCount = 10;
+
+    @ConfigEntry(path = "tax.enabled", comment = "Enable tax system")
+    private boolean taxEnabled = false;
+
+    @ConfigEntry(path = "tax.transaction-tax.enabled", comment = "Enable transaction tax on transfers")
+    private boolean transactionTaxEnabled = true;
+
+    @ConfigEntry(path = "tax.transaction-tax.rate", comment = "Transaction tax rate (0.05 = 5%)")
+    private double transactionTaxRate = 0.05;
+
+    @ConfigEntry(path = "tax.transaction-tax.exempt-permission", comment = "Permission to exempt from transaction tax")
+    private String transactionTaxExemptPermission = "ultieconomy.tax.exempt";
+
+    @ConfigEntry(path = "tax.wealth-tax.enabled", comment = "Enable periodic wealth tax")
+    private boolean wealthTaxEnabled = false;
+
+    @ConfigEntry(path = "tax.wealth-tax.interval", comment = "Wealth tax interval in seconds")
+    private int wealthTaxInterval = 3600;
+
+    @ConfigEntry(path = "tax.wealth-tax.exempt-permission", comment = "Permission to exempt from wealth tax")
+    private String wealthTaxExemptPermission = "ultieconomy.wealthtax.exempt";
 }
