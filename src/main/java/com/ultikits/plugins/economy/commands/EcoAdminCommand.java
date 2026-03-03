@@ -1,10 +1,14 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
+import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.TaxService;
 import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -34,6 +38,16 @@ public class EcoAdminCommand extends AbstractCommandExecutor {
         this.economyService = economyService;
         this.taxService = taxService;
         this.currencyManager = currencyManager;
+    }
+
+    @Autowired
+    public EcoAdminCommand(UltiToolsPlugin plugin) {
+        this(plugin,
+             plugin.getContext().getBean(EconomyService.class),
+             new TaxService(
+                     plugin.getConfig(EconomyConfig.class),
+                     plugin.getDataOperator(TreasuryEntity.class)),
+             ((UltiEconomy) plugin).getCurrencyManager());
     }
 
     @CmdMapping(format = "give <player> <amount>")

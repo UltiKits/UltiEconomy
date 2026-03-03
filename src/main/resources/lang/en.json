@@ -34,5 +34,12 @@
   "手中没有纸币": "You are not holding a money note",
   "创建纸币": "Create money note",
   "创建指定货币纸币": "Create money note (specific currency)",
-  "兑换手中纸币": "Redeem held money note"
+  "兑换手中纸币": "Redeem held money note",
+  "交易税: %s": "Transaction tax: %s",
+  "财富税已收取: %s": "Wealth tax collected: %s",
+  "财富税豁免": "You are exempt from wealth tax",
+  "税收系统未启用": "Tax system is not enabled",
+  "已从国库提取 %s": "Withdrew %s from treasury",
+  "国库余额不足": "Insufficient treasury balance",
+  "操作失败": "Operation failed"
 }
