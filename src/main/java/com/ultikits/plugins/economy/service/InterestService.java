@@ -1,10 +1,12 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
@@ -46,6 +48,16 @@ public class InterestService {
                            EconomyConfig config,
                            DataOperator<PlayerAccountEntity> dataOperator) {
         this(plugin, economyService, config, dataOperator, null, null);
+    }
+
+    @Autowired
+    public InterestService(UltiToolsPlugin plugin) {
+        this(plugin,
+             plugin.getContext().getBean(EconomyService.class),
+             plugin.getConfig(EconomyConfig.class),
+             plugin.getDataOperator(PlayerAccountEntity.class),
+             plugin.getDataOperator(CurrencyBalanceEntity.class),
+             ((UltiEconomy) plugin).getCurrencyManager());
     }
 
     /**

@@ -1,8 +1,11 @@
 package com.ultikits.plugins.economy.listener;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.EventListener;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -23,6 +26,12 @@ public class PlayerJoinListener implements Listener {
     // Backward-compatible constructor
     public PlayerJoinListener(EconomyService economyService) {
         this(economyService, null);
+    }
+
+    @Autowired
+    public PlayerJoinListener(UltiToolsPlugin plugin) {
+        this(plugin.getContext().getBean(EconomyService.class),
+             ((UltiEconomy) plugin).getCurrencyManager());
     }
 
     @EventHandler

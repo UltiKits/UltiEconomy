@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.placeholder.EconomyPlaceholderExpansion;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.LeaderboardService;
 import com.ultikits.plugins.economy.vault.VaultEconomyProvider;
@@ -9,9 +10,11 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.UltiToolsModule;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
@@ -19,6 +22,20 @@ import java.util.List;
 public class UltiEconomy extends UltiToolsPlugin {
 
     private VaultEconomyProvider vaultProvider;
+    private volatile CurrencyManager currencyManager;
+
+    public CurrencyManager getCurrencyManager() {
+        if (currencyManager == null) {
+            synchronized (this) {
+                if (currencyManager == null) {
+                    File currenciesFile = getConfigFile("config/currencies.yml");
+                    YamlConfiguration yaml = YamlConfiguration.loadConfiguration(currenciesFile);
+                    currencyManager = new CurrencyManager(yaml);
+                }
+            }
+        }
+        return currencyManager;
+    }
 
     @Override
     public boolean registerSelf() {
@@ -34,7 +51,8 @@ public class UltiEconomy extends UltiToolsPlugin {
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             LeaderboardService leaderboardService = getContext().getBean(LeaderboardService.class);
-            new EconomyPlaceholderExpansion(economyService, leaderboardService).register();
+            new EconomyPlaceholderExpansion(economyService, leaderboardService,
+                    getCurrencyManager()).register();
         }
 
         return true;

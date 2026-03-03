@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -42,7 +43,7 @@ public class EconomyServiceImpl implements EconomyService {
              plugin.getDataOperator(PlayerAccountEntity.class),
              plugin.getConfig(EconomyConfig.class),
              plugin.getDataOperator(CurrencyBalanceEntity.class),
-             null);
+             ((UltiEconomy) plugin).getCurrencyManager());
     }
 
     // --- Legacy single-currency methods (delegate to primary) ---

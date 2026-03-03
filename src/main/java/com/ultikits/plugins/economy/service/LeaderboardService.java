@@ -1,8 +1,11 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import lombok.Getter;
@@ -34,6 +37,14 @@ public class LeaderboardService {
     public LeaderboardService(EconomyConfig config,
                               DataOperator<PlayerAccountEntity> dataOperator) {
         this(config, dataOperator, null, null);
+    }
+
+    @Autowired
+    public LeaderboardService(UltiToolsPlugin plugin) {
+        this(plugin.getConfig(EconomyConfig.class),
+             plugin.getDataOperator(PlayerAccountEntity.class),
+             plugin.getDataOperator(CurrencyBalanceEntity.class),
+             ((UltiEconomy) plugin).getCurrencyManager());
     }
 
     /**
