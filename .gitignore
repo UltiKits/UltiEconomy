@@ -30,3 +30,6 @@ target/
 .DS_Store
 Thumbs.db
 CLAUDE.md
+
+# Worktrees
+.worktrees/
