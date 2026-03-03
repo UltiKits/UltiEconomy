@@ -1,6 +1,7 @@
 package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
@@ -14,13 +15,25 @@ public class LeaderboardService {
 
     private final EconomyConfig config;
     private final DataOperator<PlayerAccountEntity> dataOperator;
+    private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
+    private final CurrencyManager currencyManager;
     private volatile List<LeaderboardEntry> cachedLeaderboard = Collections.emptyList();
     private volatile Map<String, List<LeaderboardEntry>> currencyLeaderboards = Collections.emptyMap();
 
     public LeaderboardService(EconomyConfig config,
-                              DataOperator<PlayerAccountEntity> dataOperator) {
+                              DataOperator<PlayerAccountEntity> dataOperator,
+                              DataOperator<CurrencyBalanceEntity> currencyDataOperator,
+                              CurrencyManager currencyManager) {
         this.config = config;
         this.dataOperator = dataOperator;
+        this.currencyDataOperator = currencyDataOperator;
+        this.currencyManager = currencyManager;
+    }
+
+    // Backward-compatible constructor
+    public LeaderboardService(EconomyConfig config,
+                              DataOperator<PlayerAccountEntity> dataOperator) {
+        this(config, dataOperator, null, null);
     }
 
     /**
@@ -33,6 +46,37 @@ public class LeaderboardService {
                 .map(a -> new LeaderboardEntry(a.getUuid(), a.getPlayerName(), a.getTotalWealth()))
                 .sorted(Comparator.comparingDouble(LeaderboardEntry::getTotalWealth).reversed())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Refreshes the leaderboard cache for a specific currency.
+     * Builds a UUID→playerName map from primary accounts, then filters
+     * currency balances by currencyId and sorts by total wealth.
+     */
+    public void refreshCurrencyLeaderboard(String currencyId) {
+        if (currencyDataOperator == null) {
+            return;
+        }
+
+        // Build UUID → playerName map from primary accounts
+        Map<String, String> nameMap = new HashMap<>();
+        for (PlayerAccountEntity account : dataOperator.getAll()) {
+            nameMap.put(account.getUuid(), account.getPlayerName());
+        }
+
+        List<CurrencyBalanceEntity> balances = currencyDataOperator.getAll();
+        List<LeaderboardEntry> entries = balances.stream()
+                .filter(b -> currencyId.equals(b.getCurrencyId()))
+                .map(b -> new LeaderboardEntry(
+                        b.getUuid(),
+                        nameMap.getOrDefault(b.getUuid(), b.getUuid()),
+                        b.getTotalWealth()))
+                .sorted(Comparator.comparingDouble(LeaderboardEntry::getTotalWealth).reversed())
+                .collect(Collectors.toList());
+
+        Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
+        updated.put(currencyId, entries);
+        currencyLeaderboards = Collections.unmodifiableMap(updated);
     }
 
     /**

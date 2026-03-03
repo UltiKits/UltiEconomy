@@ -1,11 +1,13 @@
 package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.StringReader;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,18 +34,36 @@ class InterestServiceTest {
     @Mock private UltiToolsPlugin plugin;
     @Mock private EconomyService economyService;
     @Mock private DataOperator<PlayerAccountEntity> dataOperator;
+    @Mock private DataOperator<CurrencyBalanceEntity> currencyDataOperator;
 
     private EconomyConfig config;
+    private CurrencyManager currencyManager;
     private InterestService service;
 
     private static final UUID PLAYER1_UUID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     private static final UUID PLAYER2_UUID = UUID.fromString("660e8400-e29b-41d4-a716-446655440000");
 
+    private static final String CURRENCIES_YAML =
+            "currencies:\n" +
+            "  coins:\n" +
+            "    display-name: 'Coins'\n" +
+            "    symbol: '$'\n" +
+            "    primary: true\n" +
+            "    bank-enabled: true\n" +
+            "  gems:\n" +
+            "    display-name: 'Gems'\n" +
+            "    symbol: 'G'\n" +
+            "    primary: false\n" +
+            "    bank-enabled: false\n";
+
     @BeforeEach
     void setUp() {
         config = new EconomyConfig();
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
+        currencyManager = new CurrencyManager(yaml);
         lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-        service = new InterestService(plugin, economyService, config, dataOperator);
+        lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.emptyList());
+        service = new InterestService(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
     }
 
     @Nested
@@ -237,6 +258,126 @@ class InterestServiceTest {
                 service.distributeInterest();
 
                 verify(economyService, never()).addBank(any(), anyDouble());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Currency interest distribution")
+    class CurrencyInterestTests {
+
+        @Test
+        @DisplayName("distributes interest for bank-enabled currency balances")
+        void distributesToBankEnabledCurrencies() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+
+                CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .currencyId("coins")
+                        .cash(100.0)
+                        .bank(5000.0)
+                        .build();
+                when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(balance));
+
+                service.distributeInterest();
+
+                // 5000 * 0.03 = 150
+                verify(economyService).addBank(PLAYER1_UUID, 150.0, "coins");
+            }
+        }
+
+        @Test
+        @DisplayName("skips currencies where bank is not enabled")
+        void skipsBankDisabledCurrencies() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+
+                CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .currencyId("gems")
+                        .cash(100.0)
+                        .bank(5000.0)
+                        .build();
+                when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(balance));
+
+                service.distributeInterest();
+
+                verify(economyService, never()).addBank(any(), anyDouble(), eq("gems"));
+            }
+        }
+
+        @Test
+        @DisplayName("caps currency interest at maxInterest")
+        void capsCurrencyInterest() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+
+                config.setMaxInterest(200.0);
+                config.setInterestRate(0.1);
+
+                CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .currencyId("coins")
+                        .cash(0.0)
+                        .bank(50000.0)
+                        .build();
+                when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(balance));
+
+                service.distributeInterest();
+
+                // 50000 * 0.1 = 5000, capped at 200
+                verify(economyService).addBank(PLAYER1_UUID, 200.0, "coins");
+            }
+        }
+
+        @Test
+        @DisplayName("notifies online player about currency interest")
+        void notifiesCurrencyInterest() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                Player onlinePlayer = mock(Player.class);
+                when(onlinePlayer.isOnline()).thenReturn(true);
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(onlinePlayer);
+                when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+                when(economyService.formatAmount(150.0, "coins")).thenReturn("$150.00");
+
+                CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .currencyId("coins")
+                        .cash(0.0)
+                        .bank(5000.0)
+                        .build();
+                when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(balance));
+
+                service.distributeInterest();
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(onlinePlayer).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("Coins").contains("$150.00");
+            }
+        }
+
+        @Test
+        @DisplayName("skips currency balances with zero bank")
+        void skipsZeroBankCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+
+                CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .currencyId("coins")
+                        .cash(500.0)
+                        .bank(0.0)
+                        .build();
+                when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(balance));
+
+                service.distributeInterest();
+
+                verify(economyService, never()).addBank(any(), anyDouble(), anyString());
             }
         }
     }
