@@ -2,14 +2,12 @@ package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
-import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.util.List;
 
-@Service
 public class TaxService {
 
     private final EconomyConfig config;

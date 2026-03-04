@@ -8,7 +8,6 @@ import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.TaxService;
 import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -22,32 +21,47 @@ import org.bukkit.command.CommandSender;
 )
 public class EcoAdminCommand extends AbstractCommandExecutor {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
     private TaxService taxService;
     private CurrencyManager currencyManager;
 
     public EcoAdminCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
+        this.taxService = new TaxService(
+                plugin.getConfig(EconomyConfig.class),
+                plugin.getDataOperator(TreasuryEntity.class));
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
     }
 
-    public EcoAdminCommand(UltiToolsPlugin plugin, EconomyService economyService,
-                           TaxService taxService, CurrencyManager currencyManager) {
-        this.plugin = plugin;
-        this.economyService = economyService;
-        this.taxService = taxService;
-        this.currencyManager = currencyManager;
+    @SuppressWarnings("all")
+    private static EcoAdminCommand allocate() {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            return (EcoAdminCommand) unsafe.allocateInstance(EcoAdminCommand.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    @Autowired
-    public EcoAdminCommand(UltiToolsPlugin plugin) {
-        this(plugin,
-             plugin.getContext().getBean(EconomyService.class),
-             new TaxService(
-                     plugin.getConfig(EconomyConfig.class),
-                     plugin.getDataOperator(TreasuryEntity.class)),
-             ((UltiEconomy) plugin).getCurrencyManager());
+    static EcoAdminCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService) {
+        EcoAdminCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        return cmd;
+    }
+
+    static EcoAdminCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                         TaxService taxService, CurrencyManager currencyManager) {
+        EcoAdminCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.taxService = taxService;
+        cmd.currencyManager = currencyManager;
+        return cmd;
     }
 
     @CmdMapping(format = "give <player> <amount>")

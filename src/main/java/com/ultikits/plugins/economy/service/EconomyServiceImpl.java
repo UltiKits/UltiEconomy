@@ -7,7 +7,6 @@ import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
@@ -18,37 +17,49 @@ import java.util.UUID;
 @Service
 public class EconomyServiceImpl implements EconomyService {
 
-    private final UltiToolsPlugin plugin;
-    private final DataOperator<PlayerAccountEntity> dataOperator;
-    private final EconomyConfig config;
-    private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
-    private final CurrencyManager currencyManager;
+    private UltiToolsPlugin plugin;
+    private DataOperator<PlayerAccountEntity> dataOperator;
+    private EconomyConfig config;
+    private DataOperator<CurrencyBalanceEntity> currencyDataOperator;
+    private CurrencyManager currencyManager;
     private TaxService taxService;
     private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
 
-    // Full test-friendly constructor
-    public EconomyServiceImpl(UltiToolsPlugin plugin,
-                              DataOperator<PlayerAccountEntity> dataOperator,
-                              EconomyConfig config,
-                              DataOperator<CurrencyBalanceEntity> currencyDataOperator,
-                              CurrencyManager currencyManager) {
-        this.plugin = plugin;
-        this.dataOperator = dataOperator;
-        this.config = config;
-        this.currencyDataOperator = currencyDataOperator;
-        this.currencyManager = currencyManager;
-    }
-
-    @Autowired
     public EconomyServiceImpl(UltiToolsPlugin plugin) {
-        this(plugin,
-             plugin.getDataOperator(PlayerAccountEntity.class),
-             plugin.getConfig(EconomyConfig.class),
-             plugin.getDataOperator(CurrencyBalanceEntity.class),
-             ((UltiEconomy) plugin).getCurrencyManager());
+        this.plugin = plugin;
+        this.dataOperator = plugin.getDataOperator(PlayerAccountEntity.class);
+        this.config = plugin.getConfig(EconomyConfig.class);
+        this.currencyDataOperator = plugin.getDataOperator(CurrencyBalanceEntity.class);
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
         this.taxService = new TaxService(
                 plugin.getConfig(EconomyConfig.class),
                 plugin.getDataOperator(TreasuryEntity.class));
+    }
+
+    @SuppressWarnings("all")
+    static EconomyServiceImpl createForTest(UltiToolsPlugin plugin,
+                                            DataOperator<PlayerAccountEntity> dataOperator,
+                                            EconomyConfig config,
+                                            DataOperator<CurrencyBalanceEntity> currencyDataOperator,
+                                            CurrencyManager currencyManager) {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            EconomyServiceImpl instance = (EconomyServiceImpl) unsafe.allocateInstance(EconomyServiceImpl.class);
+            instance.plugin = plugin;
+            instance.dataOperator = dataOperator;
+            instance.config = config;
+            instance.currencyDataOperator = currencyDataOperator;
+            instance.currencyManager = currencyManager;
+            // Field initializers don't run with allocateInstance
+            java.lang.reflect.Field df = EconomyServiceImpl.class.getDeclaredField("decimalFormat");
+            df.setAccessible(true);
+            df.set(instance, new DecimalFormat("#,##0.00"));
+            return instance;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void setTaxService(TaxService taxService) {

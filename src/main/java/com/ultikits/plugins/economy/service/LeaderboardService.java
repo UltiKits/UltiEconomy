@@ -5,7 +5,6 @@ import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import lombok.Getter;
@@ -16,35 +15,45 @@ import java.util.stream.Collectors;
 @Service
 public class LeaderboardService {
 
-    private final EconomyConfig config;
-    private final DataOperator<PlayerAccountEntity> dataOperator;
-    private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
-    private final CurrencyManager currencyManager;
+    private EconomyConfig config;
+    private DataOperator<PlayerAccountEntity> dataOperator;
+    private DataOperator<CurrencyBalanceEntity> currencyDataOperator;
+    private CurrencyManager currencyManager;
     private volatile List<LeaderboardEntry> cachedLeaderboard = Collections.emptyList();
     private volatile Map<String, List<LeaderboardEntry>> currencyLeaderboards = Collections.emptyMap();
 
-    public LeaderboardService(EconomyConfig config,
-                              DataOperator<PlayerAccountEntity> dataOperator,
-                              DataOperator<CurrencyBalanceEntity> currencyDataOperator,
-                              CurrencyManager currencyManager) {
-        this.config = config;
-        this.dataOperator = dataOperator;
-        this.currencyDataOperator = currencyDataOperator;
-        this.currencyManager = currencyManager;
-    }
-
-    // Backward-compatible constructor
-    public LeaderboardService(EconomyConfig config,
-                              DataOperator<PlayerAccountEntity> dataOperator) {
-        this(config, dataOperator, null, null);
-    }
-
-    @Autowired
     public LeaderboardService(UltiToolsPlugin plugin) {
-        this(plugin.getConfig(EconomyConfig.class),
-             plugin.getDataOperator(PlayerAccountEntity.class),
-             plugin.getDataOperator(CurrencyBalanceEntity.class),
-             ((UltiEconomy) plugin).getCurrencyManager());
+        this.config = plugin.getConfig(EconomyConfig.class);
+        this.dataOperator = plugin.getDataOperator(PlayerAccountEntity.class);
+        this.currencyDataOperator = plugin.getDataOperator(CurrencyBalanceEntity.class);
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
+    }
+
+    @SuppressWarnings("all")
+    static LeaderboardService createForTest(EconomyConfig config,
+                                            DataOperator<PlayerAccountEntity> dataOperator,
+                                            DataOperator<CurrencyBalanceEntity> currencyDataOperator,
+                                            CurrencyManager currencyManager) {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            LeaderboardService svc = (LeaderboardService) unsafe.allocateInstance(LeaderboardService.class);
+            svc.config = config;
+            svc.dataOperator = dataOperator;
+            svc.currencyDataOperator = currencyDataOperator;
+            svc.currencyManager = currencyManager;
+            // Field initializers don't run with allocateInstance
+            java.lang.reflect.Field cl = LeaderboardService.class.getDeclaredField("cachedLeaderboard");
+            cl.setAccessible(true);
+            cl.set(svc, java.util.Collections.emptyList());
+            java.lang.reflect.Field clb = LeaderboardService.class.getDeclaredField("currencyLeaderboards");
+            clb.setAccessible(true);
+            clb.set(svc, java.util.Collections.emptyMap());
+            return svc;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

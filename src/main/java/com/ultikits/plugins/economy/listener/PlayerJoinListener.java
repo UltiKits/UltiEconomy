@@ -5,7 +5,6 @@ import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.EventListener;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,23 +14,27 @@ import org.bukkit.event.player.PlayerJoinEvent;
 @EventListener
 public class PlayerJoinListener implements Listener {
 
-    private final EconomyService economyService;
-    private final CurrencyManager currencyManager;
+    private EconomyService economyService;
+    private CurrencyManager currencyManager;
 
-    public PlayerJoinListener(EconomyService economyService, CurrencyManager currencyManager) {
+    public PlayerJoinListener(UltiToolsPlugin plugin, EconomyService economyService) {
         this.economyService = economyService;
-        this.currencyManager = currencyManager;
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
     }
 
-    // Backward-compatible constructor
-    public PlayerJoinListener(EconomyService economyService) {
-        this(economyService, null);
-    }
-
-    @Autowired
-    public PlayerJoinListener(UltiToolsPlugin plugin) {
-        this(plugin.getContext().getBean(EconomyService.class),
-             ((UltiEconomy) plugin).getCurrencyManager());
+    @SuppressWarnings("all")
+    static PlayerJoinListener createForTest(EconomyService economyService, CurrencyManager currencyManager) {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            PlayerJoinListener listener = (PlayerJoinListener) unsafe.allocateInstance(PlayerJoinListener.class);
+            listener.economyService = economyService;
+            listener.currencyManager = currencyManager;
+            return listener;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @EventHandler

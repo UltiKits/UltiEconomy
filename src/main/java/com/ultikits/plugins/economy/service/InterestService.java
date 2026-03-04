@@ -6,7 +6,6 @@ import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
@@ -21,43 +20,44 @@ import java.util.UUID;
 @ConditionalOnConfig(value = "config/config.yml", path = "interest.enabled")
 public class InterestService {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
-    private final EconomyConfig config;
-    private final DataOperator<PlayerAccountEntity> dataOperator;
-    private final DataOperator<CurrencyBalanceEntity> currencyDataOperator;
-    private final CurrencyManager currencyManager;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
+    private EconomyConfig config;
+    private DataOperator<PlayerAccountEntity> dataOperator;
+    private DataOperator<CurrencyBalanceEntity> currencyDataOperator;
+    private CurrencyManager currencyManager;
 
-    public InterestService(UltiToolsPlugin plugin,
-                           EconomyService economyService,
-                           EconomyConfig config,
-                           DataOperator<PlayerAccountEntity> dataOperator,
-                           DataOperator<CurrencyBalanceEntity> currencyDataOperator,
-                           CurrencyManager currencyManager) {
+    public InterestService(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
-        this.config = config;
-        this.dataOperator = dataOperator;
-        this.currencyDataOperator = currencyDataOperator;
-        this.currencyManager = currencyManager;
+        this.config = plugin.getConfig(EconomyConfig.class);
+        this.dataOperator = plugin.getDataOperator(PlayerAccountEntity.class);
+        this.currencyDataOperator = plugin.getDataOperator(CurrencyBalanceEntity.class);
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
     }
 
-    // Backward-compatible constructor
-    public InterestService(UltiToolsPlugin plugin,
-                           EconomyService economyService,
-                           EconomyConfig config,
-                           DataOperator<PlayerAccountEntity> dataOperator) {
-        this(plugin, economyService, config, dataOperator, null, null);
-    }
-
-    @Autowired
-    public InterestService(UltiToolsPlugin plugin) {
-        this(plugin,
-             plugin.getContext().getBean(EconomyService.class),
-             plugin.getConfig(EconomyConfig.class),
-             plugin.getDataOperator(PlayerAccountEntity.class),
-             plugin.getDataOperator(CurrencyBalanceEntity.class),
-             ((UltiEconomy) plugin).getCurrencyManager());
+    @SuppressWarnings("all")
+    static InterestService createForTest(UltiToolsPlugin plugin,
+                                         EconomyService economyService,
+                                         EconomyConfig config,
+                                         DataOperator<PlayerAccountEntity> dataOperator,
+                                         DataOperator<CurrencyBalanceEntity> currencyDataOperator,
+                                         CurrencyManager currencyManager) {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            InterestService svc = (InterestService) unsafe.allocateInstance(InterestService.class);
+            svc.plugin = plugin;
+            svc.economyService = economyService;
+            svc.config = config;
+            svc.dataOperator = dataOperator;
+            svc.currencyDataOperator = currencyDataOperator;
+            svc.currencyManager = currencyManager;
+            return svc;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

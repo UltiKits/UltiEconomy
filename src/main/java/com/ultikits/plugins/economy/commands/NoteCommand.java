@@ -5,7 +5,6 @@ import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
-import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -19,21 +18,30 @@ import org.bukkit.inventory.ItemStack;
 )
 public class NoteCommand extends AbstractCommandExecutor {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
-    private final MoneyNoteFactory noteFactory;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
+    private MoneyNoteFactory noteFactory;
 
-    public NoteCommand(UltiToolsPlugin plugin, EconomyService economyService, MoneyNoteFactory noteFactory) {
+    public NoteCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
-        this.noteFactory = noteFactory;
+        this.noteFactory = ((UltiEconomy) plugin).getMoneyNoteFactory();
     }
 
-    @Autowired
-    public NoteCommand(UltiToolsPlugin plugin) {
-        this(plugin,
-             plugin.getContext().getBean(EconomyService.class),
-             ((UltiEconomy) plugin).getMoneyNoteFactory());
+    @SuppressWarnings("all")
+    static NoteCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService, MoneyNoteFactory noteFactory) {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            NoteCommand cmd = (NoteCommand) unsafe.allocateInstance(NoteCommand.class);
+            cmd.plugin = plugin;
+            cmd.economyService = economyService;
+            cmd.noteFactory = noteFactory;
+            return cmd;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @CmdMapping(format = "<amount>")
