@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -104,5 +105,71 @@ class WithdrawCommandTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(player).sendMessage(captor.capture());
         assertThat(captor.getValue()).contains("成功从银行取出").contains("G300.00");
+    }
+
+    @Test
+    @DisplayName("negative amount shows error")
+    void negativeAmount() {
+        command.onWithdraw(player, "-10");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("金额必须大于零");
+    }
+
+    @Test
+    @DisplayName("currency withdrawal with invalid amount shows error")
+    void withdrawCurrencyInvalidAmount() {
+        command.onWithdrawCurrency(player, "abc", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("无效的金额");
+    }
+
+    @Test
+    @DisplayName("currency withdrawal with zero amount shows error")
+    void withdrawCurrencyZeroAmount() {
+        command.onWithdrawCurrency(player, "0", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("金额必须大于零");
+    }
+
+    @Test
+    @DisplayName("currency withdrawal with negative amount shows error")
+    void withdrawCurrencyNegativeAmount() {
+        command.onWithdrawCurrency(player, "-5", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("金额必须大于零");
+    }
+
+    @Test
+    @DisplayName("currency withdrawal with insufficient balance shows error")
+    void withdrawCurrencyInsufficientBalance() {
+        when(economyService.withdrawFromBank(PLAYER_UUID, 5000.0, "gems")).thenReturn(false);
+
+        command.onWithdrawCurrency(player, "5000", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("银行存款不足");
+    }
+
+    @Test
+    @DisplayName("handleHelp sends command usage messages")
+    void handleHelpShowsCommands() throws Exception {
+        @SuppressWarnings("unchecked")
+        CommandSender sender = mock(CommandSender.class);
+        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+        java.lang.reflect.Method helpMethod = WithdrawCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+        helpMethod.setAccessible(true);
+        helpMethod.invoke(command, sender);
+
+        verify(sender, atLeast(2)).sendMessage(anyString());
     }
 }

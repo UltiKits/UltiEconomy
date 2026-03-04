@@ -46,7 +46,7 @@ class PlayerJoinListenerTest {
     void setUp() {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
-        listener = new PlayerJoinListener(economyService, currencyManager);
+        listener = PlayerJoinListener.createForTest(economyService, currencyManager);
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(player.getName()).thenReturn("TestPlayer");
     }
@@ -86,7 +86,7 @@ class PlayerJoinListenerTest {
         @Test
         @DisplayName("without CurrencyManager only creates primary account")
         void withoutCurrencyManager() {
-            PlayerJoinListener legacyListener = new PlayerJoinListener(economyService);
+            PlayerJoinListener legacyListener = PlayerJoinListener.createForTest(economyService, null);
 
             PlayerJoinEvent event = new PlayerJoinEvent(player, "TestPlayer joined");
             legacyListener.onPlayerJoin(event);

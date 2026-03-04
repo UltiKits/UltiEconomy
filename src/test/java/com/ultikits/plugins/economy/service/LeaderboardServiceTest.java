@@ -47,7 +47,7 @@ class LeaderboardServiceTest {
         config = new EconomyConfig();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
-        service = new LeaderboardService(config, dataOperator, currencyDataOperator, currencyManager);
+        service = LeaderboardService.createForTest(config, dataOperator, currencyDataOperator, currencyManager);
     }
 
     @Nested

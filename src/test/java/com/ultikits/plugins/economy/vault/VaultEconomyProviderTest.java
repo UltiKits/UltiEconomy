@@ -121,6 +121,16 @@ class VaultEconomyProviderTest {
             assertThat(result).isFalse();
             verify(economyService, never()).getOrCreateAccount(any(), any());
         }
+
+        @Test
+        @DisplayName("createPlayerAccount with world delegates to non-world version")
+        void createPlayerAccountWithWorld() {
+            when(economyService.hasAccount(PLAYER_UUID)).thenReturn(false);
+
+            boolean result = provider.createPlayerAccount(offlinePlayer, "world");
+            assertThat(result).isTrue();
+            verify(economyService).getOrCreateAccount(PLAYER_UUID, "Steve");
+        }
     }
 
     @Nested
@@ -267,6 +277,70 @@ class VaultEconomyProviderTest {
         void hasByName() {
             assertThat(provider.has("Steve", 500.0)).isFalse();
         }
+
+        @Test
+        @DisplayName("hasAccount by name returns false (deprecated stub)")
+        void hasAccountByName() {
+            assertThat(provider.hasAccount("Steve")).isFalse();
+        }
+
+        @Test
+        @DisplayName("hasAccount by name with world returns false (deprecated stub)")
+        void hasAccountByNameWithWorld() {
+            assertThat(provider.hasAccount("Steve", "world")).isFalse();
+        }
+
+        @Test
+        @DisplayName("getBalance by name with world returns 0 (deprecated stub)")
+        void getBalanceByNameWithWorld() {
+            assertThat(provider.getBalance("Steve", "world")).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("has by name with world returns false (deprecated stub)")
+        void hasByNameWithWorld() {
+            assertThat(provider.has("Steve", "world", 500.0)).isFalse();
+        }
+
+        @Test
+        @DisplayName("createPlayerAccount by name returns false (deprecated stub)")
+        void createPlayerAccountByName() {
+            assertThat(provider.createPlayerAccount("Steve")).isFalse();
+        }
+
+        @Test
+        @DisplayName("createPlayerAccount by name with world returns false (deprecated stub)")
+        void createPlayerAccountByNameWithWorld() {
+            assertThat(provider.createPlayerAccount("Steve", "world")).isFalse();
+        }
+
+        @Test
+        @DisplayName("withdrawPlayer by name returns failure (deprecated stub)")
+        void withdrawPlayerByName() {
+            EconomyResponse response = provider.withdrawPlayer("Steve", 100.0);
+            assertThat(response.transactionSuccess()).isFalse();
+        }
+
+        @Test
+        @DisplayName("withdrawPlayer by name with world returns failure (deprecated stub)")
+        void withdrawPlayerByNameWithWorld() {
+            EconomyResponse response = provider.withdrawPlayer("Steve", "world", 100.0);
+            assertThat(response.transactionSuccess()).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositPlayer by name returns failure (deprecated stub)")
+        void depositPlayerByName() {
+            EconomyResponse response = provider.depositPlayer("Steve", 100.0);
+            assertThat(response.transactionSuccess()).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositPlayer by name with world returns failure (deprecated stub)")
+        void depositPlayerByNameWithWorld() {
+            EconomyResponse response = provider.depositPlayer("Steve", "world", 100.0);
+            assertThat(response.transactionSuccess()).isFalse();
+        }
     }
 
     @Nested
@@ -333,6 +407,38 @@ class VaultEconomyProviderTest {
         @DisplayName("getBanks returns empty list")
         void getBanks() {
             assertThat(provider.getBanks()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("bankHas returns not implemented")
+        void bankHas() {
+            EconomyResponse response = provider.bankHas("TestBank", 100.0);
+            assertThat(response.transactionSuccess()).isFalse();
+            assertThat(response.type).isEqualTo(EconomyResponse.ResponseType.NOT_IMPLEMENTED);
+        }
+
+        @Test
+        @DisplayName("createBank with string player returns not implemented")
+        void createBankString() {
+            EconomyResponse response = provider.createBank("TestBank", "Steve");
+            assertThat(response.transactionSuccess()).isFalse();
+            assertThat(response.type).isEqualTo(EconomyResponse.ResponseType.NOT_IMPLEMENTED);
+        }
+
+        @Test
+        @DisplayName("isBankOwner with string player returns not implemented")
+        void isBankOwnerString() {
+            EconomyResponse response = provider.isBankOwner("TestBank", "Steve");
+            assertThat(response.transactionSuccess()).isFalse();
+            assertThat(response.type).isEqualTo(EconomyResponse.ResponseType.NOT_IMPLEMENTED);
+        }
+
+        @Test
+        @DisplayName("isBankMember with string player returns not implemented")
+        void isBankMemberString() {
+            EconomyResponse response = provider.isBankMember("TestBank", "Steve");
+            assertThat(response.transactionSuccess()).isFalse();
+            assertThat(response.type).isEqualTo(EconomyResponse.ResponseType.NOT_IMPLEMENTED);
         }
     }
 }

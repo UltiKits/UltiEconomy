@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -40,7 +41,7 @@ class NoteCommandTest {
         lenient().when(player.getName()).thenReturn("TestPlayer");
         lenient().when(player.getInventory()).thenReturn(inventory);
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
-        command = new NoteCommand(plugin, economyService, noteFactory);
+        command = NoteCommand.createForTest(plugin, economyService, noteFactory);
     }
 
     @Nested
@@ -100,6 +101,34 @@ class NoteCommandTest {
 
             verify(inventory, never()).addItem(any(ItemStack.class));
             verify(player).sendMessage(contains("余额不足"));
+        }
+
+        @Test
+        @DisplayName("rejects currency note with invalid amount")
+        void rejectsCurrencyInvalidAmount() {
+            command.onCreateCurrencyNote(player, "abc", "gems");
+
+            verify(economyService, never()).takeCash(any(), anyDouble(), anyString());
+            verify(player).sendMessage(contains("无效的金额"));
+        }
+
+        @Test
+        @DisplayName("rejects currency note with zero amount")
+        void rejectsCurrencyZeroAmount() {
+            command.onCreateCurrencyNote(player, "0", "gems");
+
+            verify(player).sendMessage(contains("金额必须大于零"));
+        }
+
+        @Test
+        @DisplayName("rejects currency note with insufficient balance")
+        void rejectsCurrencyInsufficientBalance() {
+            when(economyService.takeCash(PLAYER_UUID, 500.0, "gems")).thenReturn(false);
+
+            command.onCreateCurrencyNote(player, "500", "gems");
+
+            verify(player).sendMessage(contains("余额不足"));
+            verify(inventory, never()).addItem(any(ItemStack.class));
         }
     }
 
@@ -165,5 +194,19 @@ class NoteCommandTest {
             verify(heldItem).setAmount(2);
             verify(inventory, never()).setItemInMainHand(null);
         }
+    }
+
+    @Test
+    @DisplayName("handleHelp sends command usage messages")
+    void handleHelpShowsCommands() throws Exception {
+        @SuppressWarnings("unchecked")
+        CommandSender sender = mock(CommandSender.class);
+        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+        java.lang.reflect.Method helpMethod = NoteCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+        helpMethod.setAccessible(true);
+        helpMethod.invoke(command, sender);
+
+        verify(sender, atLeast(2)).sendMessage(anyString());
     }
 }

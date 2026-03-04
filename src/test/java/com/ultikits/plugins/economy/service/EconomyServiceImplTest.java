@@ -60,7 +60,7 @@ class EconomyServiceImplTest {
         config = new EconomyConfig();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
-        service = new EconomyServiceImpl(plugin, dataOperator, config, currencyDataOperator, currencyManager);
+        service = EconomyServiceImpl.createForTest(plugin, dataOperator, config, currencyDataOperator, currencyManager);
     }
 
     private void mockQueryReturns(UUID uuid, PlayerAccountEntity account) {
@@ -378,6 +378,41 @@ class EconomyServiceImplTest {
         void withdrawInvalid() {
             assertThat(service.withdrawFromBank(PLAYER_UUID, 0)).isFalse();
             assertThat(service.withdrawFromBank(PLAYER_UUID, -10)).isFalse();
+        }
+
+        @Test
+        @DisplayName("setBank fails for non-existent account")
+        void setBankNonExistent() {
+            mockQueryReturns(PLAYER_UUID, null);
+            assertThat(service.setBank(PLAYER_UUID, 100)).isFalse();
+        }
+
+        @Test
+        @DisplayName("addBank rejects zero or negative")
+        void addBankInvalid() {
+            assertThat(service.addBank(PLAYER_UUID, 0)).isFalse();
+            assertThat(service.addBank(PLAYER_UUID, -10)).isFalse();
+        }
+
+        @Test
+        @DisplayName("addBank fails for non-existent account")
+        void addBankNonExistent() {
+            mockQueryReturns(PLAYER_UUID, null);
+            assertThat(service.addBank(PLAYER_UUID, 100)).isFalse();
+        }
+
+        @Test
+        @DisplayName("takeBank rejects zero or negative")
+        void takeBankInvalid() {
+            assertThat(service.takeBank(PLAYER_UUID, 0)).isFalse();
+            assertThat(service.takeBank(PLAYER_UUID, -10)).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositToBank rejects zero or negative")
+        void depositToBankInvalid() {
+            assertThat(service.depositToBank(PLAYER_UUID, 0)).isFalse();
+            assertThat(service.depositToBank(PLAYER_UUID, -10)).isFalse();
         }
     }
 
@@ -749,6 +784,117 @@ class EconomyServiceImplTest {
             assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "coins")).isTrue();
             assertThat(balance.getCash()).isEqualTo(300.0);
             assertThat(balance.getBank()).isEqualTo(300.0);
+        }
+
+        @Test
+        @DisplayName("setBank with currencyId updates bank balance")
+        void setBankWithCurrency() throws Exception {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(200.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.setBank(PLAYER_UUID, 800.0, "coins")).isTrue();
+            assertThat(balance.getBank()).isEqualTo(800.0);
+            verify(currencyDataOperator).update(balance);
+        }
+
+        @Test
+        @DisplayName("addBank with currencyId increases bank balance")
+        void addBankWithCurrency() throws Exception {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(300.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.addBank(PLAYER_UUID, 200.0, "coins")).isTrue();
+            assertThat(balance.getBank()).isEqualTo(500.0);
+            verify(currencyDataOperator).update(balance);
+        }
+
+        @Test
+        @DisplayName("takeBank with currencyId decreases bank balance")
+        void takeBankWithCurrency() throws Exception {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(500.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.takeBank(PLAYER_UUID, 200.0, "coins")).isTrue();
+            assertThat(balance.getBank()).isEqualTo(300.0);
+            verify(currencyDataOperator).update(balance);
+        }
+
+        @Test
+        @DisplayName("takeBank with currencyId fails on insufficient funds")
+        void takeBankInsufficientCurrency() {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(50.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.takeBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositToBank with currencyId fails on insufficient cash")
+        void depositToBankCurrencyInsufficient() {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(50.0).bank(0.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.depositToBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+        }
+
+        @Test
+        @DisplayName("withdrawFromBank with currencyId fails on insufficient bank")
+        void withdrawFromBankCurrencyInsufficient() {
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(50.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+
+            assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+        }
+
+        @Test
+        @DisplayName("addCash for non-existent currency balance returns false")
+        void addCashNonExistentCurrency() {
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", null);
+
+            assertThat(service.addCash(PLAYER_UUID, 100.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("setCash for non-existent currency balance returns false")
+        void setCashNonExistentCurrency() {
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", null);
+
+            assertThat(service.setCash(PLAYER_UUID, 100.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("setCash with negative amount for currency returns false")
+        void setCashNegativeCurrency() {
+            assertThat(service.setCash(PLAYER_UUID, -50.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId fails on insufficient funds")
+        void transferCurrencyInsufficient() {
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(50.0).bank(0.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", sender);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId rejects zero or negative")
+        void transferCurrencyInvalid() {
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 0, "gems")).isFalse();
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, -50.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId rejects self-transfer")
+        void transferCurrencySelf() {
+            assertThat(service.transfer(PLAYER_UUID, PLAYER_UUID, 100.0, "gems")).isFalse();
         }
     }
 }

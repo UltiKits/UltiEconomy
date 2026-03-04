@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -132,5 +133,61 @@ class DepositCommandTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(player).sendMessage(captor.capture());
         assertThat(captor.getValue()).contains("成功存入").contains("G500.00");
+    }
+
+    @Test
+    @DisplayName("currency deposit with invalid amount shows error")
+    void depositCurrencyInvalidAmount() {
+        command.onDepositCurrency(player, "abc", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("无效的金额");
+    }
+
+    @Test
+    @DisplayName("currency deposit with zero amount shows error")
+    void depositCurrencyZeroAmount() {
+        command.onDepositCurrency(player, "0", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("金额必须大于零");
+    }
+
+    @Test
+    @DisplayName("currency deposit with negative amount shows error")
+    void depositCurrencyNegativeAmount() {
+        command.onDepositCurrency(player, "-10", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("金额必须大于零");
+    }
+
+    @Test
+    @DisplayName("currency deposit with insufficient cash shows error")
+    void depositCurrencyInsufficientCash() {
+        when(economyService.depositToBank(PLAYER_UUID, 500.0, "gems")).thenReturn(false);
+
+        command.onDepositCurrency(player, "500", "gems");
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(player).sendMessage(captor.capture());
+        assertThat(captor.getValue()).contains("余额不足");
+    }
+
+    @Test
+    @DisplayName("handleHelp sends command usage messages")
+    void handleHelpShowsCommands() throws Exception {
+        @SuppressWarnings("unchecked")
+        CommandSender sender = mock(CommandSender.class);
+        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+        java.lang.reflect.Method helpMethod = DepositCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+        helpMethod.setAccessible(true);
+        helpMethod.invoke(command, sender);
+
+        verify(sender, atLeast(2)).sendMessage(anyString());
     }
 }

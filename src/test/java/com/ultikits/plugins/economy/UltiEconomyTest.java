@@ -6,7 +6,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,6 +58,24 @@ class UltiEconomyTest {
             Method method = UltiEconomy.class.getMethod("supported");
             assertThat(method).isNotNull();
             assertThat(method.getReturnType()).isEqualTo(java.util.List.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("Lifecycle")
+    class LifecycleTests {
+
+        @Test
+        @DisplayName("supported() returns zh and en")
+        void supportedLanguages() throws Exception {
+            // Use Unsafe.allocateInstance to bypass constructors (UltiToolsPlugin needs a server)
+            Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            UltiEconomy instance = (UltiEconomy) unsafe.allocateInstance(UltiEconomy.class);
+
+            List<String> languages = instance.supported();
+            assertThat(languages).containsExactly("zh", "en");
         }
     }
 }

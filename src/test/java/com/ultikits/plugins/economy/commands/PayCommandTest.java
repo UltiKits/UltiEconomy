@@ -4,6 +4,7 @@ import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -164,5 +165,99 @@ class PayCommandTest {
             verify(sender).sendMessage(senderCaptor.capture());
             assertThat(senderCaptor.getValue()).contains("成功转账").contains("G500.00").contains("Bob");
         }
+    }
+
+    @Nested
+    @DisplayName("Currency Failure Cases")
+    class CurrencyFailureCases {
+
+        @Test
+        @DisplayName("currency transfer with invalid amount shows error")
+        void currencyInvalidAmount() {
+            command.onPayWithCurrency(sender, "Bob", "abc", "gems");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("无效的金额");
+        }
+
+        @Test
+        @DisplayName("currency transfer with zero amount shows error")
+        void currencyZeroAmount() {
+            command.onPayWithCurrency(sender, "Bob", "0", "gems");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("金额必须大于零");
+        }
+
+        @Test
+        @DisplayName("currency transfer with negative amount shows error")
+        void currencyNegativeAmount() {
+            command.onPayWithCurrency(sender, "Bob", "-50", "gems");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("金额必须大于零");
+        }
+
+        @Test
+        @DisplayName("currency transfer to offline player shows error")
+        void currencyOfflinePlayer() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer("Nobody")).thenReturn(null);
+
+                command.onPayWithCurrency(sender, "Nobody", "100", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("玩家不存在");
+            }
+        }
+
+        @Test
+        @DisplayName("currency self-transfer shows error")
+        void currencySelfTransfer() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                Player self = mock(Player.class);
+                when(self.getUniqueId()).thenReturn(SENDER_UUID);
+                bukkit.when(() -> Bukkit.getPlayer("Alice")).thenReturn(self);
+
+                command.onPayWithCurrency(sender, "Alice", "100", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("无效的金额");
+            }
+        }
+
+        @Test
+        @DisplayName("currency transfer with insufficient funds shows error")
+        void currencyInsufficientFunds() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
+                when(economyService.transfer(SENDER_UUID, TARGET_UUID, 999999.0, "gems")).thenReturn(false);
+
+                command.onPayWithCurrency(sender, "Bob", "999999", "gems");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains("余额不足");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("handleHelp sends command usage messages")
+    void handleHelpShowsCommands() throws Exception {
+        @SuppressWarnings("unchecked")
+        CommandSender helpSender = mock(CommandSender.class);
+        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+        java.lang.reflect.Method helpMethod = PayCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+        helpMethod.setAccessible(true);
+        helpMethod.invoke(command, helpSender);
+
+        verify(helpSender, atLeast(2)).sendMessage(anyString());
     }
 }

@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -88,5 +89,19 @@ class MoneyCommandTest {
         List<String> messages = captor.getAllValues();
         assertThat(messages.get(0)).contains("gems");
         assertThat(messages.get(1)).contains("G250.00");
+    }
+
+    @Test
+    @DisplayName("handleHelp sends command usage messages")
+    void handleHelpShowsCommands() throws Exception {
+        @SuppressWarnings("unchecked")
+        CommandSender sender = mock(CommandSender.class);
+        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+        java.lang.reflect.Method helpMethod = MoneyCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+        helpMethod.setAccessible(true);
+        helpMethod.invoke(command, sender);
+
+        verify(sender, atLeast(2)).sendMessage(anyString());
     }
 }

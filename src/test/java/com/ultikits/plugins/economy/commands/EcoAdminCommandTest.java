@@ -41,7 +41,7 @@ class EcoAdminCommandTest {
         lenient().when(targetPlayer.getUniqueId()).thenReturn(TARGET_UUID);
         lenient().when(targetPlayer.getName()).thenReturn("Steve");
         lenient().when(targetPlayer.hasPlayedBefore()).thenReturn(true);
-        command = new EcoAdminCommand(plugin, economyService);
+        command = EcoAdminCommand.createForTest(plugin, economyService);
     }
 
     @Nested
@@ -349,7 +349,7 @@ class EcoAdminCommandTest {
         @BeforeEach
         void setUp() {
             lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            treasuryCommand = new EcoAdminCommand(plugin, economyService, taxService, currencyManager);
+            treasuryCommand = EcoAdminCommand.createForTest(plugin, economyService, taxService, currencyManager);
         }
 
         @Test
@@ -421,7 +421,7 @@ class EcoAdminCommandTest {
         @Test
         @DisplayName("treasury commands show error when tax disabled")
         void treasuryDisabled() {
-            EcoAdminCommand noTaxCommand = new EcoAdminCommand(plugin, economyService);
+            EcoAdminCommand noTaxCommand = EcoAdminCommand.createForTest(plugin, economyService);
 
             noTaxCommand.onTreasury(sender);
 

@@ -39,7 +39,7 @@ class NoteRedeemListenerTest {
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(player.getInventory()).thenReturn(inventory);
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
-        listener = new NoteRedeemListener(plugin, economyService, noteFactory);
+        listener = NoteRedeemListener.createForTest(plugin, economyService, noteFactory);
     }
 
     @Test

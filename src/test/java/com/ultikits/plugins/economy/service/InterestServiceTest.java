@@ -63,7 +63,7 @@ class InterestServiceTest {
         currencyManager = new CurrencyManager(yaml);
         lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.emptyList());
-        service = new InterestService(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
+        service = InterestService.createForTest(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
     }
 
     @Nested
