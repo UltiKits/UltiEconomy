@@ -6,7 +6,7 @@ import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.TaxService;
-import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
+import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.Bukkit;
@@ -19,7 +19,7 @@ import org.bukkit.command.CommandSender;
         description = "经济管理命令",
         alias = {"eco"}
 )
-public class EcoAdminCommand extends AbstractCommandExecutor {
+public class EcoAdminCommand extends BaseCommandExecutor {
 
     private UltiToolsPlugin plugin;
     private EconomyService economyService;

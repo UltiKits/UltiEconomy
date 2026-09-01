@@ -1,7 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.service.EconomyService;
-import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
+import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.ChatColor;
@@ -13,7 +13,7 @@ import org.bukkit.entity.Player;
         description = "查看余额",
         alias = {"money", "bal"}
 )
-public class MoneyCommand extends AbstractCommandExecutor {
+public class MoneyCommand extends BaseCommandExecutor {
 
     private final UltiToolsPlugin plugin;
     private final EconomyService economyService;

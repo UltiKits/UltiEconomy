@@ -2,7 +2,7 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
-import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
+import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.ChatColor;
@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
         description = "从银行取款",
         alias = {"withdraw", "qk"}
 )
-public class WithdrawCommand extends AbstractCommandExecutor {
+public class WithdrawCommand extends BaseCommandExecutor {
 
     private final UltiToolsPlugin plugin;
     private final EconomyService economyService;
