@@ -3,7 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
-import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
+import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.ChatColor;
@@ -16,7 +16,7 @@ import org.bukkit.inventory.ItemStack;
         description = "创建/兑换纸币",
         alias = {"note"}
 )
-public class NoteCommand extends AbstractCommandExecutor {
+public class NoteCommand extends BaseCommandExecutor {
 
     private UltiToolsPlugin plugin;
     private EconomyService economyService;

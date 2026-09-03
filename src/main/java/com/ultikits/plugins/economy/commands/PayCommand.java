@@ -1,7 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.service.EconomyService;
-import com.ultikits.ultitools.abstracts.AbstractCommandExecutor;
+import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
 import org.bukkit.Bukkit;
@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
         description = "转账给其他玩家",
         alias = {"pay"}
 )
-public class PayCommand extends AbstractCommandExecutor {
+public class PayCommand extends BaseCommandExecutor {
 
     private final UltiToolsPlugin plugin;
     private final EconomyService economyService;
