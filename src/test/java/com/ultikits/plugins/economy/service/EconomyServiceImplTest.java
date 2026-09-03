@@ -528,6 +528,191 @@ class EconomyServiceImplTest {
             assertThat(receiver.getCash()).isEqualTo(290.0);
             verify(taxService).depositToTreasury(10.0, "gems");
         }
+
+        @Test
+        @DisplayName("transfer rolls back the sender's cash when persisting the sender's update fails")
+        void transferRollsBackWhenSenderUpdateFails() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 200, 0);
+
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            doThrow(new IllegalAccessException("sender persist failed")).when(dataOperator).update(sender);
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 300);
+
+            assertThat(result).isFalse();
+            assertThat(sender.getCash()).isEqualTo(1000.0);
+            verify(dataOperator, never()).update(receiver);
+        }
+
+        @Test
+        @DisplayName("transfer rolls back both balances when persisting the receiver's update fails")
+        void transferRollsBackWhenReceiverUpdateFails() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 200, 0);
+
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            doNothing().when(dataOperator).update(sender);
+            doThrow(new IllegalAccessException("receiver persist failed")).when(dataOperator).update(receiver);
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 300);
+
+            assertThat(result).isFalse();
+            assertThat(sender.getCash()).isEqualTo(1000.0);
+            verify(dataOperator, times(2)).update(sender);
+        }
+
+        @Test
+        @DisplayName("transfer still succeeds when the tax treasury deposit itself fails")
+        void transferIgnoresTaxDepositFailure() throws Exception {
+            TaxService taxService = mock(TaxService.class);
+            when(taxService.calculateTransactionTax(100.0)).thenReturn(5.0);
+            doThrow(new IllegalAccessException("treasury closed")).when(taxService).depositToTreasury(anyDouble(), anyString());
+            service.setTaxService(taxService);
+
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 0, 0);
+
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 100);
+
+            assertThat(result).isTrue();
+            assertThat(sender.getCash()).isEqualTo(900.0);
+            assertThat(receiver.getCash()).isEqualTo(95.0);
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId fails when receiver's currency balance is not found")
+        void transferWithCurrencyReceiverNotFound() {
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.emptyList());
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId rolls back the sender's balance when persisting the sender's update fails")
+        void transferWithCurrencyRollsBackWhenSenderUpdateFails() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            doThrow(new IllegalAccessException("sender persist failed")).when(currencyDataOperator).update(sender);
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
+
+            assertThat(result).isFalse();
+            assertThat(sender.getCash()).isEqualTo(500.0);
+            verify(currencyDataOperator, never()).update(receiver);
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId rolls back both balances when persisting the receiver's update fails")
+        void transferWithCurrencyRollsBackWhenReceiverUpdateFails() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            doNothing().when(currencyDataOperator).update(sender);
+            doThrow(new IllegalAccessException("receiver persist failed")).when(currencyDataOperator).update(receiver);
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
+
+            assertThat(result).isFalse();
+            assertThat(sender.getCash()).isEqualTo(500.0);
+            verify(currencyDataOperator, times(2)).update(sender);
+        }
+
+        @Test
+        @DisplayName("transfer with currencyId still succeeds when the tax treasury deposit itself fails")
+        void transferWithCurrencyIgnoresTaxDepositFailure() throws Exception {
+            TaxService taxService = mock(TaxService.class);
+            when(taxService.calculateTransactionTax(200.0)).thenReturn(10.0);
+            doThrow(new IllegalAccessException("treasury closed")).when(taxService).depositToTreasury(anyDouble(), anyString());
+            service.setTaxService(taxService);
+
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+
+            boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
+
+            assertThat(result).isTrue();
+            assertThat(sender.getCash()).isEqualTo(300.0);
+            assertThat(receiver.getCash()).isEqualTo(290.0);
+        }
     }
 
     @Nested
@@ -895,6 +1080,138 @@ class EconomyServiceImplTest {
         @DisplayName("transfer with currencyId rejects self-transfer")
         void transferCurrencySelf() {
             assertThat(service.transfer(PLAYER_UUID, PLAYER_UUID, 100.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("addCash with currencyId rejects zero or negative")
+        void addCashCurrencyRejectsInvalid() {
+            assertThat(service.addCash(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.addCash(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("takeCash with currencyId rejects zero or negative")
+        void takeCashCurrencyRejectsInvalid() {
+            assertThat(service.takeCash(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.takeCash(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("addBank with currencyId rejects zero or negative")
+        void addBankCurrencyRejectsInvalid() {
+            assertThat(service.addBank(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.addBank(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("addBank with currencyId fails for a non-existent currency balance")
+        void addBankNonExistentCurrency() {
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", null);
+
+            assertThat(service.addBank(PLAYER_UUID, 100.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("takeBank with currencyId rejects zero or negative")
+        void takeBankCurrencyRejectsInvalid() {
+            assertThat(service.takeBank(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.takeBank(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("setBank with currencyId rejects negative")
+        void setBankCurrencyRejectsNegative() {
+            assertThat(service.setBank(PLAYER_UUID, -50.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("setBank with currencyId fails for a non-existent currency balance")
+        void setBankNonExistentCurrency() {
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", null);
+
+            assertThat(service.setBank(PLAYER_UUID, 100.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositToBank with currencyId rejects zero or negative")
+        void depositToBankCurrencyRejectsInvalid() {
+            assertThat(service.depositToBank(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.depositToBank(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("withdrawFromBank with currencyId rejects zero or negative")
+        void withdrawFromBankCurrencyRejectsInvalid() {
+            assertThat(service.withdrawFromBank(PLAYER_UUID, 0, "gems")).isFalse();
+            assertThat(service.withdrawFromBank(PLAYER_UUID, -10.0, "gems")).isFalse();
+        }
+
+        @Test
+        @DisplayName("depositToBank with currencyId refuses a currency that has its bank disabled")
+        void depositToBankCurrencyRejectsWhenBankDisabled() {
+            // "gems" is defined with bank-enabled: false in CURRENCIES_YAML.
+            boolean result = service.depositToBank(PLAYER_UUID, 50.0, "gems");
+
+            assertThat(result).isFalse();
+            verifyNoInteractions(currencyDataOperator);
+        }
+
+        @Test
+        @DisplayName("depositToBank with currencyId refuses an amount below the currency's minimum deposit")
+        void depositToBankCurrencyRejectsBelowMinDeposit() {
+            // "coins" requires min-deposit: 100.0 in CURRENCIES_YAML.
+            boolean result = service.depositToBank(PLAYER_UUID, 50.0, "coins");
+
+            assertThat(result).isFalse();
+            verifyNoInteractions(currencyDataOperator);
+        }
+
+        @Test
+        @DisplayName("depositToBank with currencyId refuses a deposit that would exceed the currency's max bank balance")
+        void depositToBankCurrencyRejectsAboveMaxBalance() {
+            String cappedYaml =
+                    "currencies:\n" +
+                    "  capped:\n" +
+                    "    display-name: 'Capped'\n" +
+                    "    symbol: 'C'\n" +
+                    "    bank-enabled: true\n" +
+                    "    min-deposit: 0.0\n" +
+                    "    max-bank-balance: 1000.0\n" +
+                    "    primary: true\n";
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(cappedYaml));
+            CurrencyManager cappedManager = new CurrencyManager(yaml);
+            EconomyServiceImpl cappedService =
+                    EconomyServiceImpl.createForTest(plugin, dataOperator, config, currencyDataOperator, cappedManager);
+
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("capped").cash(1000.0).bank(900.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "capped", balance);
+
+            boolean result = cappedService.depositToBank(PLAYER_UUID, 200.0, "capped");
+
+            assertThat(result).isFalse();
+            assertThat(balance.getBank()).isEqualTo(900.0);
+        }
+
+        @Test
+        @DisplayName("setCash with currencyId returns false when persisting the balance fails")
+        void setCashCurrencyUpdateFails() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", balance);
+            doThrow(new IllegalAccessException("test")).when(currencyDataOperator).update(any());
+
+            assertThat(service.setCash(PLAYER_UUID, 500.0, "gems")).isFalse();
+            verify(logger).error(anyString());
+        }
+
+        @Test
+        @DisplayName("getCurrencyManager exposes the manager the service was constructed with")
+        void getCurrencyManagerReturnsConfiguredManager() {
+            assertThat(service.getCurrencyManager()).isSameAs(currencyManager);
         }
     }
 }

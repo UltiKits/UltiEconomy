@@ -275,5 +275,66 @@ class LeaderboardServiceTest {
             assertThat(top).hasSize(1);
             assertThat(top.get(0).getPlayerName()).isEqualTo("Rich");
         }
+
+        @Test
+        @DisplayName("getTopPlayers with currencyId limits results to the requested count")
+        void currencyLimitsCount() {
+            List<PlayerAccountEntity> primaryAccounts = Arrays.asList(
+                    PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(0).bank(0).build(),
+                    PlayerAccountEntity.builder().uuid(UUID_MIDDLE.toString()).playerName("Middle").cash(0).bank(0).build(),
+                    PlayerAccountEntity.builder().uuid(UUID_POOR.toString()).playerName("Poor").cash(0).bank(0).build()
+            );
+            when(dataOperator.getAll()).thenReturn(primaryAccounts);
+
+            List<CurrencyBalanceEntity> balances = Arrays.asList(
+                    CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(5000).bank(0).build(),
+                    CurrencyBalanceEntity.builder().uuid(UUID_MIDDLE.toString()).currencyId("gems").cash(3000).bank(0).build(),
+                    CurrencyBalanceEntity.builder().uuid(UUID_POOR.toString()).currencyId("gems").cash(1000).bank(0).build()
+            );
+            when(currencyDataOperator.getAll()).thenReturn(balances);
+
+            service.refreshCurrencyLeaderboard("gems");
+
+            List<LeaderboardService.LeaderboardEntry> top = service.getTopPlayers(2, "gems");
+            assertThat(top).hasSize(2);
+            assertThat(top.get(0).getTotalWealth()).isEqualTo(5000.0);
+            assertThat(top.get(1).getTotalWealth()).isEqualTo(3000.0);
+        }
+
+        @Test
+        @DisplayName("getPlayerRank with currencyId falls back to the primary rank when no currency data refreshed")
+        void currencyRankFallsBackToPrimary() {
+            List<PlayerAccountEntity> accounts = Collections.singletonList(
+                    PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(5000).bank(0).build()
+            );
+            when(dataOperator.getAll()).thenReturn(accounts);
+            service.refreshLeaderboard();
+
+            // Don't refresh the currency leaderboard — should fall back to the primary rank.
+            assertThat(service.getPlayerRank(UUID_RICH, "gems")).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("refreshCurrencyLeaderboard does nothing when the module has no currency data operator")
+        void refreshDoesNothingWithoutCurrencyOperator() {
+            LeaderboardService noCurrencyOpService =
+                    LeaderboardService.createForTest(config, dataOperator, null, currencyManager);
+
+            noCurrencyOpService.refreshCurrencyLeaderboard("gems");
+
+            // Falls back to the (empty, never-refreshed) primary leaderboard rather than throwing.
+            assertThat(noCurrencyOpService.getTopPlayers(10, "gems")).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("getDefaultDisplayCount")
+    class DefaultDisplayCountTests {
+
+        @Test
+        @DisplayName("returns the configured leaderboard display count")
+        void returnsConfiguredValue() {
+            assertThat(service.getDefaultDisplayCount()).isEqualTo(config.getLeaderboardDisplayCount());
+        }
     }
 }

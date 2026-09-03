@@ -33,3 +33,7 @@ CLAUDE.md
 
 # Worktrees
 .worktrees/
+
+# Tooling artifacts
+.factorypath
+PROJECT.md

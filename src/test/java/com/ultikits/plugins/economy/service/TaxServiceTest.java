@@ -212,5 +212,18 @@ class TaxServiceTest {
             assertThat(result).isFalse();
             assertThat(entry.getBalance()).isEqualTo(100.0);
         }
+
+        @Test
+        @DisplayName("withdrawFromTreasury fails when no treasury entry exists for the currency")
+        void withdrawFailsWhenNoEntry() throws IllegalAccessException {
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.emptyList()));
+
+            // amount=0.0 deliberately: a "treat missing entry as zero balance" implementation would
+            // let 0.0 <= 0.0 pass and incorrectly succeed here, masking the missing-entry check.
+            boolean result = taxService.withdrawFromTreasury(0.0, "gems");
+
+            assertThat(result).isFalse();
+            verify(treasuryDataOperator, never()).update(any());
+        }
     }
 }
