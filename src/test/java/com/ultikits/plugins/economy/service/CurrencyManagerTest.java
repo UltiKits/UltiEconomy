@@ -84,4 +84,36 @@ class CurrencyManagerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("primary");
     }
+
+    @Test
+    @DisplayName("throws if the currencies.yml has no 'currencies' section at all")
+    void noCurrenciesSection() {
+        String yaml = "not-currencies:\n  foo: bar\n";
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yaml));
+        // Message must name the missing section specifically -- a generic "no primary currency"
+        // message (the OTHER IllegalStateException this constructor can throw) would also contain
+        // the substring "currencies" and must not be mistaken for this one.
+        assertThatThrownBy(() -> new CurrencyManager(config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No 'currencies' section in currencies.yml");
+    }
+
+    @Test
+    @DisplayName("throws if more than one currency is marked primary")
+    void multiplePrimaries() {
+        String yaml =
+                "currencies:\n" +
+                "  coins:\n" +
+                "    display-name: 'Coins'\n" +
+                "    symbol: '$'\n" +
+                "    primary: true\n" +
+                "  gems:\n" +
+                "    display-name: 'Gems'\n" +
+                "    symbol: 'G'\n" +
+                "    primary: true\n";
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yaml));
+        assertThatThrownBy(() -> new CurrencyManager(config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Multiple primary currencies");
+    }
 }

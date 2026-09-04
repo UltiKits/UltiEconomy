@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -379,6 +380,64 @@ class InterestServiceTest {
 
                 verify(economyService, never()).addBank(any(), anyDouble(), anyString());
             }
+        }
+
+        @Test
+        @DisplayName("distributeInterest skips per-currency interest entirely when the module has no currency data operator")
+        void skipsPerCurrencyWhenOperatorAbsent() {
+            InterestService noCurrencyOpService = InterestService.createForTest(
+                    plugin, economyService, config, dataOperator, null, currencyManager);
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+
+                PlayerAccountEntity account = PlayerAccountEntity.builder()
+                        .uuid(PLAYER1_UUID.toString())
+                        .playerName("Player1")
+                        .cash(0.0)
+                        .bank(10000.0)
+                        .build();
+                when(dataOperator.getAll()).thenReturn(Collections.singletonList(account));
+
+                noCurrencyOpService.distributeInterest();
+
+                // Primary interest still runs, but the per-currency loop is never reached.
+                verify(economyService).addBank(PLAYER1_UUID, 300.0);
+                verifyNoInteractions(currencyDataOperator);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Invalid UUID handling")
+    class InvalidUuidTests {
+
+        // notifyPlayer(String, double) and notifyPlayer(String, double, String) are private and
+        // called only after distributeInterest() has already parsed the same UUID string
+        // successfully via UUID.fromString for economyService.addBank(...) -- so the malformed-UUID
+        // catch blocks inside them are unreachable through distributeInterest() itself. They are
+        // invoked directly via reflection here, the same technique this file already uses for the
+        // private calculateInterest(double).
+
+        @Test
+        @DisplayName("notifyPlayer swallows an invalid UUID instead of propagating the parse failure")
+        void notifyPlayerSwallowsInvalidUuid() throws Exception {
+            Method method = InterestService.class.getDeclaredMethod("notifyPlayer", String.class, double.class);
+            method.setAccessible(true);
+
+            assertThatCode(() -> method.invoke(service, "not-a-real-uuid", 100.0))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("notifyPlayer with currencyId swallows an invalid UUID instead of propagating the parse failure")
+        void notifyPlayerWithCurrencySwallowsInvalidUuid() throws Exception {
+            Method method = InterestService.class.getDeclaredMethod(
+                    "notifyPlayer", String.class, double.class, String.class);
+            method.setAccessible(true);
+
+            assertThatCode(() -> method.invoke(service, "also-not-a-real-uuid", 100.0, "coins"))
+                    .doesNotThrowAnyException();
         }
     }
 }

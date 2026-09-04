@@ -132,6 +132,14 @@ class MoneyNoteFactoryTest {
             when(itemStack.getType()).thenReturn(Material.PAPER);
             assertThat(factory.isMoneyNote(itemStack)).isFalse();
         }
+
+        @Test
+        @DisplayName("returns false when the item has no ItemMeta at all")
+        void noItemMeta() {
+            when(itemStack.getType()).thenReturn(Material.PAPER);
+            when(itemStack.getItemMeta()).thenReturn(null);
+            assertThat(factory.isMoneyNote(itemStack)).isFalse();
+        }
     }
 
     @Nested
@@ -161,6 +169,20 @@ class MoneyNoteFactoryTest {
         @Test
         @DisplayName("getNoteCurrency returns empty string when no currency stored")
         void noCurrency() {
+            assertThat(factory.getNoteCurrency(itemStack)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("getNoteValue returns 0 when the item has no ItemMeta at all")
+        void getsValueNoItemMeta() {
+            when(itemStack.getItemMeta()).thenReturn(null);
+            assertThat(factory.getNoteValue(itemStack)).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("getNoteCurrency returns empty string when the item has no ItemMeta at all")
+        void getsCurrencyNoItemMeta() {
+            when(itemStack.getItemMeta()).thenReturn(null);
             assertThat(factory.getNoteCurrency(itemStack)).isEmpty();
         }
     }
