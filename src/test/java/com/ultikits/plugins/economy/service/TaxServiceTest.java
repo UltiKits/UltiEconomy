@@ -218,12 +218,19 @@ class TaxServiceTest {
         void withdrawFailsWhenNoEntry() throws IllegalAccessException {
             when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.emptyList()));
 
-            // amount=0.0 deliberately: a "treat missing entry as zero balance" implementation would
-            // let 0.0 <= 0.0 pass and incorrectly succeed here, masking the missing-entry check.
+            // amount=0.0 deliberately: a "treat missing entry as zero balance" implementation
+            // (constructing a synthetic zero-balance entry instead of returning early) would let
+            // 0.0 < 0.0 fail its own balance check and fall through to update() -- both this
+            // path and the correct early-return end up with the same (false, no update) surface,
+            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().update()`.
             boolean result = taxService.withdrawFromTreasury(0.0, "gems");
 
             assertThat(result).isFalse();
             verify(treasuryDataOperator, never()).update(any());
+            // Also prove the missing-entry branch doesn't take the "auto-create a treasury row"
+            // shortcut a copy-paste from depositToTreasury's insert-when-absent logic could
+            // introduce -- update()-never() alone doesn't rule out an errant insert() call.
+            verify(treasuryDataOperator, never()).insert(any());
         }
     }
 }
