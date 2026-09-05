@@ -38,6 +38,12 @@ class MoneyNoteFactoryTest {
     @BeforeEach
     void setUp() {
         lenient().when(plugin.getName()).thenReturn("UltiTools");
+        // Paper 1.21's Plugin extends net.kyori.adventure.key.Namespaced, whose abstract
+        // namespace() backs NamespacedKey(Plugin, String) as of paper-api 1.21.11 (the old
+        // spigot-api constructor derived the namespace from getName() instead). Mockito's
+        // default answer for this unstubbed method is null, which fails NamespacedKey's own
+        // validate() with an NPE before any assertion runs.
+        lenient().when(plugin.namespace()).thenReturn("ultitools");
         factory = new MoneyNoteFactory(plugin);
 
         pdcStore = new HashMap<>();
