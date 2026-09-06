@@ -52,11 +52,24 @@ public class CurrencyManager {
         return currencies.get(id);
     }
 
+    /**
+     * Resolves a currency identifier as typed by a command sender, trimming incidental
+     * whitespace before lookup. This is the single validation choke point every
+     * currency-taking command must call before reading or mutating a balance under a
+     * caller-supplied identifier: {@code null}, blank, and unknown identifiers all
+     * resolve to {@code null}, and callers must refuse the request without touching
+     * any balance rows.
+     *
+     * @param rawId the identifier as typed on the command line, may be null
+     * @return the matching {@link CurrencyDefinition}, or {@code null} if the identifier
+     *         is null, blank, or does not name a configured currency
+     */
     public CurrencyDefinition resolve(String rawId) {
         if (rawId == null) {
             return null;
         }
-        return currencies.get(rawId);
+        String trimmed = rawId.trim();
+        return trimmed.isEmpty() ? null : currencies.get(trimmed);
     }
 
     public CurrencyDefinition getPrimaryCurrency() {
