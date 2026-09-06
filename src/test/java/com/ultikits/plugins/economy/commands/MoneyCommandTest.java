@@ -80,7 +80,7 @@ class MoneyCommandTest {
     @Test
     @DisplayName("shows balance for specific currency")
     void showsCurrencyBalance() {
-        lenient().when(currencyManager.getCurrency("gems"))
+        lenient().when(currencyManager.resolve("gems"))
                 .thenReturn(CurrencyDefinition.builder().id("gems").build());
         when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
         when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
@@ -111,31 +111,36 @@ class MoneyCommandTest {
         verify(sender, atLeast(2)).sendMessage(anyString());
     }
 
+    @Nested
+    @DisplayName("Constructor wiring")
+    class ConstructorWiringTests {
+
+        @Test
+        @DisplayName("Production constructor resolves the currency manager from an UltiEconomy plugin")
+        void productionConstructorResolvesCurrencyManagerFromPlugin() {
+            UltiEconomy ultiEconomy = mock(UltiEconomy.class);
+            CurrencyManager resolvedCurrencyManager = mock(CurrencyManager.class);
+            when(ultiEconomy.getCurrencyManager()).thenReturn(resolvedCurrencyManager);
+            lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(resolvedCurrencyManager.resolve("gems"))
+                    .thenReturn(CurrencyDefinition.builder().id("gems").build());
+            when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(10.0);
+            when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
+            when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(10.0);
+            when(economyService.formatAmount(10.0, "gems")).thenReturn("G10.00");
+            when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+            MoneyCommand realCommand = new MoneyCommand(ultiEconomy, economyService);
+            realCommand.onCurrencyBalance(player, "gems");
+
+            verify(resolvedCurrencyManager).resolve("gems");
+            verify(economyService).getCash(PLAYER_UUID, "gems");
+        }
+    }
+
     // ============================
     // Unknown currency guard
     // ============================
-
-    @Test
-    @DisplayName("Production constructor resolves the currency manager from an UltiEconomy plugin")
-    void productionConstructorResolvesCurrencyManagerFromPlugin() {
-        UltiEconomy ultiEconomy = mock(UltiEconomy.class);
-        CurrencyManager resolvedCurrencyManager = mock(CurrencyManager.class);
-        when(ultiEconomy.getCurrencyManager()).thenReturn(resolvedCurrencyManager);
-        lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-        when(resolvedCurrencyManager.getCurrency("gems"))
-                .thenReturn(CurrencyDefinition.builder().id("gems").build());
-        when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(10.0);
-        when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
-        when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(10.0);
-        when(economyService.formatAmount(10.0, "gems")).thenReturn("G10.00");
-        when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
-
-        MoneyCommand realCommand = new MoneyCommand(ultiEconomy, economyService);
-        realCommand.onCurrencyBalance(player, "gems");
-
-        verify(resolvedCurrencyManager).getCurrency("gems");
-        verify(economyService).getCash(PLAYER_UUID, "gems");
-    }
 
     @Nested
     @DisplayName("Unknown Currency Guard")
@@ -144,7 +149,7 @@ class MoneyCommandTest {
         @Test
         @DisplayName("Unknown currency is refused before any balance is read")
         void unknownCurrencyIsRefusedBeforeAnyBalanceIsRead() {
-            when(currencyManager.getCurrency("bogus")).thenReturn(null);
+            when(currencyManager.resolve("bogus")).thenReturn(null);
 
             command.onCurrencyBalance(player, "bogus");
 
@@ -160,7 +165,7 @@ class MoneyCommandTest {
         @Test
         @DisplayName("Known currency still reports its balance")
         void knownCurrencyStillReportsItsBalance() {
-            lenient().when(currencyManager.getCurrency("gems"))
+            lenient().when(currencyManager.resolve("gems"))
                     .thenReturn(CurrencyDefinition.builder().id("gems").build());
             when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
             when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
@@ -179,14 +184,34 @@ class MoneyCommandTest {
         @Test
         @DisplayName("An empty or blank currency identifier is refused the same way")
         void anEmptyOrBlankCurrencyIdentifierIsRefusedTheSameWay() {
+            when(currencyManager.resolve("   ")).thenReturn(null);
+
             command.onCurrencyBalance(player, "   ");
 
             verify(economyService, never()).getCash(any(UUID.class), anyString());
-            verify(currencyManager, never()).getCurrency(anyString());
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(player, atLeastOnce()).sendMessage(captor.capture());
             assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+        }
+
+        @Test
+        @DisplayName("A padded but otherwise valid identifier resolves the same currency (WR-02)")
+        void aPaddedButOtherwiseValidIdentifierResolvesTheSameCurrency() {
+            lenient().when(currencyManager.resolve(" gems "))
+                    .thenReturn(CurrencyDefinition.builder().id("gems").build());
+            when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
+            when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
+            when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(250.0);
+            when(economyService.formatAmount(250.0, "gems")).thenReturn("G250.00");
+            when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+            command.onCurrencyBalance(player, " gems ");
+
+            // The canonical, resolved id -- not the padded raw argument -- is what
+            // reaches the balance reads and the format calls.
+            verify(economyService).getCash(PLAYER_UUID, "gems");
+            verify(economyService).formatAmount(250.0, "gems");
         }
     }
 }
