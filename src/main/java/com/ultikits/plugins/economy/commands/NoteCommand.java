@@ -82,14 +82,21 @@ public class NoteCommand extends BaseCommandExecutor {
         double amount = parseAmount(player, amountStr);
         if (amount <= 0) return;
 
-        if (!economyService.takeCash(player.getUniqueId(), amount, currencyId)) {
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+        String resolvedId = currency.getId();
+
+        if (!economyService.takeCash(player.getUniqueId(), amount, resolvedId)) {
             player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
             return;
         }
 
-        ItemStack note = noteFactory.createNote(currencyId, amount, player.getUniqueId(), player.getName());
+        ItemStack note = noteFactory.createNote(resolvedId, amount, player.getUniqueId(), player.getName());
         player.getInventory().addItem(note);
-        String formatted = economyService.formatAmount(amount, currencyId);
+        String formatted = economyService.formatAmount(amount, resolvedId);
         player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("纸币已创建: %s"), formatted));
     }
 
