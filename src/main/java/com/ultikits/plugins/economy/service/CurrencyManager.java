@@ -52,6 +52,13 @@ public class CurrencyManager {
         return currencies.get(id);
     }
 
+    public CurrencyDefinition resolve(String rawId) {
+        if (rawId == null) {
+            return null;
+        }
+        return currencies.get(rawId);
+    }
+
     public CurrencyDefinition getPrimaryCurrency() {
         return currencies.get(primaryCurrencyId);
     }
