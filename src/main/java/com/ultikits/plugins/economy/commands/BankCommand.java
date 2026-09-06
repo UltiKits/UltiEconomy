@@ -69,8 +69,14 @@ public class BankCommand extends BaseCommandExecutor {
     @CmdMapping(format = "<currency>")
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onBankCurrency(@CmdSender Player player, @CmdParam("currency") String currencyId) {
-        double bank = economyService.getBank(player.getUniqueId(), currencyId);
-        String formatted = economyService.formatAmount(bank, currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+
+        double bank = economyService.getBank(player.getUniqueId(), currency.getId());
+        String formatted = economyService.formatAmount(bank, currency.getId());
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formatted));
     }
 
