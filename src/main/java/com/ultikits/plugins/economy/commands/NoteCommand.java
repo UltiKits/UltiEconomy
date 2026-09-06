@@ -2,6 +2,8 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -21,15 +23,23 @@ public class NoteCommand extends BaseCommandExecutor {
     private UltiToolsPlugin plugin;
     private EconomyService economyService;
     private MoneyNoteFactory noteFactory;
+    private CurrencyManager currencyManager;
 
     public NoteCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
         this.noteFactory = ((UltiEconomy) plugin).getMoneyNoteFactory();
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
     }
 
     @SuppressWarnings("all")
     static NoteCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService, MoneyNoteFactory noteFactory) {
+        return createForTest(plugin, economyService, noteFactory, null);
+    }
+
+    @SuppressWarnings("all")
+    static NoteCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                      MoneyNoteFactory noteFactory, CurrencyManager currencyManager) {
         try {
             java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
             f.setAccessible(true);
@@ -38,6 +48,7 @@ public class NoteCommand extends BaseCommandExecutor {
             cmd.plugin = plugin;
             cmd.economyService = economyService;
             cmd.noteFactory = noteFactory;
+            cmd.currencyManager = currencyManager;
             return cmd;
         } catch (Exception e) {
             throw new RuntimeException(e);
