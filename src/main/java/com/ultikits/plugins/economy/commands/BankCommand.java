@@ -1,6 +1,9 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -16,14 +19,38 @@ import org.bukkit.entity.Player;
 )
 public class BankCommand extends BaseCommandExecutor {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
-    private final EconomyConfig config;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
+    private EconomyConfig config;
+    private CurrencyManager currencyManager;
 
     public BankCommand(UltiToolsPlugin plugin, EconomyService economyService, EconomyConfig config) {
         this.plugin = plugin;
         this.economyService = economyService;
         this.config = config;
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
+    }
+
+    @SuppressWarnings("all")
+    private static BankCommand allocate() {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            return (BankCommand) unsafe.allocateInstance(BankCommand.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static BankCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                      EconomyConfig config, CurrencyManager currencyManager) {
+        BankCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.config = config;
+        cmd.currencyManager = currencyManager;
+        return cmd;
     }
 
     @CmdMapping(format = "")
