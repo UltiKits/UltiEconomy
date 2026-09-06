@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
@@ -113,6 +114,28 @@ class MoneyCommandTest {
     // ============================
     // Unknown currency guard
     // ============================
+
+    @Test
+    @DisplayName("Production constructor resolves the currency manager from an UltiEconomy plugin")
+    void productionConstructorResolvesCurrencyManagerFromPlugin() {
+        UltiEconomy ultiEconomy = mock(UltiEconomy.class);
+        CurrencyManager resolvedCurrencyManager = mock(CurrencyManager.class);
+        when(ultiEconomy.getCurrencyManager()).thenReturn(resolvedCurrencyManager);
+        lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(resolvedCurrencyManager.getCurrency("gems"))
+                .thenReturn(CurrencyDefinition.builder().id("gems").build());
+        when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(10.0);
+        when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
+        when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(10.0);
+        when(economyService.formatAmount(10.0, "gems")).thenReturn("G10.00");
+        when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+        MoneyCommand realCommand = new MoneyCommand(ultiEconomy, economyService);
+        realCommand.onCurrencyBalance(player, "gems");
+
+        verify(resolvedCurrencyManager).getCurrency("gems");
+        verify(economyService).getCash(PLAYER_UUID, "gems");
+    }
 
     @Nested
     @DisplayName("Unknown Currency Guard")

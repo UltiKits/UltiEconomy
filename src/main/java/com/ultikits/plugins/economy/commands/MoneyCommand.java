@@ -68,6 +68,11 @@ public class MoneyCommand extends BaseCommandExecutor {
     @CmdMapping(format = "<currency>")
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onCurrencyBalance(@CmdSender Player player, @CmdParam("currency") String currencyId) {
+        if (currencyId == null || currencyId.trim().isEmpty() || currencyManager.getCurrency(currencyId) == null) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+
         double cash = economyService.getCash(player.getUniqueId(), currencyId);
         double bank = economyService.getBank(player.getUniqueId(), currencyId);
         double total = economyService.getTotalWealth(player.getUniqueId(), currencyId);
