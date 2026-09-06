@@ -1,5 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -15,12 +17,35 @@ import org.bukkit.entity.Player;
 )
 public class MoneyCommand extends BaseCommandExecutor {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
+    private CurrencyManager currencyManager;
 
     public MoneyCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
+    }
+
+    @SuppressWarnings("all")
+    private static MoneyCommand allocate() {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            return (MoneyCommand) unsafe.allocateInstance(MoneyCommand.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static MoneyCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                       CurrencyManager currencyManager) {
+        MoneyCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.currencyManager = currencyManager;
+        return cmd;
     }
 
     @CmdMapping(format = "")

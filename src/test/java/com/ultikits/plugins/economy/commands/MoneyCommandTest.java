@@ -1,5 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.command.CommandSender;
@@ -14,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @DisplayName("MoneyCommand")
@@ -23,6 +25,7 @@ class MoneyCommandTest {
 
     @Mock private UltiToolsPlugin plugin;
     @Mock private EconomyService economyService;
+    @Mock private CurrencyManager currencyManager;
     @Mock private Player player;
 
     private MoneyCommand command;
@@ -32,7 +35,7 @@ class MoneyCommandTest {
     void setUp() {
         lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
-        command = new MoneyCommand(plugin, economyService);
+        command = MoneyCommand.createForTest(plugin, economyService, currencyManager);
     }
 
     @Test
@@ -76,6 +79,8 @@ class MoneyCommandTest {
     @Test
     @DisplayName("shows balance for specific currency")
     void showsCurrencyBalance() {
+        lenient().when(currencyManager.getCurrency("gems"))
+                .thenReturn(CurrencyDefinition.builder().id("gems").build());
         when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
         when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
         when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(250.0);
@@ -103,5 +108,62 @@ class MoneyCommandTest {
         helpMethod.invoke(command, sender);
 
         verify(sender, atLeast(2)).sendMessage(anyString());
+    }
+
+    // ============================
+    // Unknown currency guard
+    // ============================
+
+    @Nested
+    @DisplayName("Unknown Currency Guard")
+    class UnknownCurrencyGuardTests {
+
+        @Test
+        @DisplayName("Unknown currency is refused before any balance is read")
+        void unknownCurrencyIsRefusedBeforeAnyBalanceIsRead() {
+            when(currencyManager.getCurrency("bogus")).thenReturn(null);
+
+            command.onCurrencyBalance(player, "bogus");
+
+            verify(economyService, never()).getCash(any(UUID.class), anyString());
+            verify(economyService, never()).getBank(any(UUID.class), anyString());
+            verify(economyService, never()).getTotalWealth(any(UUID.class), anyString());
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(player, atLeastOnce()).sendMessage(captor.capture());
+            assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+        }
+
+        @Test
+        @DisplayName("Known currency still reports its balance")
+        void knownCurrencyStillReportsItsBalance() {
+            lenient().when(currencyManager.getCurrency("gems"))
+                    .thenReturn(CurrencyDefinition.builder().id("gems").build());
+            when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(250.0);
+            when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(0.0);
+            when(economyService.getTotalWealth(PLAYER_UUID, "gems")).thenReturn(250.0);
+            when(economyService.formatAmount(250.0, "gems")).thenReturn("G250.00");
+            when(economyService.formatAmount(0.0, "gems")).thenReturn("G0.00");
+
+            command.onCurrencyBalance(player, "gems");
+
+            verify(economyService).getCash(PLAYER_UUID, "gems");
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(player, atLeastOnce()).sendMessage(captor.capture());
+            assertThat(captor.getAllValues()).anyMatch(m -> m.contains("G250.00"));
+        }
+
+        @Test
+        @DisplayName("An empty or blank currency identifier is refused the same way")
+        void anEmptyOrBlankCurrencyIdentifierIsRefusedTheSameWay() {
+            command.onCurrencyBalance(player, "   ");
+
+            verify(economyService, never()).getCash(any(UUID.class), anyString());
+            verify(currencyManager, never()).getCurrency(anyString());
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(player, atLeastOnce()).sendMessage(captor.capture());
+            assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+        }
     }
 }
