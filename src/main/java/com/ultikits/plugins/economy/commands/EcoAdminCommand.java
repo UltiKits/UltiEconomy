@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.TaxService;
@@ -51,6 +52,15 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         EcoAdminCommand cmd = allocate();
         cmd.plugin = plugin;
         cmd.economyService = economyService;
+        return cmd;
+    }
+
+    static EcoAdminCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                         CurrencyManager currencyManager) {
+        EcoAdminCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.currencyManager = currencyManager;
         return cmd;
     }
 

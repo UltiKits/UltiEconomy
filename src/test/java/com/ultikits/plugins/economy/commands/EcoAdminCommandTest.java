@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @DisplayName("EcoAdminCommand")
@@ -267,6 +267,15 @@ class EcoAdminCommandTest {
     @DisplayName("Currency-aware operations")
     class CurrencyOps {
 
+        @Mock private CurrencyManager currencyManager;
+
+        @BeforeEach
+        void setUpCurrencyManager() {
+            command = EcoAdminCommand.createForTest(plugin, economyService, currencyManager);
+            lenient().when(currencyManager.resolve("gems"))
+                    .thenReturn(CurrencyDefinition.builder().id("gems").build());
+        }
+
         @Test
         @DisplayName("give with currency adds to specific currency")
         void giveCurrency() {
@@ -333,6 +342,77 @@ class EcoAdminCommandTest {
                 List<String> messages = captor.getAllValues();
                 assertThat(messages.get(0)).contains("gems");
                 assertThat(messages.get(1)).contains("G250.00");
+            }
+        }
+
+        @Nested
+        @DisplayName("Unknown Currency Guard")
+        class UnknownCurrencyGuardTests {
+
+            @Test
+            @DisplayName("give with unknown currency is refused before any cash is added")
+            void giveUnknownCurrencyIsRefused() {
+                try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                    bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                    when(currencyManager.resolve("bogus")).thenReturn(null);
+
+                    command.onGiveCurrency(sender, "Steve", "500", "bogus");
+
+                    verify(economyService, never()).addCash(any(UUID.class), anyDouble(), anyString());
+                    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                    verify(sender, atLeastOnce()).sendMessage(captor.capture());
+                    assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+                }
+            }
+
+            @Test
+            @DisplayName("take with unknown currency is refused before any cash is removed")
+            void takeUnknownCurrencyIsRefused() {
+                try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                    bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                    when(currencyManager.resolve("bogus")).thenReturn(null);
+
+                    command.onTakeCurrency(sender, "Steve", "200", "bogus");
+
+                    verify(economyService, never()).takeCash(any(UUID.class), anyDouble(), anyString());
+                    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                    verify(sender, atLeastOnce()).sendMessage(captor.capture());
+                    assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+                }
+            }
+
+            @Test
+            @DisplayName("set with unknown currency is refused before any cash is set")
+            void setUnknownCurrencyIsRefused() {
+                try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                    bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                    when(currencyManager.resolve("bogus")).thenReturn(null);
+
+                    command.onSetCurrency(sender, "Steve", "1000", "bogus");
+
+                    verify(economyService, never()).setCash(any(UUID.class), anyDouble(), anyString());
+                    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                    verify(sender, atLeastOnce()).sendMessage(captor.capture());
+                    assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+                }
+            }
+
+            @Test
+            @DisplayName("check with unknown currency is refused before any balance is read")
+            void checkUnknownCurrencyIsRefused() {
+                try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                    bukkit.when(() -> Bukkit.getOfflinePlayer("Steve")).thenReturn(targetPlayer);
+                    when(currencyManager.resolve("bogus")).thenReturn(null);
+
+                    command.onCheckCurrency(sender, "Steve", "bogus");
+
+                    verify(economyService, never()).getCash(any(UUID.class), anyString());
+                    verify(economyService, never()).getBank(any(UUID.class), anyString());
+                    verify(economyService, never()).getTotalWealth(any(UUID.class), anyString());
+                    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                    verify(sender, atLeastOnce()).sendMessage(captor.capture());
+                    assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+                }
             }
         }
     }
