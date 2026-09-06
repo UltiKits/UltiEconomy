@@ -1,6 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.UltiEconomy;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
@@ -68,20 +69,22 @@ public class MoneyCommand extends BaseCommandExecutor {
     @CmdMapping(format = "<currency>")
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onCurrencyBalance(@CmdSender Player player, @CmdParam("currency") String currencyId) {
-        if (currencyId == null || currencyId.trim().isEmpty() || currencyManager.getCurrency(currencyId) == null) {
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
             player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
             return;
         }
+        String resolvedId = currency.getId();
 
-        double cash = economyService.getCash(player.getUniqueId(), currencyId);
-        double bank = economyService.getBank(player.getUniqueId(), currencyId);
-        double total = economyService.getTotalWealth(player.getUniqueId(), currencyId);
+        double cash = economyService.getCash(player.getUniqueId(), resolvedId);
+        double bank = economyService.getBank(player.getUniqueId(), resolvedId);
+        double total = economyService.getTotalWealth(player.getUniqueId(), resolvedId);
 
-        String formattedCash = economyService.formatAmount(cash, currencyId);
-        String formattedBank = economyService.formatAmount(bank, currencyId);
-        String formattedTotal = economyService.formatAmount(total, currencyId);
+        String formattedCash = economyService.formatAmount(cash, resolvedId);
+        String formattedBank = economyService.formatAmount(bank, resolvedId);
+        String formattedTotal = economyService.formatAmount(total, resolvedId);
 
-        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " (" + currencyId + ") ===");
+        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " (" + resolvedId + ") ===");
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的余额: %s"), formattedCash));
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formattedBank));
         player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("总资产: %s"), formattedTotal));

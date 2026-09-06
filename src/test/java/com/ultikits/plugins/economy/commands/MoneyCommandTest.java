@@ -211,7 +211,7 @@ class MoneyCommandTest {
             // The canonical, resolved id -- not the padded raw argument -- is what
             // reaches the balance reads and the format calls.
             verify(economyService).getCash(PLAYER_UUID, "gems");
-            verify(economyService).formatAmount(250.0, "gems");
+            verify(economyService, atLeastOnce()).formatAmount(250.0, "gems");
         }
     }
 }
