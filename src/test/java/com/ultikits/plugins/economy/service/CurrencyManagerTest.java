@@ -76,6 +76,39 @@ class CurrencyManagerTest {
     }
 
     @Test
+    @DisplayName("resolve returns the definition for a known currency")
+    void resolveKnownCurrency() {
+        assertThat(manager.resolve("coins")).isNotNull();
+        assertThat(manager.resolve("coins").getId()).isEqualTo("coins");
+    }
+
+    @Test
+    @DisplayName("resolve returns null for an unknown currency")
+    void resolveUnknownCurrency() {
+        assertThat(manager.resolve("bogus")).isNull();
+    }
+
+    @Test
+    @DisplayName("resolve returns null for a null identifier")
+    void resolveNullIdentifier() {
+        assertThat(manager.resolve(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("resolve returns null for a blank identifier")
+    void resolveBlankIdentifier() {
+        assertThat(manager.resolve("   ")).isNull();
+    }
+
+    @Test
+    @DisplayName("resolve trims incidental whitespace before lookup, so a padded but "
+            + "otherwise valid identifier still resolves the same currency")
+    void resolveTrimsWhitespaceBeforeLookup() {
+        assertThat(manager.resolve(" coins ")).isNotNull();
+        assertThat(manager.resolve(" coins ").getId()).isEqualTo("coins");
+    }
+
+    @Test
     @DisplayName("throws if no primary currency defined")
     void noPrimary() {
         String yaml = "currencies:\n  gems:\n    display-name: 'Gems'\n    symbol: 'G'\n    primary: false\n";

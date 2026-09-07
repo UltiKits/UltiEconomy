@@ -1,6 +1,8 @@
 package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.command.CommandSender;
@@ -26,6 +28,7 @@ class NoteCommandTest {
     @Mock private UltiToolsPlugin plugin;
     @Mock private EconomyService economyService;
     @Mock private MoneyNoteFactory noteFactory;
+    @Mock private CurrencyManager currencyManager;
     @Mock private Player player;
     @Mock private PlayerInventory inventory;
     @Mock private ItemStack noteItem;
@@ -41,7 +44,9 @@ class NoteCommandTest {
         lenient().when(player.getName()).thenReturn("TestPlayer");
         lenient().when(player.getInventory()).thenReturn(inventory);
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
-        command = NoteCommand.createForTest(plugin, economyService, noteFactory);
+        lenient().when(currencyManager.resolve("gems"))
+                .thenReturn(CurrencyDefinition.builder().id("gems").build());
+        command = NoteCommand.createForTest(plugin, economyService, noteFactory, currencyManager);
     }
 
     @Nested
@@ -129,6 +134,38 @@ class NoteCommandTest {
 
             verify(player).sendMessage(contains("余额不足"));
             verify(inventory, never()).addItem(any(ItemStack.class));
+        }
+
+        @Nested
+        @DisplayName("Unknown Currency Guard")
+        class UnknownCurrencyGuardTests {
+
+            @Test
+            @DisplayName("Unknown currency is refused before any cash is taken")
+            void unknownCurrencyIsRefusedBeforeAnyCashIsTaken() {
+                when(currencyManager.resolve("bogus")).thenReturn(null);
+
+                command.onCreateCurrencyNote(player, "500", "bogus");
+
+                verify(economyService, never()).takeCash(any(), anyDouble(), anyString());
+                verify(noteFactory, never()).createNote(anyString(), anyDouble(), any(), anyString());
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(player, atLeastOnce()).sendMessage(captor.capture());
+                assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+            }
+
+            @Test
+            @DisplayName("An empty or blank currency identifier is refused the same way")
+            void anEmptyOrBlankCurrencyIdentifierIsRefusedTheSameWay() {
+                when(currencyManager.resolve("   ")).thenReturn(null);
+
+                command.onCreateCurrencyNote(player, "500", "   ");
+
+                verify(economyService, never()).takeCash(any(), anyDouble(), anyString());
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(player, atLeastOnce()).sendMessage(captor.capture());
+                assertThat(captor.getAllValues()).anyMatch(m -> m.contains("货币不存在"));
+            }
         }
     }
 

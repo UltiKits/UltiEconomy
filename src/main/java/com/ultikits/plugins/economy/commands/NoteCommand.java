@@ -2,6 +2,8 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -21,15 +23,23 @@ public class NoteCommand extends BaseCommandExecutor {
     private UltiToolsPlugin plugin;
     private EconomyService economyService;
     private MoneyNoteFactory noteFactory;
+    private CurrencyManager currencyManager;
 
     public NoteCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
         this.noteFactory = ((UltiEconomy) plugin).getMoneyNoteFactory();
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
     }
 
     @SuppressWarnings("all")
     static NoteCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService, MoneyNoteFactory noteFactory) {
+        return createForTest(plugin, economyService, noteFactory, null);
+    }
+
+    @SuppressWarnings("all")
+    static NoteCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                      MoneyNoteFactory noteFactory, CurrencyManager currencyManager) {
         try {
             java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
             f.setAccessible(true);
@@ -38,6 +48,7 @@ public class NoteCommand extends BaseCommandExecutor {
             cmd.plugin = plugin;
             cmd.economyService = economyService;
             cmd.noteFactory = noteFactory;
+            cmd.currencyManager = currencyManager;
             return cmd;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -71,14 +82,21 @@ public class NoteCommand extends BaseCommandExecutor {
         double amount = parseAmount(player, amountStr);
         if (amount <= 0) return;
 
-        if (!economyService.takeCash(player.getUniqueId(), amount, currencyId)) {
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+        String resolvedId = currency.getId();
+
+        if (!economyService.takeCash(player.getUniqueId(), amount, resolvedId)) {
             player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
             return;
         }
 
-        ItemStack note = noteFactory.createNote(currencyId, amount, player.getUniqueId(), player.getName());
+        ItemStack note = noteFactory.createNote(resolvedId, amount, player.getUniqueId(), player.getName());
         player.getInventory().addItem(note);
-        String formatted = economyService.formatAmount(amount, currencyId);
+        String formatted = economyService.formatAmount(amount, resolvedId);
         player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("纸币已创建: %s"), formatted));
     }
 

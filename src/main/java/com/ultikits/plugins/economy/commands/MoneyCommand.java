@@ -1,5 +1,8 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.UltiEconomy;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -15,12 +18,35 @@ import org.bukkit.entity.Player;
 )
 public class MoneyCommand extends BaseCommandExecutor {
 
-    private final UltiToolsPlugin plugin;
-    private final EconomyService economyService;
+    private UltiToolsPlugin plugin;
+    private EconomyService economyService;
+    private CurrencyManager currencyManager;
 
     public MoneyCommand(UltiToolsPlugin plugin, EconomyService economyService) {
         this.plugin = plugin;
         this.economyService = economyService;
+        this.currencyManager = ((UltiEconomy) plugin).getCurrencyManager();
+    }
+
+    @SuppressWarnings("all")
+    private static MoneyCommand allocate() {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+            return (MoneyCommand) unsafe.allocateInstance(MoneyCommand.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static MoneyCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                       CurrencyManager currencyManager) {
+        MoneyCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.currencyManager = currencyManager;
+        return cmd;
     }
 
     @CmdMapping(format = "")
@@ -43,15 +69,22 @@ public class MoneyCommand extends BaseCommandExecutor {
     @CmdMapping(format = "<currency>")
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onCurrencyBalance(@CmdSender Player player, @CmdParam("currency") String currencyId) {
-        double cash = economyService.getCash(player.getUniqueId(), currencyId);
-        double bank = economyService.getBank(player.getUniqueId(), currencyId);
-        double total = economyService.getTotalWealth(player.getUniqueId(), currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+        String resolvedId = currency.getId();
 
-        String formattedCash = economyService.formatAmount(cash, currencyId);
-        String formattedBank = economyService.formatAmount(bank, currencyId);
-        String formattedTotal = economyService.formatAmount(total, currencyId);
+        double cash = economyService.getCash(player.getUniqueId(), resolvedId);
+        double bank = economyService.getBank(player.getUniqueId(), resolvedId);
+        double total = economyService.getTotalWealth(player.getUniqueId(), resolvedId);
 
-        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " (" + currencyId + ") ===");
+        String formattedCash = economyService.formatAmount(cash, resolvedId);
+        String formattedBank = economyService.formatAmount(bank, resolvedId);
+        String formattedTotal = economyService.formatAmount(total, resolvedId);
+
+        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " (" + resolvedId + ") ===");
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的余额: %s"), formattedCash));
         player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formattedBank));
         player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("总资产: %s"), formattedTotal));

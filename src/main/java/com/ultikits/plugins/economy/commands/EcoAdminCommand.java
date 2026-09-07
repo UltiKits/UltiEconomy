@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.commands;
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.TaxService;
@@ -51,6 +52,15 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         EcoAdminCommand cmd = allocate();
         cmd.plugin = plugin;
         cmd.economyService = economyService;
+        return cmd;
+    }
+
+    static EcoAdminCommand createForTest(UltiToolsPlugin plugin, EconomyService economyService,
+                                         CurrencyManager currencyManager) {
+        EcoAdminCommand cmd = allocate();
+        cmd.plugin = plugin;
+        cmd.economyService = economyService;
+        cmd.currencyManager = currencyManager;
         return cmd;
     }
 
@@ -166,9 +176,15 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         OfflinePlayer target = resolvePlayer(sender, playerName);
         if (target == null) return;
 
-        boolean success = economyService.addCash(target.getUniqueId(), amount, currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+
+        boolean success = economyService.addCash(target.getUniqueId(), amount, currency.getId());
         if (success) {
-            String formatted = economyService.formatAmount(amount, currencyId);
+            String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("已给予 %s %s"), target.getName(), formatted));
         } else {
@@ -189,9 +205,15 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         OfflinePlayer target = resolvePlayer(sender, playerName);
         if (target == null) return;
 
-        boolean success = economyService.takeCash(target.getUniqueId(), amount, currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+
+        boolean success = economyService.takeCash(target.getUniqueId(), amount, currency.getId());
         if (success) {
-            String formatted = economyService.formatAmount(amount, currencyId);
+            String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("已扣除 %s %s"), target.getName(), formatted));
         } else {
@@ -212,9 +234,15 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         OfflinePlayer target = resolvePlayer(sender, playerName);
         if (target == null) return;
 
-        boolean success = economyService.setCash(target.getUniqueId(), amount, currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+
+        boolean success = economyService.setCash(target.getUniqueId(), amount, currency.getId());
         if (success) {
-            String formatted = economyService.formatAmount(amount, currencyId);
+            String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("已设置 %s 的余额为 %s"), target.getName(), formatted));
         } else {
@@ -231,17 +259,24 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         OfflinePlayer target = resolvePlayer(sender, playerName);
         if (target == null) return;
 
-        double cash = economyService.getCash(target.getUniqueId(), currencyId);
-        double bank = economyService.getBank(target.getUniqueId(), currencyId);
-        double total = economyService.getTotalWealth(target.getUniqueId(), currencyId);
+        CurrencyDefinition currency = currencyManager.resolve(currencyId);
+        if (currency == null) {
+            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            return;
+        }
+        String resolvedId = currency.getId();
 
-        sender.sendMessage(ChatColor.GOLD + "=== " + target.getName() + " (" + currencyId + ") ===");
+        double cash = economyService.getCash(target.getUniqueId(), resolvedId);
+        double bank = economyService.getBank(target.getUniqueId(), resolvedId);
+        double total = economyService.getTotalWealth(target.getUniqueId(), resolvedId);
+
+        sender.sendMessage(ChatColor.GOLD + "=== " + target.getName() + " (" + resolvedId + ") ===");
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的余额: %s"), target.getName(), economyService.formatAmount(cash, currencyId)));
+                plugin.i18n("%s 的余额: %s"), target.getName(), economyService.formatAmount(cash, resolvedId)));
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的银行存款: %s"), target.getName(), economyService.formatAmount(bank, currencyId)));
+                plugin.i18n("%s 的银行存款: %s"), target.getName(), economyService.formatAmount(bank, resolvedId)));
         sender.sendMessage(ChatColor.GREEN + String.format(
-                plugin.i18n("总资产: %s"), economyService.formatAmount(total, currencyId)));
+                plugin.i18n("总资产: %s"), economyService.formatAmount(total, resolvedId)));
     }
 
     @CmdMapping(format = "treasury")
