@@ -210,12 +210,15 @@ refusal.
 ## Vault and PlaceholderAPI registration
 
 Boot-time behaviour driven by `UltiEconomy#registerSelf()`, gated on the presence of a soft
-dependency rather than on any config key — no `@ConditionalOnConfig` is involved in either row.
+dependency rather than on any config key — no `@ConditionalOnConfig` is involved in either
+registration row — plus the matching unload-time Vault deregistration in
+`UltiEconomy#onUnregister()`.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
 | ultieconomy.vault.register | Register `VaultEconomyProvider` as the server's Vault `Economy` service at `ServicePriority.Normal`, only if the `Vault` plugin is present — the hard dependency declared in `plugin.yml`, so in practice this always runs | event | install/enable this module with Vault present | n/a | n/a | internal | none | UltiEconomy#registerSelf |
 | ultieconomy.placeholder.register | Register `EconomyPlaceholderExpansion` with PlaceholderAPI, only if the `PlaceholderAPI` plugin is present (soft dependency) | event | install/enable this module with PlaceholderAPI present | n/a | n/a | internal | none | UltiEconomy#registerSelf |
+| ultieconomy.vault.unregister | When this module unloads (for example `/upm uninstall UltiTools-Economy` at runtime), remove the `VaultEconomyProvider` it created from Bukkit's services manager for `Economy.class`; null-guarded, so a module whose `registerSelf` never created a provider makes no call. This module's own hook must do it: `ultieconomy.vault.register` names the `Vault` plugin as the registration's owner, and the framework's own unload steps (`UltiToolsPlugin#unregisterSelf`) only unregister this module's commands and listeners (UltiKits/UltiEconomy#22) | event | unload this module at runtime, e.g. `/upm uninstall UltiTools-Economy` | n/a | n/a | internal | none | UltiEconomy#onUnregister |
 
 ## Player join
 
