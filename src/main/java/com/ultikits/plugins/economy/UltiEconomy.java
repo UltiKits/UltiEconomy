@@ -73,7 +73,7 @@ public class UltiEconomy extends UltiToolsPlugin {
     }
 
     @Override
-    public void unregisterSelf() {
+    protected void onUnregister() {
         if (vaultProvider != null) {
             Bukkit.getServicesManager().unregister(Economy.class, vaultProvider);
         }
