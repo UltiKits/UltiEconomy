@@ -343,17 +343,19 @@ class LeaderboardServiceTest {
      * Before 6.3.0 nothing called either refresh method, so every rank and top-N placeholder read an
      * empty cache for the life of the server.
      *
-     * <p>The period is fixed at 60 seconds; {@code leaderboard.update-interval} was removed because a
-     * framework {@code @Scheduled} period is a compile-time constant (UltiKits/UltiTools-Reborn#531).
+     * <p>The period is {@code leaderboard.update-interval} seconds, bound through the framework's
+     * config-bound {@code @Scheduled} (UltiKits/UltiTools-Reborn#531); the first refresh runs at load.
      */
     @Nested
     @DisplayName("Scheduled refresh (UltiEconomy#15)")
     class ScheduleTests {
 
         @Test
-        @DisplayName("the framework schedules exactly one repeating sync task: first run at once, then every 1200 ticks (60 s)")
+        @DisplayName("leaderboard.update-interval at its declared 60: one repeating sync task, first run at once, then every 1200 ticks")
         void registersOneSyncTaskEvery60Seconds() {
-            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service);
+            assertThat(com.ultikits.plugins.economy.config.ConfigEntryAccess.get(config, "leaderboard.update-interval"))
+                    .isEqualTo(60);
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
 
             assertThat(calls).hasSize(1);
             ScheduledRegistration.Call call = calls.get(0);
@@ -361,6 +363,19 @@ class LeaderboardServiceTest {
             assertThat(call.period).isEqualTo(1200L);
             assertThat(call.delay).isEqualTo(0L);
             assertThat(call.task).isNotNull();
+        }
+
+        @Test
+        @DisplayName("leaderboard.update-interval: 30 -- first run at once, then every 600 ticks (UltiTools-Reborn#531 binding)")
+        void registersOnTheConfiguredInterval() {
+            com.ultikits.plugins.economy.config.ConfigEntryAccess.set(config, "leaderboard.update-interval", 30);
+
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
+
+            assertThat(calls).hasSize(1);
+            assertThat(calls.get(0).method).isEqualTo("runTaskTimer");
+            assertThat(calls.get(0).period).isEqualTo(600L);
+            assertThat(calls.get(0).delay).isEqualTo(0L);
         }
 
         @Test
@@ -374,7 +389,7 @@ class LeaderboardServiceTest {
             when(currencyDataOperator.getAll()).thenReturn(Arrays.asList(
                     CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(1).bank(0).build(),
                     CurrencyBalanceEntity.builder().uuid(UUID_POOR.toString()).currencyId("gems").cash(900).bank(0).build()));
-            Runnable task = ScheduledRegistration.register(service).get(0).task;
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
 
             try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
                          org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
@@ -399,7 +414,7 @@ class LeaderboardServiceTest {
                     PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(10).bank(0).build()));
             when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(
                     CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(5).bank(0).build()));
-            Runnable task = ScheduledRegistration.register(service).get(0).task;
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
 
             try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
                          org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {

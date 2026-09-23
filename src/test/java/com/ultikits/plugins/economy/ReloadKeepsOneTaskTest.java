@@ -1,10 +1,12 @@
 package com.ultikits.plugins.economy;
 
+import com.ultikits.plugins.economy.config.ConfigEntryAccess;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.InterestServiceTestAccess;
 import com.ultikits.ultitools.UltiTools;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.manager.ConfigManager;
+import com.ultikits.ultitools.manager.PluginManager;
 import com.ultikits.ultitools.manager.TaskManager;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -21,11 +23,15 @@ import org.mockito.invocation.Invocation;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.mockingDetails;
@@ -48,10 +54,18 @@ import static org.mockito.Mockito.when;
  * future reload does through the scheduler is counted, and whatever it does through a part of the
  * framework this test does not set up fails loudly instead of passing quietly.
  *
+ * <p>Since UltiKits/UltiTools-Reborn#531 the two tasks are config-bound, and the reload path reaches
+ * the task manager: {@code reloadSelf()} calls {@code PluginManager#applyReloadedConfigBindings},
+ * which asks {@code TaskManager#rescheduleBound} to apply a changed interval. The real
+ * {@code PluginManager} method runs here against the same {@code TaskManager} the tasks were
+ * registered with, so a reschedule that forgot to cancel the old task would show up as a second
+ * live task.
+ *
  * <h2>Control</h2>
  * {@code ConfigManager#reloadConfigs(module)} is verified to have run twice, so the reloads really
  * went through the framework's reload path; a test that never reloaded would also see one task per
- * method.
+ * method. The changed-interval case additionally sees the interest task replaced by one with the
+ * new period, so the reschedule path it guards really ran.
  */
 @DisplayName("Reload keeps exactly one scheduled task per method (T-17-15-01, UltiEconomy#15)")
 class ReloadKeepsOneTaskTest {
@@ -67,83 +81,145 @@ class ReloadKeepsOneTaskTest {
     }
 
     @Test
-    @DisplayName("two /ul reload runs leave one interest task and one leaderboard task, with their periods")
+    @DisplayName("two /ul reload runs with unchanged values leave one interest task and one leaderboard task, untouched")
     void twoReloadsAddNoTask() throws Exception {
-        UltiEconomy module = module();
-        ConfigManager configManager = mock(ConfigManager.class);
-        UltiTools framework = mock(UltiTools.class);
-        when(framework.getConfigManager()).thenReturn(configManager);
-        YamlConfiguration frameworkConfig = new YamlConfiguration();
-        frameworkConfig.set("language", "en");
-        when(framework.getConfig()).thenReturn(frameworkConfig);
-        when(framework.getLogger()).thenReturn(Logger.getLogger("ultieconomy-reload-test"));
-        when(framework.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-        previousInstance = instanceField().get(null);
-        instanceField().set(null, framework);
+        Harness h = new Harness(new EconomyConfig());
 
-        JavaPlugin host = mock(JavaPlugin.class);
-        // Every task the scheduler hands out is recorded with the call that created it, so the
-        // assertion below counts LIVE tasks: a reload that cancels a task and schedules its
-        // replacement (UltiKits/UltiTools-Reborn#531's design for a changed period) still leaves one.
-        final List<String[]> created = new ArrayList<>();
-        final List<BukkitTask> tasks = new ArrayList<>();
-        BukkitScheduler scheduler = mock(BukkitScheduler.class, invocation -> {
-            if (!BukkitTask.class.equals(invocation.getMethod().getReturnType())) {
-                return null;
-            }
-            BukkitTask task = mock(BukkitTask.class);
-            Object[] args = invocation.getArguments();
-            created.add(new String[] {invocation.getMethod().getName(),
-                    args.length > 2 ? String.valueOf(args[2]) : "?",
-                    args.length > 3 ? String.valueOf(args[3]) : "-"});
-            tasks.add(task);
-            return task;
-        });
+        h.load();
+        assertThat(h.liveTasks()).as("after load").containsExactlyInAnyOrder(
+                "runTaskTimer(delay=36000, period=36000)",
+                "runTaskTimer(delay=0, period=1200)");
 
-        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-            bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
-            bukkit.when(Bukkit::getLogger).thenReturn(Logger.getLogger("ultieconomy-reload-test"));
+        h.reload(200);
+        h.reload(300);
 
-            TaskManager taskManager = new TaskManager(host);
-            for (Object bean : InterestServiceTestAccess.scheduledBeans(module, config())) {
-                taskManager.registerScheduledMethods(module, bean);
-            }
-            assertThat(liveTasks(created, tasks)).as("after load").containsExactlyInAnyOrder(
-                    "runTaskTimer(delay=36000, period=36000)",
-                    "runTaskTimer(delay=0, period=1200)");
-
-            module.reloadSelf();
-            module.reloadSelf();
-        }
-
-        verify(configManager, times(2)).reloadConfigs(module);
-        assertThat(liveTasks(created, tasks)).as("live tasks after two reloads").containsExactlyInAnyOrder(
+        verify(h.configManager, times(2)).reloadConfigs(h.module);
+        assertThat(h.liveTasks()).as("live tasks after two reloads").containsExactlyInAnyOrder(
                 "runTaskTimer(delay=36000, period=36000)",
                 "runTaskTimer(delay=0, period=1200)");
     }
 
-    /** Every created task that nothing has cancelled, described by the call that created it. */
-    private static List<String> liveTasks(List<String[]> created, List<BukkitTask> tasks) {
-        List<String> live = new ArrayList<>();
-        for (int i = 0; i < tasks.size(); i++) {
-            boolean cancelled = false;
-            for (Invocation invocation : mockingDetails(tasks.get(i)).getInvocations()) {
-                if ("cancel".equals(invocation.getMethod().getName())) {
-                    cancelled = true;
-                }
-            }
-            if (!cancelled) {
-                String[] call = created.get(i);
-                live.add(call[0] + "(delay=" + call[1] + ", period=" + call[2] + ")");
-            }
-        }
-        return live;
+    @Test
+    @DisplayName("a reload with a changed interest.interval replaces the interest task, keeping its phase: still one live task per method")
+    void reloadWithAChangedIntervalKeepsOneTaskPerMethod() throws Exception {
+        EconomyConfig config = new EconomyConfig();
+        Harness h = new Harness(config);
+
+        h.load();                                    // armed at tick 100
+        ConfigEntryAccess.set(config, "interest.interval", 900);
+        h.reload(200);                               // 100 ticks after arming
+        h.reload(300);                               // unchanged again: must not touch it
+
+        verify(h.configManager, times(2)).reloadConfigs(h.module);
+        // Not yet run: first run = arm tick + new delay = 100 + 18000, i.e. 17900 ticks after the
+        // reload at tick 200 -- neither early (not at once) nor postponed (not a fresh 18000).
+        assertThat(h.liveTasks()).as("live tasks after a changed interval").containsExactlyInAnyOrder(
+                "runTaskTimer(delay=17900, period=18000)",
+                "runTaskTimer(delay=0, period=1200)");
     }
 
-    private EconomyConfig config() {
-        EconomyConfig config = new EconomyConfig();
-        config.setInterestEnabled(true);
-        return config;
+    /** One module, its two scheduled services, the real task manager, and the real reload path. */
+    private final class Harness {
+        final EconomyConfig config;
+        final UltiEconomy module;
+        final ConfigManager configManager = mock(ConfigManager.class);
+        final List<String[]> created = new ArrayList<>();
+        final List<BukkitTask> tasks = new ArrayList<>();
+        final AtomicInteger tick = new AtomicInteger(100);
+        final BukkitScheduler scheduler;
+        final TaskManager taskManager;
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Harness(EconomyConfig config) throws Exception {
+            this.config = config;
+            this.module = module();
+            // Every task the scheduler hands out is recorded with the call that created it, so the
+            // assertions count LIVE tasks: a task that is cancelled and replaced still counts once.
+            scheduler = mock(BukkitScheduler.class, invocation -> {
+                if (!BukkitTask.class.equals(invocation.getMethod().getReturnType())) {
+                    return null;
+                }
+                BukkitTask task = mock(BukkitTask.class);
+                Object[] args = invocation.getArguments();
+                created.add(new String[] {invocation.getMethod().getName(),
+                        args.length > 2 ? String.valueOf(args[2]) : "?",
+                        args.length > 3 ? String.valueOf(args[3]) : "-"});
+                tasks.add(task);
+                return task;
+            });
+            taskManager = new TaskManager(mock(JavaPlugin.class));
+            PluginManager pluginManager = realPluginManagerWith(taskManager);
+
+            when(configManager.getConfigEntities(any(UltiToolsPlugin.class), eq(EconomyConfig.class)))
+                    .thenReturn((List) Collections.singletonList(config));
+            UltiTools framework = mock(UltiTools.class);
+            when(framework.getConfigManager()).thenReturn(configManager);
+            when(framework.getPluginManager()).thenReturn(pluginManager);
+            YamlConfiguration frameworkConfig = new YamlConfiguration();
+            frameworkConfig.set("language", "en");
+            when(framework.getConfig()).thenReturn(frameworkConfig);
+            when(framework.getLogger()).thenReturn(Logger.getLogger("ultieconomy-reload-test"));
+            when(framework.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            previousInstance = instanceField().get(null);
+            instanceField().set(null, framework);
+        }
+
+        void load() {
+            try (MockedStatic<Bukkit> bukkit = bukkit()) {
+                for (Object bean : InterestServiceTestAccess.scheduledBeans(module, config)) {
+                    taskManager.registerScheduledMethods(module, bean);
+                }
+            }
+        }
+
+        void reload(int atTick) {
+            tick.set(atTick);
+            try (MockedStatic<Bukkit> bukkit = bukkit()) {
+                module.reloadSelf();
+            }
+        }
+
+        private MockedStatic<Bukkit> bukkit() {
+            MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
+            bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+            bukkit.when(Bukkit::getLogger).thenReturn(Logger.getLogger("ultieconomy-reload-test"));
+            bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+            bukkit.when(Bukkit::getCurrentTick).thenAnswer(inv -> tick.get());
+            return bukkit;
+        }
+
+        /** Every created task that nothing has cancelled, described by the call that created it. */
+        List<String> liveTasks() {
+            List<String> live = new ArrayList<>();
+            for (int i = 0; i < tasks.size(); i++) {
+                boolean cancelled = false;
+                for (Invocation invocation : mockingDetails(tasks.get(i)).getInvocations()) {
+                    if ("cancel".equals(invocation.getMethod().getName())) {
+                        cancelled = true;
+                    }
+                }
+                if (!cancelled) {
+                    String[] call = created.get(i);
+                    live.add(call[0] + "(delay=" + call[1] + ", period=" + call[2] + ")");
+                }
+            }
+            return live;
+        }
+    }
+
+    /**
+     * The framework's own {@code PluginManager}, allocated without its server-bound constructor, with
+     * only the task manager set: {@code applyReloadedConfigBindings} is then the real reload step.
+     */
+    private static PluginManager realPluginManagerWith(TaskManager taskManager) throws Exception {
+        Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        sun.misc.Unsafe unsafe = (sun.misc.Unsafe) unsafeField.get(null);
+        PluginManager pluginManager = (PluginManager) unsafe.allocateInstance(PluginManager.class);
+        Field field = PluginManager.class.getDeclaredField("taskManager");
+        field.setAccessible(true);
+        field.set(pluginManager, taskManager);
+        return pluginManager;
     }
 
     private UltiEconomy module() throws Exception {

@@ -83,38 +83,37 @@ class ConfigFileWriteBackTest {
     }
 
     /**
-     * {@code interest.interval} and {@code leaderboard.update-interval} were removed
-     * (UltiKits/UltiEconomy#15). Written as what a fresh boot must now produce rather than as
-     * "the field is gone", so it fails against the old code, which writes both keys into a new
-     * operator's file on first boot.
+     * {@code interest.interval} and {@code leaderboard.update-interval} are declared again, bound
+     * to the two scheduled tasks through the framework's config-bound {@code @Scheduled}
+     * (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531). A first boot writes both, with the
+     * defaults that reproduce today's timing (1800 and 60 seconds), into the operator's file.
      */
     @Test
-    @DisplayName("A first boot writes no interest.interval and no leaderboard.update-interval into the operator's file (UltiEconomy#15)")
-    void firstBootWritesNoRemovedIntervalKey() throws Exception {
+    @DisplayName("A first boot writes interest.interval: 1800 and leaderboard.update-interval: 60 into the operator's file (UltiEconomy#15)")
+    void firstBootWritesBothIntervalKeysWithTheirDefaults() throws Exception {
         File file = writeOperatorFile("");
 
         new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
 
         YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
-        // Control: the same boot did write the keys this module still declares.
-        assertThat(onDisk.contains("interest.rate")).isTrue();
-        assertThat(onDisk.contains("leaderboard.display-count")).isTrue();
         assertThat(onDisk.contains("interest.interval"))
-                .withFailMessage("interest.interval was written; file now reads:%n%s", read(file))
-                .isFalse();
+                .withFailMessage("interest.interval was not written; file now reads:%n%s", read(file))
+                .isTrue();
+        assertThat(onDisk.getInt("interest.interval")).isEqualTo(1800);
         assertThat(onDisk.contains("leaderboard.update-interval"))
-                .withFailMessage("leaderboard.update-interval was written; file now reads:%n%s", read(file))
-                .isFalse();
+                .withFailMessage("leaderboard.update-interval was not written; file now reads:%n%s", read(file))
+                .isTrue();
+        assertThat(onDisk.getInt("leaderboard.update-interval")).isEqualTo(60);
     }
 
     /**
-     * The shipped {@code config/config.yml} is what a new server starts from. It must declare
-     * interest off, matching the Java default (maintainer decision 2026-09-23), and carry neither
-     * removed interval key.
+     * The shipped {@code config/config.yml} is what a new server starts from. It declares interest
+     * off, matching the Java default (maintainer decision 2026-09-23), and carries both interval
+     * keys at the values the Java fields declare.
      */
     @Test
-    @DisplayName("The shipped config.yml declares interest.enabled: false and neither removed interval key (UltiEconomy#15)")
-    void shippedFileDeclaresInterestOffAndNoIntervals() throws Exception {
+    @DisplayName("The shipped config.yml declares interest.enabled: false, interest.interval: 1800 and leaderboard.update-interval: 60 (UltiEconomy#15)")
+    void shippedFileDeclaresInterestOffAndBothIntervals() throws Exception {
         YamlConfiguration shipped;
         try (java.io.InputStream in = ConfigFileWriteBackTest.class.getClassLoader()
                 .getResourceAsStream("config/config.yml")) {
@@ -123,12 +122,14 @@ class ConfigFileWriteBackTest {
                     new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
         }
 
-        // Control: the file was read -- it holds the rate this module still declares.
+        // Control: the file was read -- it holds the rate this module declares.
         assertThat(shipped.getDouble("interest.rate")).isEqualTo(0.03);
         assertThat(shipped.contains("interest.enabled")).isTrue();
         assertThat(shipped.getBoolean("interest.enabled")).isFalse();
-        assertThat(shipped.contains("interest.interval")).isFalse();
-        assertThat(shipped.contains("leaderboard.update-interval")).isFalse();
+        assertThat(shipped.contains("interest.interval")).isTrue();
+        assertThat(shipped.getInt("interest.interval")).isEqualTo(1800);
+        assertThat(shipped.contains("leaderboard.update-interval")).isTrue();
+        assertThat(shipped.getInt("leaderboard.update-interval")).isEqualTo(60);
     }
 
     private File writeOperatorFile(String content) throws Exception {

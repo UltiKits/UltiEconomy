@@ -77,7 +77,7 @@ class StartupWarningsTest {
     class InterestSwitch {
 
         @Test
-        @DisplayName("interest.enabled: true logs one warning naming the rate, the fixed interval, the cap and how to turn it off")
+        @DisplayName("interest.enabled: true logs one warning naming the rate, the interval, the cap and how to turn it off")
         void interestOnIsAnnounced() {
             EconomyConfig config = new EconomyConfig();
             config.setInterestEnabled(true);
@@ -91,12 +91,27 @@ class StartupWarningsTest {
                     .contains("UltiEconomy")
                     .contains(CONFIG_FILE)
                     .contains("interest.rate = 0.03")
-                    .contains("every 1800 seconds")
+                    .contains("every interest.interval = 1800 seconds")
                     .contains("interest.max-interest = 10000.0")
                     .contains("interest.enabled: false")
                     // Gate-1 WR-02: servers sharing one database each pay the full rate.
                     .contains("If several servers share this database")
                     .contains("exactly one of them");
+        }
+
+        @Test
+        @DisplayName("interest.enabled: true names the configured interval, not a fixed one (UltiTools-Reborn#531 binding)")
+        void interestOnNamesTheConfiguredInterval() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(true);
+            com.ultikits.plugins.economy.config.ConfigEntryAccess.set(config, "interest.interval", 900);
+
+            List<String> warnings = warningsMentioning("interest.enabled is true", bootWith(config));
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0))
+                    .contains("every interest.interval = 900 seconds")
+                    .doesNotContain("fixed");
         }
 
         @Test
@@ -123,64 +138,26 @@ class StartupWarningsTest {
     }
 
     /**
-     * Two interval keys were removed because the periods they named are fixed in a framework
-     * {@code @Scheduled} annotation (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531). Removing
-     * a key from the code does not remove it from an operator's file, so each still-present one is
-     * named once per boot.
+     * {@code interest.interval} and {@code leaderboard.update-interval} were briefly removed on this
+     * branch and are declared again, bound to the two scheduled tasks (UltiKits/UltiTools-Reborn#531).
+     * A value an operator kept in the file is a live setting, so nothing may call it dead.
      */
     @Nested
-    @DisplayName("Removed interval keys still in the file (UltiEconomy#15)")
-    class RemovedKeys {
+    @DisplayName("Interval keys are live settings (UltiEconomy#15)")
+    class IntervalKeysAreLive {
 
         @Test
-        @DisplayName("interest.interval still in the file is named, with the fixed 1800 s and the framework request")
-        void residualInterestInterval() {
-            List<String> warnings = residueWarningsFor("interest.interval", 900);
-
-            assertThat(warnings).hasSize(1);
-            assertThat(warnings.get(0))
-                    .contains("UltiEconomy")
-                    .contains(CONFIG_FILE)
-                    .contains("'interest.interval'")
-                    .contains("1800 seconds")
-                    .contains("UltiKits/UltiTools-Reborn#531");
-        }
-
-        @Test
-        @DisplayName("leaderboard.update-interval still in the file is named, with the fixed 60 s and the framework request")
-        void residualLeaderboardInterval() {
-            List<String> warnings = residueWarningsFor("leaderboard.update-interval", 30);
-
-            assertThat(warnings).hasSize(1);
-            assertThat(warnings.get(0))
-                    .contains("UltiEconomy")
-                    .contains(CONFIG_FILE)
-                    .contains("'leaderboard.update-interval'")
-                    .contains("60 seconds")
-                    .contains("UltiKits/UltiTools-Reborn#531");
-        }
-
-        @Test
-        @DisplayName("Control: a file with no removed key produces no removed-key warning")
-        void cleanFileIsNotReported() {
-            assertThat(warningsMentioning("no longer has any effect",
-                    bootWith(new EconomyConfig(), new YamlConfiguration()))).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Control: a key this module still reads (interest.rate) is not reported as removed")
-        void stillDeclaredKeyIsNotReported() {
+        @DisplayName("interest.interval and leaderboard.update-interval in the file are not reported as removed")
+        void intervalKeysAreNotReportedAsRemoved() {
             YamlConfiguration onDisk = new YamlConfiguration();
-            onDisk.set("interest.rate", 0.03);
+            onDisk.set("interest.interval", 900);
+            onDisk.set("leaderboard.update-interval", 30);
 
-            assertThat(warningsMentioning("no longer has any effect",
-                    bootWith(new EconomyConfig(), onDisk))).isEmpty();
-        }
+            List<String> warnings = bootWith(new EconomyConfig(), onDisk);
 
-        private List<String> residueWarningsFor(String key, Object value) {
-            YamlConfiguration onDisk = new YamlConfiguration();
-            onDisk.set(key, value);
-            return warningsMentioning("'" + key + "'", bootWith(new EconomyConfig(), onDisk));
+            assertThat(warningsMentioning("no longer has any effect", warnings)).isEmpty();
+            assertThat(warningsMentioning("interest.interval'", warnings)).isEmpty();
+            assertThat(warningsMentioning("leaderboard.update-interval'", warnings)).isEmpty();
         }
     }
 

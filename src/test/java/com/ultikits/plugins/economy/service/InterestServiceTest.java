@@ -419,10 +419,10 @@ class InterestServiceTest {
      * nothing scheduled {@link InterestService#distributeInterest()}, so no interest was ever paid
      * on any server whatever {@code interest.enabled} said.
      *
-     * <p>The period is fixed at 1800 seconds; {@code interest.interval} was removed because a
-     * framework {@code @Scheduled} period is a compile-time constant (UltiKits/UltiTools-Reborn#531).
-     * {@code interest.enabled} is read at every run, so a {@code /ul reload} that flips it takes
-     * effect at the next payment without rescheduling anything.
+     * <p>The period and the first delay are both {@code interest.interval} seconds, bound through
+     * the framework's config-bound {@code @Scheduled} (UltiKits/UltiTools-Reborn#531), so the first
+     * payment comes one full interval after load. {@code interest.enabled} is read at every run, so
+     * a {@code /ul reload} that flips it takes effect at the next payment.
      */
     @Nested
     @DisplayName("Scheduled payment (UltiEconomy#15)")
@@ -432,9 +432,11 @@ class InterestServiceTest {
                 .uuid(PLAYER1_UUID.toString()).playerName("Saver").cash(0.0).bank(10000.0).build();
 
         @Test
-        @DisplayName("the framework schedules exactly one repeating sync task: first run after 36000 ticks, then every 36000 ticks (1800 s)")
-        void registersOneSyncTaskEvery1800Seconds() throws Exception {
-            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service);
+        @DisplayName("interest.interval at its declared 1800: one repeating sync task, first run after 36000 ticks, then every 36000")
+        void registersOneSyncTaskOnTheDeclaredInterval() throws Exception {
+            assertThat(com.ultikits.plugins.economy.config.ConfigEntryAccess.get(config, "interest.interval"))
+                    .isEqualTo(1800);
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
 
             assertThat(calls).hasSize(1);
             ScheduledRegistration.Call call = calls.get(0);
@@ -445,11 +447,24 @@ class InterestServiceTest {
         }
 
         @Test
+        @DisplayName("interest.interval: 900 -- first run after 18000 ticks, then every 18000 (UltiTools-Reborn#531 binding)")
+        void registersOnTheConfiguredInterval() throws Exception {
+            com.ultikits.plugins.economy.config.ConfigEntryAccess.set(config, "interest.interval", 900);
+
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
+
+            assertThat(calls).hasSize(1);
+            assertThat(calls.get(0).method).isEqualTo("runTaskTimer");
+            assertThat(calls.get(0).period).isEqualTo(18000L);
+            assertThat(calls.get(0).delay).isEqualTo(18000L);
+        }
+
+        @Test
         @DisplayName("interest.enabled: true -- a scheduled run pays interest")
         void enabledRunPays() throws Exception {
             config.setInterestEnabled(true);
             when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
-            Runnable task = ScheduledRegistration.register(service).get(0).task;
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
 
             try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
                 bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
@@ -464,7 +479,7 @@ class InterestServiceTest {
         void disabledRunDoesNothing() throws Exception {
             config.setInterestEnabled(false);
             lenient().when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
-            Runnable task = ScheduledRegistration.register(service).get(0).task;
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
 
             try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
                 bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
@@ -480,7 +495,7 @@ class InterestServiceTest {
         @DisplayName("interest.enabled is read at every run: on, off, on pays twice")
         void switchIsReadAtEveryRun() throws Exception {
             when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
-            Runnable task = ScheduledRegistration.register(service).get(0).task;
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
 
             try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
                 bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);

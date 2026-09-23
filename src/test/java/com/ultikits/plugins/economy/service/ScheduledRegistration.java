@@ -1,6 +1,9 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.ultitools.UltiTools;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.manager.ConfigManager;
 import com.ultikits.ultitools.manager.TaskManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -9,6 +12,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.mockito.MockedStatic;
 import org.mockito.invocation.Invocation;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,7 +20,10 @@ import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.mockingDetails;
 
@@ -56,17 +63,40 @@ final class ScheduledRegistration {
     private ScheduledRegistration() {
     }
 
-    /** Registers {@code bean} once and returns every scheduler call that registration made. */
-    static List<Call> register(Object bean) {
+    /*
+     * Stubs are lenient: an unbound @Scheduled never asks for the module's name or its config, and
+     * a caller running under MockitoExtension's strict stubs would otherwise fail for that alone.
+     */
+
+    /**
+     * Registers {@code bean} once, for a module whose one registered {@link EconomyConfig} is
+     * {@code config}, and returns every scheduler call that registration made. A config-bound
+     * {@code @Scheduled} (UltiKits/UltiTools-Reborn#531) reads its seconds from {@code config}
+     * through the framework's {@code ConfigManager}, reached via {@code UltiTools.getInstance()};
+     * that singleton is a mock for the duration of the call and restored afterwards.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static List<Call> register(Object bean, EconomyConfig config) {
         JavaPlugin host = mock(JavaPlugin.class);
         BukkitScheduler scheduler = mock(BukkitScheduler.class, invocation -> {
             Class<?> type = invocation.getMethod().getReturnType();
             return BukkitTask.class.equals(type) ? mock(BukkitTask.class) : null;
         });
+        UltiToolsPlugin module = mock(UltiToolsPlugin.class);
+        lenient().when(module.getPluginName()).thenReturn("UltiTools-Economy");
+        ConfigManager configManager = mock(ConfigManager.class);
+        lenient().when(configManager.getConfigEntities(any(UltiToolsPlugin.class), eq(EconomyConfig.class)))
+                .thenReturn((List) java.util.Collections.singletonList(config));
+        UltiTools framework = mock(UltiTools.class);
+        lenient().when(framework.getConfigManager()).thenReturn(configManager);
+        Object previous = frameworkInstance(null, false);
+        frameworkInstance(framework, true);
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::getLogger).thenReturn(Logger.getLogger("ultieconomy-scheduled-test"));
-            new TaskManager(host).registerScheduledMethods(mock(UltiToolsPlugin.class), bean);
+            new TaskManager(host).registerScheduledMethods(module, bean);
+        } finally {
+            frameworkInstance(previous, true);
         }
         List<Call> calls = new ArrayList<>();
         for (Invocation invocation : mockingDetails(scheduler).getInvocations()) {
@@ -78,6 +108,21 @@ final class ScheduledRegistration {
             calls.add(new Call(name, task, delay, period));
         }
         return calls;
+    }
+
+    /** Reads (and, when {@code write}, first replaces) the framework singleton. */
+    private static Object frameworkInstance(Object value, boolean write) {
+        try {
+            Field field = UltiTools.class.getDeclaredField("ultiTools");
+            field.setAccessible(true);
+            Object old = field.get(null);
+            if (write) {
+                field.set(null, value);
+            }
+            return old;
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     /**
