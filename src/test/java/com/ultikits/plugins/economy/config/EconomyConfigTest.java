@@ -24,13 +24,25 @@ class EconomyConfigTest {
         assertThat(config.getMaxInterest()).isEqualTo(10000.0);
         assertThat(config.getLeaderboardUpdateInterval()).isEqualTo(60);
         assertThat(config.getLeaderboardDisplayCount()).isEqualTo(10);
-        assertThat(config.isTaxEnabled()).isFalse();
+        assertThat(config.isTaxEnabled()).isTrue();
         assertThat(config.isTransactionTaxEnabled()).isTrue();
         assertThat(config.getTransactionTaxRate()).isEqualTo(0.05);
         assertThat(config.getTransactionTaxExemptPermission()).isEqualTo("ultieconomy.tax.exempt");
         assertThat(config.isWealthTaxEnabled()).isFalse();
         assertThat(config.getWealthTaxInterval()).isEqualTo(3600);
         assertThat(config.getWealthTaxExemptPermission()).isEqualTo("ultieconomy.wealthtax.exempt");
+    }
+
+    /**
+     * The declared default of the master tax switch follows what a server did before 6.3.0, when
+     * nothing read the key and a transfer was taxed whenever {@code tax.transaction-tax.enabled}
+     * was on (UltiKits/UltiEconomy#16, maintainer decision 2026-09-23). It only reaches a file
+     * that does not hold the key yet -- see {@code ConfigFileWriteBackTest}.
+     */
+    @Test
+    @DisplayName("tax.enabled is declared true, matching the transfer tax a server already took (UltiEconomy#16)")
+    void taxMasterSwitchIsDeclaredOn() {
+        assertThat(new EconomyConfig().isTaxEnabled()).isTrue();
     }
 
     @Test
