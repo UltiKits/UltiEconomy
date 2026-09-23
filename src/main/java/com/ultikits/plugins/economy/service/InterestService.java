@@ -105,6 +105,14 @@ public class InterestService {
      * (CurrencyBalanceEntity) for bank-enabled currencies.
      * Called by {@link #payInterestIfEnabled()} on the framework's schedule.
      *
+     * <p>Which balances earn interest: the primary currency's bank balance on the account row
+     * ({@link PlayerAccountEntity}, what {@code /bank}, {@code /money}, {@code /eco check} and Vault
+     * show), once per player; and the bank balance of every other currency whose
+     * {@code bank-enabled} is true. The per-currency row this module also keeps for the primary
+     * currency (UltiKits/UltiEconomy#25) earns nothing, so a player is paid once for the primary
+     * currency and the per-payment cap is {@code interest.max-interest}, not twice it (maintainer
+     * ruling 2026-09-23).
+     *
      * <p>How a payment writes (gate-1 review of UltiKits/UltiEconomy#15):
      * <ul>
      *   <li>It credits the rows {@code getAll()} returned and writes each one once. It does not look a
@@ -144,6 +152,12 @@ public class InterestService {
 
         List<CurrencyBalanceEntity> currencyBalances = currencyDataOperator.getAll();
         for (CurrencyBalanceEntity balance : currencyBalances) {
+            // The primary currency is paid once, above, on the account row -- the bank balance
+            // /bank, /money, /eco check and Vault show. Its per-currency row (created on join,
+            // UltiKits/UltiEconomy#25) earns nothing (maintainer ruling 2026-09-23).
+            if (currencyManager.getPrimaryCurrencyId().equals(balance.getCurrencyId())) {
+                continue;
+            }
             CurrencyDefinition def = currencyManager.getCurrency(balance.getCurrencyId());
             if (def == null || !def.isBankEnabled()) {
                 continue;

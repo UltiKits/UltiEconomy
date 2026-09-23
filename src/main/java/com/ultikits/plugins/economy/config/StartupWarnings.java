@@ -73,8 +73,10 @@ public final class StartupWarnings {
                     : "with no cap, because interest.max-interest = " + cap + " is not above 0";
             logger.warn(String.format(
                     "%s: interest.enabled is true in %s, so interest is paid: every 1800 seconds"
-                            + " (30 minutes, a fixed period), every positive bank balance -- in the"
-                            + " primary currency and in every currency with bank-enabled: true -- earns"
+                            + " (30 minutes, a fixed period), a player's primary-currency bank balance"
+                            + " (the one /bank, /money and Vault show; paid once per player, not also on"
+                            + " the per-currency row that /bank <primary currency> shows) and their bank"
+                            + " balance in every other currency with bank-enabled: true each earn"
                             + " interest.rate = %s of itself, %s, never above the bank's own maximum"
                             + " balance. This creates money. Before this release (UltiEconomy 2.0.0 and"
                             + " earlier) this switch had no effect and no interest was ever paid. If"

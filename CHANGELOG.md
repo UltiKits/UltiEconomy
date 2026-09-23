@@ -15,8 +15,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `interest.enabled: true` in both 1.0.0 and 2.0.0, so every server that has run either holds `true`
   unless its operator changed it — **on such a server, upgrading starts paying interest, which creates money**:
   every 1800 seconds (30 minutes, a fixed period; the first payment 30 minutes after the module
-  loads), every positive bank balance — in the primary currency and in every currency with
-  `bank-enabled: true` in `config/currencies.yml` — earns `interest.rate` of itself (`0.03`, 3%, by
+  loads), a player's primary-currency bank balance — the one `/bank`, `/money`, `/eco check <player>`
+  and Vault show, paid once per player and not also on the separate per-currency row that
+  `/bank <primary currency>` shows (UltiKits/UltiEconomy#25) — and their bank balance in every other
+  currency with `bank-enabled: true` in `config/currencies.yml` each earn `interest.rate` of itself (`0.03`, 3%, by
   default), capped at `interest.max-interest` per payment (`10000.0` by default; `-1` means no cap)
   and never taking a balance above its bank maximum (`bank.max-balance`, or the currency's own
   `max-bank-balance`, when set above 0 — a balance already at the maximum earns nothing), and an
@@ -32,7 +34,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （UltiKits/UltiEconomy#15）。此前从未有任何代码调度利息发放，因此无论该键如何设置，任何服务器上都从未发放过利息。
   1.0.0 与 2.0.0 的出厂文件都写的是 `interest.enabled: true`，所以所有运行过其中任一版本的服务器，除非运维改过，文件里都是 `true`——
   **这样的服务器升级后开始发放利息，这会凭空产生货币**：每 1800 秒（30 分钟，固定周期；模块加载 30 分钟后首次发放），
-  每个为正的银行余额——主货币以及 `config/currencies.yml` 中所有 `bank-enabled: true` 的货币——获得其自身
+  玩家的主货币银行余额——即 `/bank`、`/money`、`/eco check <玩家>` 与 Vault 显示的那一个，每名玩家只计一次，
+  不会再对 `/bank <主货币>` 显示的那一行单独货币余额重复计息（UltiKits/UltiEconomy#25）——以及其在 `config/currencies.yml`
+  中其他所有 `bank-enabled: true` 货币的银行余额，各自获得其自身
   `interest.rate`（默认 `0.03`，即 3%）的利息，单次上限为 `interest.max-interest`（默认 `10000.0`；`-1` 表示无上限），
   且不会使余额超过其银行上限（`bank.max-balance`，或该货币自己的 `max-bank-balance`，大于 0 时生效——已达上限的余额不再获得利息），
   利息写入成功后在线玩家才会收到聊天提示。**若多台服务器共用同一个数据库，每台开启利息的服务器都会对其中每个余额按全额利率发放：
