@@ -386,5 +386,30 @@ class LeaderboardServiceTest {
             assertThat(service.getPlayerRank(UUID_POOR, "gems")).isEqualTo(1);
             assertThat(service.getTopPlayers(1, "gems").get(0).getPlayerName()).isEqualTo("Poor");
         }
+
+        /**
+         * The refresh runs on the main thread every 60 seconds. Gate-1 review (WR-01): with two
+         * configured currencies it read the accounts table three times and the balances table twice
+         * per run. One read of each is enough.
+         */
+        @Test
+        @DisplayName("a scheduled run reads each table once, however many currencies are configured")
+        void scheduledRunReadsEachTableOnce() {
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(
+                    PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(10).bank(0).build()));
+            when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(
+                    CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(5).bank(0).build()));
+            Runnable task = ScheduledRegistration.register(service).get(0).task;
+
+            try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
+                         org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            org.mockito.Mockito.verify(dataOperator, org.mockito.Mockito.times(1)).getAll();
+            org.mockito.Mockito.verify(currencyDataOperator, org.mockito.Mockito.times(1)).getAll();
+            assertThat(service.getPlayerRank(UUID_RICH, "gems")).isEqualTo(1);
+            assertThat(service.getTopPlayers(1, "gems").get(0).getTotalWealth()).isEqualTo(5.0);
+        }
     }
 }
