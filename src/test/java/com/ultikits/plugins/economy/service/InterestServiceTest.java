@@ -549,7 +549,8 @@ class InterestServiceTest {
             PlayerAccountEntity nearCap = account(PLAYER2_UUID, 99900.0);
             when(dataOperator.getAll()).thenReturn(Arrays.asList(atCap, nearCap));
             Player online = mock(Player.class);
-            when(online.isOnline()).thenReturn(true);
+            // Lenient: a correct payment never reaches the owner of a balance already at the cap.
+            lenient().when(online.isOnline()).thenReturn(true);
 
             try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
                 bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(online);
