@@ -4,7 +4,9 @@ import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Scheduled;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import lombok.Getter;
@@ -14,6 +16,12 @@ import java.util.stream.Collectors;
 
 @Service
 public class LeaderboardService {
+
+    /**
+     * 60 seconds, in ticks. Fixed: a {@code @Scheduled} period is a compile-time constant, and
+     * reading it from configuration is requested of the framework as UltiKits/UltiTools-Reborn#531.
+     */
+    static final long REFRESH_PERIOD_TICKS = 60L * 20L;
 
     private EconomyConfig config;
     private DataOperator<PlayerAccountEntity> dataOperator;
@@ -57,8 +65,28 @@ public class LeaderboardService {
     }
 
     /**
+     * The scheduled refresh: rebuilds the primary leaderboard and every configured currency's own
+     * leaderboard (UltiKits/UltiEconomy#15). Runs once as soon as the module has loaded, so the rank
+     * and top-N placeholders are filled from the start, and then every 60 seconds. Before 6.3.0
+     * nothing called either refresh method and every such placeholder read an empty cache.
+     *
+     * <p>Runs on the main thread, like the rest of this module's data access; the refresh only reads
+     * and then swaps the two volatile snapshots, so readers never see a half-built list.
+     */
+    @Scheduled(period = REFRESH_PERIOD_TICKS)
+    public void refreshAll() {
+        refreshLeaderboard();
+        if (currencyManager == null) {
+            return;
+        }
+        for (CurrencyDefinition currency : currencyManager.getAllCurrencies()) {
+            refreshCurrencyLeaderboard(currency.getId());
+        }
+    }
+
+    /**
      * Refreshes the leaderboard cache from the database.
-     * Called periodically by the scheduled task in the main plugin.
+     * Called by {@link #refreshAll()} on the framework's schedule.
      */
     public void refreshLeaderboard() {
         List<PlayerAccountEntity> accounts = dataOperator.getAll();

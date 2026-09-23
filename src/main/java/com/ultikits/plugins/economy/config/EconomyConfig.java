@@ -33,20 +33,14 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited)")
     private double maxBankBalance = -1;
 
-    @ConfigEntry(path = "interest.enabled", comment = "Enable interest")
-    private boolean interestEnabled = true;
+    @ConfigEntry(path = "interest.enabled", comment = "Pay bank interest every 1800 seconds (fixed); read at each payment")
+    private boolean interestEnabled = false;
 
-    @ConfigEntry(path = "interest.rate", comment = "Interest rate per interval")
+    @ConfigEntry(path = "interest.rate", comment = "Interest rate per payment (payments are every 1800 seconds)")
     private double interestRate = 0.03;
-
-    @ConfigEntry(path = "interest.interval", comment = "Interval in seconds")
-    private int interestInterval = 1800;
 
     @ConfigEntry(path = "interest.max-interest", comment = "Max interest per payment")
     private double maxInterest = 10000.0;
-
-    @ConfigEntry(path = "leaderboard.update-interval", comment = "Leaderboard update interval in seconds")
-    private int leaderboardUpdateInterval = 60;
 
     @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
     private int leaderboardDisplayCount = 10;

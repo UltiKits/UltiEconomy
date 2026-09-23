@@ -13,8 +13,8 @@ UltiTools-API 的完整 Vault 经济提供者模块。支持双钱包（现金 +
 - **Vault Economy** - Full Vault API integration as economy provider / 完整 Vault API 经济提供者
 - **Dual Wallet** - Separate cash and bank balances / 现金和银行双钱包
 - **Bank System** - Deposit, withdraw, min deposit, max balance / 存款、取款、最低存款、最高余额
-- **Interest** - Configurable periodic interest on bank balances / 可配置的银行利息
-- **Leaderboard** - Cached wealth rankings with periodic refresh / 定期刷新的财富排行榜
+- **Interest** - Bank interest every 30 minutes, off by default / 每 30 分钟发放的银行利息，默认关闭
+- **Leaderboard** - Cached wealth rankings refreshed every 60 seconds / 每 60 秒刷新的财富排行榜
 - **PlaceholderAPI** - Rich placeholder support / 丰富的占位符支持
 - **Admin Commands** - Give, take, set, check player balances / 管理员经济管理命令
 - **i18n** - Chinese and English language support / 中英文支持
@@ -46,15 +46,16 @@ bank:
   min-deposit: 100.0            # Minimum deposit amount / 最低存款金额
   max-balance: -1               # Max bank balance (-1 = unlimited) / 最高银行余额
 
-interest:
-  enabled: true                 # Enable interest / 启用利息
-  rate: 0.03                    # Interest rate per interval / 每周期利率
-  interval: 1800                # Interval in seconds / 利息发放间隔（秒）
+interest:                       # Paid every 1800 s, a fixed period / 每 1800 秒发放，周期固定
+  enabled: false                # Pay bank interest (creates money) / 发放银行利息（凭空产生货币）
+  rate: 0.03                    # Interest rate per payment / 每次发放的利率
   max-interest: 10000.0         # Max interest per payment / 单次最大利息
 
-leaderboard:
-  update-interval: 60           # Refresh interval in seconds / 排行榜刷新间隔
+leaderboard:                    # Refreshed every 60 s, a fixed period / 每 60 秒刷新，周期固定
   display-count: 10             # Default top N / 默认显示前 N 名
+
+tax:
+  enabled: true                 # Master switch: false collects no tax at all / 总开关：false 时不征收任何税
 ```
 
 ## PlaceholderAPI Placeholders / 占位符
@@ -80,7 +81,7 @@ leaderboard:
 - `@UltiToolsModule` plugin registration
 - `@CmdExecutor` / `@CmdMapping` command system
 - `@ConfigEntity` / `@ConfigEntry` config management
-- `@ConditionalOnConfig` for feature toggling (interest)
+- `@Scheduled` for the interest payment and the leaderboard refresh
 - `AbstractDataEntity` + `@Table` / `@Column` ORM
 - Query DSL (`operator.query().where("x").eq(y).list()`)
 - `DataOperator<T>` for account persistence
