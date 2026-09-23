@@ -82,6 +82,55 @@ class ConfigFileWriteBackTest {
         assertThat(config.isTaxEnabled()).isEqualTo(operatorValue);
     }
 
+    /**
+     * {@code interest.interval} and {@code leaderboard.update-interval} were removed
+     * (UltiKits/UltiEconomy#15). Written as what a fresh boot must now produce rather than as
+     * "the field is gone", so it fails against the old code, which writes both keys into a new
+     * operator's file on first boot.
+     */
+    @Test
+    @DisplayName("A first boot writes no interest.interval and no leaderboard.update-interval into the operator's file (UltiEconomy#15)")
+    void firstBootWritesNoRemovedIntervalKey() throws Exception {
+        File file = writeOperatorFile("");
+
+        new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
+
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
+        // Control: the same boot did write the keys this module still declares.
+        assertThat(onDisk.contains("interest.rate")).isTrue();
+        assertThat(onDisk.contains("leaderboard.display-count")).isTrue();
+        assertThat(onDisk.contains("interest.interval"))
+                .withFailMessage("interest.interval was written; file now reads:%n%s", read(file))
+                .isFalse();
+        assertThat(onDisk.contains("leaderboard.update-interval"))
+                .withFailMessage("leaderboard.update-interval was written; file now reads:%n%s", read(file))
+                .isFalse();
+    }
+
+    /**
+     * The shipped {@code config/config.yml} is what a new server starts from. It must declare
+     * interest off, matching the Java default (maintainer decision 2026-09-23), and carry neither
+     * removed interval key.
+     */
+    @Test
+    @DisplayName("The shipped config.yml declares interest.enabled: false and neither removed interval key (UltiEconomy#15)")
+    void shippedFileDeclaresInterestOffAndNoIntervals() throws Exception {
+        YamlConfiguration shipped;
+        try (java.io.InputStream in = ConfigFileWriteBackTest.class.getClassLoader()
+                .getResourceAsStream("config/config.yml")) {
+            assertThat(in).as("shipped config/config.yml on the classpath").isNotNull();
+            shipped = YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+
+        // Control: the file was read -- it holds the rate this module still declares.
+        assertThat(shipped.getDouble("interest.rate")).isEqualTo(0.03);
+        assertThat(shipped.contains("interest.enabled")).isTrue();
+        assertThat(shipped.getBoolean("interest.enabled")).isFalse();
+        assertThat(shipped.contains("interest.interval")).isFalse();
+        assertThat(shipped.contains("leaderboard.update-interval")).isFalse();
+    }
+
     private File writeOperatorFile(String content) throws Exception {
         File file = serverDir.resolve("config").resolve("config.yml").toFile();
         Files.createDirectories(file.getParentFile().toPath());

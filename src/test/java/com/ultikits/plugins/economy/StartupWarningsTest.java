@@ -72,6 +72,115 @@ class StartupWarningsTest {
         }
     }
 
+    @Nested
+    @DisplayName("interest.enabled (UltiEconomy#15)")
+    class InterestSwitch {
+
+        @Test
+        @DisplayName("interest.enabled: true logs one warning naming the rate, the fixed interval, the cap and how to turn it off")
+        void interestOnIsAnnounced() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(true);
+            config.setInterestRate(0.03);
+            config.setMaxInterest(10000.0);
+
+            List<String> warnings = warningsMentioning("interest.enabled is true", bootWith(config));
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0))
+                    .contains("UltiEconomy")
+                    .contains(CONFIG_FILE)
+                    .contains("interest.rate = 0.03")
+                    .contains("every 1800 seconds")
+                    .contains("interest.max-interest = 10000.0")
+                    .contains("interest.enabled: false");
+        }
+
+        @Test
+        @DisplayName("interest.enabled: true with max-interest -1 says the payment has no cap")
+        void interestOnWithoutCapSaysSo() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(true);
+            config.setMaxInterest(-1);
+
+            List<String> warnings = warningsMentioning("interest.enabled is true", bootWith(config));
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0)).contains("no cap");
+        }
+
+        @Test
+        @DisplayName("Control: interest.enabled: false logs no interest warning")
+        void interestOffIsNotAnnounced() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(false);
+
+            assertThat(warningsMentioning("interest.enabled", bootWith(config))).isEmpty();
+        }
+    }
+
+    /**
+     * Two interval keys were removed because the periods they named are fixed in a framework
+     * {@code @Scheduled} annotation (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531). Removing
+     * a key from the code does not remove it from an operator's file, so each still-present one is
+     * named once per boot.
+     */
+    @Nested
+    @DisplayName("Removed interval keys still in the file (UltiEconomy#15)")
+    class RemovedKeys {
+
+        @Test
+        @DisplayName("interest.interval still in the file is named, with the fixed 1800 s and the framework request")
+        void residualInterestInterval() {
+            List<String> warnings = residueWarningsFor("interest.interval", 900);
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0))
+                    .contains("UltiEconomy")
+                    .contains(CONFIG_FILE)
+                    .contains("'interest.interval'")
+                    .contains("1800 seconds")
+                    .contains("UltiKits/UltiTools-Reborn#531");
+        }
+
+        @Test
+        @DisplayName("leaderboard.update-interval still in the file is named, with the fixed 60 s and the framework request")
+        void residualLeaderboardInterval() {
+            List<String> warnings = residueWarningsFor("leaderboard.update-interval", 30);
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0))
+                    .contains("UltiEconomy")
+                    .contains(CONFIG_FILE)
+                    .contains("'leaderboard.update-interval'")
+                    .contains("60 seconds")
+                    .contains("UltiKits/UltiTools-Reborn#531");
+        }
+
+        @Test
+        @DisplayName("Control: a file with no removed key produces no removed-key warning")
+        void cleanFileIsNotReported() {
+            assertThat(warningsMentioning("no longer has any effect",
+                    bootWith(new EconomyConfig(), new YamlConfiguration()))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Control: a key this module still reads (interest.rate) is not reported as removed")
+        void stillDeclaredKeyIsNotReported() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("interest.rate", 0.03);
+
+            assertThat(warningsMentioning("no longer has any effect",
+                    bootWith(new EconomyConfig(), onDisk))).isEmpty();
+        }
+
+        private List<String> residueWarningsFor(String key, Object value) {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set(key, value);
+            return warningsMentioning("'" + key + "'", bootWith(new EconomyConfig(), onDisk));
+        }
+    }
+
     // ==================== helpers ====================
 
     static List<String> warningsMentioning(String needle, List<String> warnings) {

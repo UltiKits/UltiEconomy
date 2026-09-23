@@ -18,11 +18,9 @@ class EconomyConfigTest {
         assertThat(config.isBankEnabled()).isTrue();
         assertThat(config.getMinDeposit()).isEqualTo(100.0);
         assertThat(config.getMaxBankBalance()).isEqualTo(-1.0);
-        assertThat(config.isInterestEnabled()).isTrue();
+        assertThat(config.isInterestEnabled()).isFalse();
         assertThat(config.getInterestRate()).isEqualTo(0.03);
-        assertThat(config.getInterestInterval()).isEqualTo(1800);
         assertThat(config.getMaxInterest()).isEqualTo(10000.0);
-        assertThat(config.getLeaderboardUpdateInterval()).isEqualTo(60);
         assertThat(config.getLeaderboardDisplayCount()).isEqualTo(10);
         assertThat(config.isTaxEnabled()).isTrue();
         assertThat(config.isTransactionTaxEnabled()).isTrue();
@@ -55,11 +53,9 @@ class EconomyConfigTest {
         config.setBankEnabled(false);
         config.setMinDeposit(50.0);
         config.setMaxBankBalance(100000.0);
-        config.setInterestEnabled(false);
+        config.setInterestEnabled(true); // the declared default is false, so set the other value
         config.setInterestRate(0.05);
-        config.setInterestInterval(3600);
         config.setMaxInterest(5000.0);
-        config.setLeaderboardUpdateInterval(120);
         config.setLeaderboardDisplayCount(20);
 
         assertThat(config.getInitialCash()).isEqualTo(500.0);
@@ -68,11 +64,9 @@ class EconomyConfigTest {
         assertThat(config.isBankEnabled()).isFalse();
         assertThat(config.getMinDeposit()).isEqualTo(50.0);
         assertThat(config.getMaxBankBalance()).isEqualTo(100000.0);
-        assertThat(config.isInterestEnabled()).isFalse();
+        assertThat(config.isInterestEnabled()).isTrue();
         assertThat(config.getInterestRate()).isEqualTo(0.05);
-        assertThat(config.getInterestInterval()).isEqualTo(3600);
         assertThat(config.getMaxInterest()).isEqualTo(5000.0);
-        assertThat(config.getLeaderboardUpdateInterval()).isEqualTo(120);
         assertThat(config.getLeaderboardDisplayCount()).isEqualTo(20);
     }
 }

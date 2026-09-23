@@ -408,6 +408,101 @@ class InterestServiceTest {
         }
     }
 
+    /**
+     * Interest is paid on a schedule the framework runs (UltiKits/UltiEconomy#15). Before 6.3.0
+     * nothing scheduled {@link InterestService#distributeInterest()}, so no interest was ever paid
+     * on any server whatever {@code interest.enabled} said.
+     *
+     * <p>The period is fixed at 1800 seconds; {@code interest.interval} was removed because a
+     * framework {@code @Scheduled} period is a compile-time constant (UltiKits/UltiTools-Reborn#531).
+     * {@code interest.enabled} is read at every run, so a {@code /ul reload} that flips it takes
+     * effect at the next payment without rescheduling anything.
+     */
+    @Nested
+    @DisplayName("Scheduled payment (UltiEconomy#15)")
+    class ScheduleTests {
+
+        private final PlayerAccountEntity saver = PlayerAccountEntity.builder()
+                .uuid(PLAYER1_UUID.toString()).playerName("Saver").cash(0.0).bank(10000.0).build();
+
+        @Test
+        @DisplayName("the framework schedules exactly one repeating sync task: first run after 36000 ticks, then every 36000 ticks (1800 s)")
+        void registersOneSyncTaskEvery1800Seconds() {
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service);
+
+            assertThat(calls).hasSize(1);
+            ScheduledRegistration.Call call = calls.get(0);
+            assertThat(call.method).isEqualTo("runTaskTimer");
+            assertThat(call.period).isEqualTo(36000L);
+            assertThat(call.delay).isEqualTo(36000L);
+            assertThat(call.task).isNotNull();
+        }
+
+        @Test
+        @DisplayName("interest.enabled: true -- a scheduled run pays interest")
+        void enabledRunPays() {
+            config.setInterestEnabled(true);
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
+            Runnable task = ScheduledRegistration.register(service).get(0).task;
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            verify(economyService).addBank(PLAYER1_UUID, 300.0);
+        }
+
+        @Test
+        @DisplayName("interest.enabled: false -- a scheduled run reads no account and pays nothing")
+        void disabledRunDoesNothing() {
+            config.setInterestEnabled(false);
+            lenient().when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
+            Runnable task = ScheduledRegistration.register(service).get(0).task;
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            verify(dataOperator, never()).getAll();
+            verify(currencyDataOperator, never()).getAll();
+            verifyNoInteractions(economyService);
+        }
+
+        @Test
+        @DisplayName("interest.enabled is read at every run: on, off, on pays twice")
+        void switchIsReadAtEveryRun() {
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
+            Runnable task = ScheduledRegistration.register(service).get(0).task;
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
+                config.setInterestEnabled(true);
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+                config.setInterestEnabled(false);
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+                config.setInterestEnabled(true);
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            verify(economyService, times(2)).addBank(PLAYER1_UUID, 300.0);
+        }
+
+        @Test
+        @DisplayName("the service is not conditional on interest.enabled, so turning it on by reload has something to run")
+        void serviceExistsWhateverTheSwitchSaysAtBoot() {
+            assertThat(InterestService.class.isAnnotationPresent(
+                    com.ultikits.ultitools.annotations.ConditionalOnConfig.class)).isFalse();
+        }
+
+        @Test
+        @DisplayName("interest.enabled is declared false: paying interest creates money, so it is an operator's choice")
+        void switchIsDeclaredOff() {
+            assertThat(new EconomyConfig().isInterestEnabled()).isFalse();
+        }
+    }
+
     @Nested
     @DisplayName("Invalid UUID handling")
     class InvalidUuidTests {
