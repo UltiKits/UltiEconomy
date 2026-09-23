@@ -1,7 +1,6 @@
 package com.ultikits.plugins.economy.config;
 
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
-import org.bukkit.configuration.file.YamlConfiguration;
 
 /**
  * Warnings this module logs once per boot about settings whose effect changed in 6.3.0.
@@ -17,13 +16,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
  * and stops taking the transfer tax on upgrade without its operator having chosen either. These
  * warnings are how the operator finds out.
  *
- * <p><b>Settings that were removed.</b> Deleting a {@code @ConfigEntry} field removes the key from
- * the code, not from anybody's disk: the framework never deletes a key it no longer declares, so a
- * server that has run this module still has it, with whatever value its operator set. Each one still
- * present is named once per boot, with where its job went. The check reads an explicit list rather
- * than reporting every undeclared key, because an unknown key is not necessarily one this module
- * ever had.
- *
  * <p>Each warning names the module, the file and the key, says what the server is doing because
  * of it, and says exactly how to change it.
  */
@@ -34,21 +26,6 @@ public final class StartupWarnings {
 
     /** This module's runtime name, which is what {@code /ul reload <name>} expects. */
     private static final String RUNTIME_NAME = "UltiTools-Economy";
-
-    /**
-     * One entry per removed key: the key path as it appears in the file, then where its job went.
-     * The second element completes the sentence "... and can be deleted from the file -- %s."
-     */
-    private static final String[][] REMOVED = {
-            {"interest.interval",
-                    "interest is paid every 1800 seconds (30 minutes), a fixed period; making it"
-                            + " configurable is requested of the framework as"
-                            + " UltiKits/UltiTools-Reborn#531 (UltiKits/UltiEconomy#15)"},
-            {"leaderboard.update-interval",
-                    "the leaderboard is refreshed every 60 seconds, a fixed period; making it"
-                            + " configurable is requested of the framework as"
-                            + " UltiKits/UltiTools-Reborn#531 (UltiKits/UltiEconomy#15)"},
-    };
 
     private StartupWarnings() {
     }
@@ -72,8 +49,9 @@ public final class StartupWarnings {
                     ? "capped at interest.max-interest = " + cap + " per payment"
                     : "with no cap, because interest.max-interest = " + cap + " is not above 0";
             logger.warn(String.format(
-                    "%s: interest.enabled is true in %s, so interest is paid: every 1800 seconds"
-                            + " (30 minutes, a fixed period), a player's primary-currency bank balance"
+                    "%s: interest.enabled is true in %s, so interest is paid: every interest.interval"
+                            + " = %d seconds (the first payment one interval after load), a player's"
+                            + " primary-currency bank balance"
                             + " (the one /bank, /money and Vault show; paid once per player, not also on"
                             + " the per-currency row that /bank <primary currency> shows) and their bank"
                             + " balance in every other currency with bank-enabled: true each earn"
@@ -84,7 +62,8 @@ public final class StartupWarnings {
                             + " the full rate, so turn it on for exactly one of them. To stop paying"
                             + " interest, set interest.enabled: false in %s and run /ul reload %s; the"
                             + " next payment is skipped.",
-                    MODULE, file, config.getInterestRate(), capText, file, RUNTIME_NAME));
+                    MODULE, file, config.getInterestInterval(), config.getInterestRate(), capText, file,
+                    RUNTIME_NAME));
         }
         if (!config.isTaxEnabled()) {
             logger.warn(String.format(
@@ -96,18 +75,6 @@ public final class StartupWarnings {
                             + " set tax.enabled: true in %s and run /ul reload %s; the next transfer"
                             + " is taxed.",
                     MODULE, file, file, RUNTIME_NAME));
-        }
-        YamlConfiguration onDisk = config.getConfig();
-        if (onDisk == null) {
-            return;
-        }
-        for (String[] removed : REMOVED) {
-            if (onDisk.contains(removed[0])) {
-                logger.warn(String.format(
-                        "%s: '%s' in %s no longer has any effect and can be deleted from the file"
-                                + " -- %s.",
-                        MODULE, removed[0], file, removed[1]));
-            }
         }
     }
 }

@@ -71,7 +71,7 @@ under `.worktrees/` was read, cited, or counted anywhere in this document.
 
 **Positive control:** the canonical (worktree-excluded) line-start form returns `@CmdExecutor` = 7,
 `@CmdMapping` = 24, `@EventListener` = 2 (classes, 2 handler methods total: one each),
-`@Scheduled` = 2, `@ConfigEntity` = 1, `@ConditionalOnConfig` = 0, `@ConfigEntry` = 17, `@Table` = 3 —
+`@Scheduled` = 2, `@ConfigEntity` = 1, `@ConditionalOnConfig` = 0, `@ConfigEntry` = 19, `@Table` = 3 —
 confirmed by reading `EcoAdminCommand.java` directly: it alone declares 11 of the 24
 `@CmdMapping` sites (`give`, `take`, `set`, `check`, `give <player> <amount> <currency>`,
 `take <player> <amount> <currency>`, `set <player> <amount> <currency>`,
@@ -228,15 +228,22 @@ registration row — plus the matching unload-time Vault deregistration in
 
 ## Scheduled tasks
 
-Both tasks are registered by the framework's `TaskManager` from a `@Scheduled` method, once when the
-module loads, on the main thread (`async = false`); `/ul reload` does not register them again, and
-unloading the module (`/upm uninstall UltiTools-Economy`, server shutdown) cancels them through
-`PluginManager#unregister`. Each registration logs one INFO line,
-`Registered @Scheduled task: <Class>.<method> (delay=<d>, period=<p>, async=false)`. Both periods
-are fixed in the annotation, because a `@Scheduled` period is a compile-time constant; the former
-`interest.interval` and `leaderboard.update-interval` keys were removed rather than wired, and making
-the periods configurable is requested of the framework as UltiKits/UltiTools-Reborn#531. Before
-6.3.0 neither task existed (UltiKits/UltiEconomy#15): nothing called `distributeInterest()` or
+Both tasks are registered by the framework's `TaskManager` from a config-bound `@Scheduled`
+method (UltiTools 6.3.0, UltiKits/UltiTools-Reborn#531), once when the module loads, on the main
+thread (a binding is sync only). The interval is read in seconds from `interest.interval` /
+`leaderboard.update-interval` in `config/config.yml`; the default lives only in the `EconomyConfig`
+field. Each registration logs one INFO line, `Registered config-bound @Scheduled task:
+<Class>.<method> (delay=<d>, period=<p>, async=false, config=EconomyConfig, periodKey=<key>=<n>s…)`.
+`/ul reload UltiTools-Economy` does not register them again: it applies a changed interval to the
+running task, keeping its place in its cycle (the next run is the last run -- or, before the first,
+the load -- plus the new interval, or the next tick if that has passed), and logs one INFO line
+`rescheduled config-bound @Scheduled task <Class>.<method> after reload`; an unchanged value leaves
+the task alone. A value below 1 or above 107374182 seconds refuses the module at load, naming the
+key; at reload it is not applied, the running value is kept and a WARNING names the key. Unloading
+the module (`/upm uninstall UltiTools-Economy`, server shutdown) cancels both through
+`PluginManager#unregister`. The binding needs `api-version: 630` in `plugin.yml`: an older framework
+would drop it silently and run the method once at load, so it refuses the module instead. Before
+this release neither task existed (UltiKits/UltiEconomy#15): nothing called `distributeInterest()` or
 either refresh method, so no interest was ever paid and every leaderboard placeholder read an empty
 cache.
 
@@ -246,15 +253,15 @@ exists and the switch is read at every run instead, so turning interest on or of
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.scheduled.interest-payment | Every 1800 seconds (36000 ticks; the first run 1800 seconds after the module loads, not at load), if `interest.enabled` is `true` at that moment: every positive primary-currency bank balance on the account row (`PlayerAccountEntity` — the balance `/bank`, `/money`, `/eco check <player>` and Vault show) and every positive bank balance in each other currency whose `bank-enabled` is `true` (`CurrencyBalanceEntity`) is credited `balance × interest.rate`, capped at `interest.max-interest` when that is above 0 and never taking the balance above its bank maximum (`bank.max-balance` for the primary account, the currency's own `max-bank-balance` otherwise, when above 0; a balance at the maximum gets nothing). Each row is read once by `getAll()` and written once by `update`, with no per-row lookup; the owner, if online, is sent a chat line only after that write succeeded, and a failed write is logged and leaves the row unchanged. If the switch is `false` the run reads no account and sends nothing. Every server that runs this task pays every balance in its database, so servers sharing one database must have interest on for exactly one of them (the boot warning says so). The primary currency is also stored as a per-currency row (created on join alongside the account, UltiKits/UltiEconomy#25); that row earns nothing, so a player is paid once for the primary currency and the per-payment cap is `interest.max-interest` (maintainer ruling 2026-09-23) | scheduled | automatic while the module is loaded; `interest.enabled` in `config/config.yml` | n/a | n/a | admin | detailed | InterestService#payInterestIfEnabled |
-| ultieconomy.scheduled.leaderboard-refresh | Rebuild the cached wealth leaderboards: once as soon as the module has loaded (delay 0), then every 60 seconds (1200 ticks) — the primary leaderboard from every account's cash + bank, and one leaderboard per configured currency from that currency's balance rows. The rank and top-N placeholders read these caches, so they lag real balances by up to 60 seconds | scheduled | automatic while the module is loaded; no switch | n/a | n/a | internal | brief | LeaderboardService#refreshAll |
+| ultieconomy.scheduled.interest-payment | Every `interest.interval` seconds (1800 by default, 36000 ticks; the first run one interval after the module loads, not at load), if `interest.enabled` is `true` at that moment: every positive primary-currency bank balance on the account row (`PlayerAccountEntity` — the balance `/bank`, `/money`, `/eco check <player>` and Vault show) and every positive bank balance in each other currency whose `bank-enabled` is `true` (`CurrencyBalanceEntity`) is credited `balance × interest.rate`, capped at `interest.max-interest` when that is above 0 and never taking the balance above its bank maximum (`bank.max-balance` for the primary account, the currency's own `max-bank-balance` otherwise, when above 0; a balance at the maximum gets nothing). Each row is read once by `getAll()` and written once by `update`, with no per-row lookup; the owner, if online, is sent a chat line only after that write succeeded, and a failed write is logged and leaves the row unchanged. If the switch is `false` the run reads no account and sends nothing. Every server that runs this task pays every balance in its database, so servers sharing one database must have interest on for exactly one of them (the boot warning says so). The primary currency is also stored as a per-currency row (created on join alongside the account, UltiKits/UltiEconomy#25); that row earns nothing, so a player is paid once for the primary currency and the per-payment cap is `interest.max-interest` (maintainer ruling 2026-09-23) | scheduled | automatic while the module is loaded; `interest.enabled` and `interest.interval` in `config/config.yml` | n/a | n/a | admin | detailed | InterestService#payInterestIfEnabled |
+| ultieconomy.scheduled.leaderboard-refresh | Rebuild the cached wealth leaderboards: once as soon as the module has loaded (delay 0), then every `leaderboard.update-interval` seconds (60 by default, 1200 ticks) — the primary leaderboard from every account's cash + bank, and one leaderboard per configured currency from that currency's balance rows. The rank and top-N placeholders read these caches, so they lag real balances by up to one interval | scheduled | automatic while the module is loaded; `leaderboard.update-interval` in `config/config.yml`, no on/off switch | n/a | n/a | internal | brief | LeaderboardService#refreshAll |
 
 ## Leaderboard placeholders
 
 `EconomyPlaceholderExpansion` (identifier `ultieconomy`), registered per
 `ultieconomy.placeholder.register` above. The rank and top-N placeholders read the caches
-`ultieconomy.scheduled.leaderboard-refresh` rebuilds every 60 seconds, so they lag real balances by
-up to that long; before this release nothing rebuilt them and they always read empty (UltiKits/UltiEconomy#15).
+`ultieconomy.scheduled.leaderboard-refresh` rebuilds every `leaderboard.update-interval` seconds (60 by
+default), so they lag real balances by up to that long; before this release nothing rebuilt them and they always read empty (UltiKits/UltiEconomy#15).
 
 12 distinct placeholder-parameter branches exist across `onRequest`, `handleCurrencyPlaceholder`,
 and `handleTopPlaceholder` (5 unscoped: `cash`/`bank`/`total`/`cash_formatted`/`rank`; 5 identical
@@ -283,14 +290,15 @@ restated five times.
 
 ## Configuration
 
-All 17 `@ConfigEntry` fields declared on the module's one `@ConfigEntity` class,
+All 19 `@ConfigEntry` fields declared on the module's one `@ConfigEntity` class,
 `EconomyConfig` (confirmed by reading the class field by field, matching the reconciliation
-table's `@ConfigEntry` = 17 exactly). **The packaged default resource,
-`src/main/resources/config/config.yml`, ships only 10 of these 17 as literal YAML** —
+table's `@ConfigEntry` = 19 exactly). **The packaged default resource,
+`src/main/resources/config/config.yml`, ships only 12 of these 19 as literal YAML** —
 `grep -cE '^[[:space:]]*[a-zA-Z][a-zA-Z0-9_-]*:[[:space:]]*[^[:space:]#]'
-src/main/resources/config/config.yml` returns 10 (`initial-cash`, `currency-name`,
+src/main/resources/config/config.yml` returns 12 (`initial-cash`, `currency-name`,
 `currency-symbol`, `bank.enabled`, `bank.min-deposit`, `bank.max-balance`, `interest.enabled`,
-`interest.rate`, `interest.max-interest`, `leaderboard.display-count`); the packaged file has no
+`interest.rate`, `interest.interval`, `interest.max-interest`, `leaderboard.update-interval`,
+`leaderboard.display-count`); the packaged file has no
 `tax:` section at all. The remaining 7 — every `tax.*` key — are absent from the shipped resource
 and are written to the on-disk `plugins/UltiTools/pluginConfig/UltiTools-Economy/config/config.yml`
 on the plugin's first boot instead, by
@@ -298,20 +306,18 @@ on the plugin's first boot instead, by
 writing each `@ConfigEntry` field's Java-declared default for any key the on-disk file lacks) —
 the same "migrated onto disk on first boot if absent" mechanism the framework's own `FEATURES.md`
 documents for `ultipanel.commands.blocklist`/`ultipanel.files.editable-roots`. A server that has
-booted this module at least once therefore has all 17 keys on disk even though the packaged jar's
-default resource ships only 10. `config/currencies.yml` is this module's second shipped yml
+booted this module at least once therefore has all 19 keys on disk even though the packaged jar's
+default resource ships only 12. `config/currencies.yml` is this module's second shipped yml
 resource; it is **not** `@ConfigEntity`-bound (see `## Currencies` above for its own single row)
 and — per this plan's own instruction that this module carries exactly one config-per-file
 checklist row, for the single `@ConfigEntity` class — its loading is folded into that same
 checklist row rather than given a second one; see that row's own Preconditions/Steps for how.
 
-**Two keys were removed in 6.3.0:** `interest.interval` and `leaderboard.update-interval`. Nothing
-ever read either; the periods they named are now fixed at 1800 and 60 seconds in the two
-`@Scheduled` annotations (see `## Scheduled tasks`), and making them configurable is requested of
-the framework as UltiKits/UltiTools-Reborn#531 (UltiKits/UltiEconomy#15). The framework never
-deletes a key it no longer declares, so a server that has run an earlier version still has both
-in its file; `StartupWarnings#log` names each one still present in a WARN line at every boot,
-saying it can be deleted.
+**Two keys are bound to the scheduled tasks:** `interest.interval` and `leaderboard.update-interval`.
+Before this release nothing read either (UltiKits/UltiEconomy#15); they now set the two tasks'
+intervals through the framework's config-bound `@Scheduled` (UltiKits/UltiTools-Reborn#531), so a
+value an operator kept in the file from 1.0.0 or 2.0.0 takes effect on upgrade. See
+`## Scheduled tasks` for reload and invalid-value behaviour.
 
 **Also confirmed while reading for this section: 23 of the 44 distinct `plugin.i18n(...)` key
 literals used across this module's source have no exact match in either `lang/en.json` or
@@ -336,10 +342,12 @@ ends "never localizes"), not repeated here.
 | ultieconomy.config.config.currency-name | Currency display name used in Vault's `currencyNamePlural`/`currencyNameSingular` queries | config | `config/config.yml: currency-name (default: "Coins")` | n/a | n/a | admin | brief | VaultEconomyProvider#currencyNamePlural |
 | ultieconomy.config.config.currency-symbol | Symbol prefixed to every formatted primary-currency amount | config | `config/config.yml: currency-symbol (default: "$")` | n/a | n/a | admin | brief | EconomyServiceImpl#formatAmount |
 | ultieconomy.config.config.initial-cash | Starting primary-currency cash balance for a newly-created account | config | `config/config.yml: initial-cash (default: 1000.0)` | n/a | n/a | admin | brief | EconomyServiceImpl#getOrCreateAccount |
-| ultieconomy.config.config.interest.enabled | Whether each scheduled interest payment (`ultieconomy.scheduled.interest-payment`) pays anything, read at every payment, so a `/ul reload UltiTools-Economy` that changes it applies to the next one. While it is `true`, every boot logs one WARN line from `StartupWarnings#log` naming the rate, the fixed 1800-second interval, the cap (or that there is none) and how to turn it off. Declared default and shipped value `false`; a file written by 1.0.0 or 2.0.0 holds `true` (their shipped value) unless edited, and on upgrade that value applies (UltiKits/UltiEconomy#15) | config | `config/config.yml: interest.enabled (default: false; a file written by 1.0.0 or 2.0.0 holds true)` | n/a | n/a | admin | detailed | InterestService#payInterestIfEnabled, StartupWarnings#log |
+| ultieconomy.config.config.interest.enabled | Whether each scheduled interest payment (`ultieconomy.scheduled.interest-payment`) pays anything, read at every payment, so a `/ul reload UltiTools-Economy` that changes it applies to the next one. While it is `true`, every boot logs one WARN line from `StartupWarnings#log` naming the rate, the configured `interest.interval`, the cap (or that there is none) and how to turn it off. Declared default and shipped value `false`; a file written by 1.0.0 or 2.0.0 holds `true` (their shipped value) unless edited, and on upgrade that value applies (UltiKits/UltiEconomy#15) | config | `config/config.yml: interest.enabled (default: false; a file written by 1.0.0 or 2.0.0 holds true)` | n/a | n/a | admin | detailed | InterestService#payInterestIfEnabled, StartupWarnings#log |
+| ultieconomy.config.config.interest.interval | Seconds between scheduled interest payments, and before the first one after load, bound to `ultieconomy.scheduled.interest-payment`; 1 to 107374182. `/ul reload UltiTools-Economy` applies a change keeping the payment's place in its cycle (never paid early, never postponed); an invalid value refuses the module at load, and at reload is ignored with a WARNING naming the key (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531) | config | `config/config.yml: interest.interval (default: 1800)` | n/a | n/a | admin | detailed | InterestService#payInterestIfEnabled |
 | ultieconomy.config.config.interest.max-interest | Cap on a single interest payment to a single balance; a value of 0 or below means no cap | config | `config/config.yml: interest.max-interest (default: 10000.0)` | n/a | n/a | admin | brief | InterestService#distributeInterest |
-| ultieconomy.config.config.interest.rate | Fraction of a positive bank balance credited at each scheduled payment (0.03 = 3% every 1800 seconds) | config | `config/config.yml: interest.rate (default: 0.03)` | n/a | n/a | admin | brief | InterestService#distributeInterest |
+| ultieconomy.config.config.interest.rate | Fraction of a positive bank balance credited at each scheduled payment (0.03 = 3% per payment; payments every `interest.interval` seconds) | config | `config/config.yml: interest.rate (default: 0.03)` | n/a | n/a | admin | brief | InterestService#distributeInterest |
 | ultieconomy.config.config.leaderboard.display-count | Default number of top entries `LeaderboardService#getDefaultDisplayCount` reports; no command or placeholder in this module actually calls that accessor | config | `config/config.yml: leaderboard.display-count (default: 10)` | n/a | n/a | admin | none | LeaderboardService#getDefaultDisplayCount (declared, no caller) |
+| ultieconomy.config.config.leaderboard.update-interval | Seconds between leaderboard refreshes, bound to `ultieconomy.scheduled.leaderboard-refresh` (the first refresh runs at load); 1 to 107374182, applied at `/ul reload` the same way as `interest.interval` (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531) | config | `config/config.yml: leaderboard.update-interval (default: 60)` | n/a | n/a | admin | brief | LeaderboardService#refreshAll |
 | ultieconomy.config.config.tax.enabled | Master switch over all taxation, read at every transfer (UltiKits/UltiEconomy#16): while `false`, `TaxService#calculateTransactionTax` returns 0 before looking at `tax.transaction-tax.*`, so both `EconomyServiceImpl#transfer` overloads credit the receiver the full amount and deposit nothing into the treasury; while `true`, the transaction tax applies as `tax.transaction-tax.enabled`/`.rate` say. A `/ul reload UltiTools-Economy` that changes it applies to the next transfer. While it is `false`, every boot logs one WARN line from `StartupWarnings#log` saying no transaction tax and no wealth tax is collected and how to turn it back on. The treasury commands (`/eco treasury ...`) are not taxation and are not gated by it. The declared default is `true`, but it reaches only a file that lacks the key: every server that has run 2.0.0 (the release that added the tax settings) had `false` written into its file on first boot (the then-declared default) and keeps that value | config | `config/config.yml: tax.enabled (default: true; a file written by 2.0.0 holds false, see the Feature text)` | n/a | n/a | admin | detailed | TaxService#calculateTransactionTax, StartupWarnings#log |
 | ultieconomy.config.config.tax.transaction-tax.enabled | Enable a transaction tax deducted from a `/pay` transfer only, deposited into the treasury; has an effect only while the master switch `tax.enabled` is `true` (UltiKits/UltiEconomy#16). `EcoAdminCommand#onGive`/`#onTake`/`#onSet` call `EconomyService#addCash`/`#takeCash`/`#setCash` directly, never `#transfer` — `TaxService#calculateTransactionTax` is invoked only from `EconomyServiceImpl#transfer`'s two overloads (the code path behind `/pay` and `/pay ... <currency>`), so the admin commands neither deduct tax nor deposit anything into the treasury regardless of this key | config | `config/config.yml: tax.transaction-tax.enabled (default: true)` | n/a | n/a | admin | detailed | TaxService#calculateTransactionTax, EconomyServiceImpl#transfer |
 | ultieconomy.config.config.tax.transaction-tax.exempt-permission | Permission node that, if held, is intended to exempt a player from the transaction tax — declared but never referenced by any `hasPermission` check anywhere in this module's source (0 occurrences outside this config field and its default-value string), so holding it currently changes nothing | config | `config/config.yml: tax.transaction-tax.exempt-permission (default: "ultieconomy.tax.exempt", not enforced anywhere)` | n/a | n/a | admin | none | EconomyConfig#getTransactionTaxExemptPermission (declared, never checked) |

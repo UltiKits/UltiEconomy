@@ -17,12 +17,6 @@ import java.util.stream.Collectors;
 @Service
 public class LeaderboardService {
 
-    /**
-     * 60 seconds, in ticks. Fixed: a {@code @Scheduled} period is a compile-time constant, and
-     * reading it from configuration is requested of the framework as UltiKits/UltiTools-Reborn#531.
-     */
-    static final long REFRESH_PERIOD_TICKS = 60L * 20L;
-
     private EconomyConfig config;
     private DataOperator<PlayerAccountEntity> dataOperator;
     private DataOperator<CurrencyBalanceEntity> currencyDataOperator;
@@ -67,14 +61,16 @@ public class LeaderboardService {
     /**
      * The scheduled refresh: rebuilds the primary leaderboard and every configured currency's own
      * leaderboard (UltiKits/UltiEconomy#15). Runs once as soon as the module has loaded, so the rank
-     * and top-N placeholders are filled from the start, and then every 60 seconds. Before this
+     * and top-N placeholders are filled from the start, and then every
+     * {@code leaderboard.update-interval} seconds, bound through the framework's config-bound
+     * {@code @Scheduled} (UltiKits/UltiTools-Reborn#531). Before this
      * release nothing called either refresh method and every such placeholder read an empty cache.
      *
      * <p>Runs on the main thread, like the rest of this module's data access, and reads each table
      * once per run however many currencies are configured (gate-1 WR-01). It only reads and then
      * swaps the two volatile snapshots, so readers never see a half-built list.
      */
-    @Scheduled(period = REFRESH_PERIOD_TICKS)
+    @Scheduled(config = EconomyConfig.class, periodKey = "leaderboard.update-interval")
     public void refreshAll() {
         List<PlayerAccountEntity> accounts = dataOperator.getAll();
         cachedLeaderboard = primaryEntries(accounts);

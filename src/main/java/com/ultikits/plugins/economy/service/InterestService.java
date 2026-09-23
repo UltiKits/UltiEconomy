@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Pays bank interest on a fixed schedule while {@code interest.enabled} is true.
+ * Pays bank interest every {@code interest.interval} seconds while {@code interest.enabled} is true.
  *
  * <p>The service is created whatever {@code interest.enabled} says at boot. The switch is read at
  * every scheduled run instead, so a {@code /ul reload} that turns interest on or off takes effect at
@@ -27,12 +27,6 @@ import java.util.UUID;
  */
 @Service
 public class InterestService {
-
-    /**
-     * 1800 seconds, in ticks. Fixed: a {@code @Scheduled} period is a compile-time constant, and
-     * reading it from configuration is requested of the framework as UltiKits/UltiTools-Reborn#531.
-     */
-    static final long PAYMENT_PERIOD_TICKS = 1800L * 20L;
 
     private UltiToolsPlugin plugin;
     private EconomyService economyService;
@@ -78,9 +72,13 @@ public class InterestService {
      * The scheduled payment: pays interest if {@code interest.enabled} is true right now, and does
      * nothing at all otherwise -- no account is read and nobody is notified.
      *
-     * <p>The first payment comes one full period after the module loads, not at load. Paying at load
-     * would pay an extra time on every server restart, which a player could not cause but an
-     * operator restarting often would turn into free money.
+     * <p>Timing is bound to {@code interest.interval} (seconds) through the framework's config-bound
+     * {@code @Scheduled} (UltiKits/UltiTools-Reborn#531) -- the default lives only in
+     * {@link EconomyConfig}. The same key is the first delay, so the first payment comes one full
+     * interval after the module loads, not at load: paying at load would pay an extra time on every
+     * server restart. {@code /ul reload} applies a changed interval keeping the task's place in its
+     * cycle, so a reload never pays early and never postpones a payment. The binding is sync only,
+     * and requires {@code api-version: 630} in {@code plugin.yml}.
      *
      * <p>Runs on the main thread. A payment is a read-modify-write of every bank balance, and this
      * module's own commands change balances on the main thread; running it there means no payment
@@ -91,7 +89,7 @@ public class InterestService {
      * several servers share one database, interest must be on for exactly one of them (gate-1
      * WR-02; the load-time warning says so).
      */
-    @Scheduled(delay = PAYMENT_PERIOD_TICKS, period = PAYMENT_PERIOD_TICKS)
+    @Scheduled(config = EconomyConfig.class, periodKey = "interest.interval", delayKey = "interest.interval")
     public void payInterestIfEnabled() {
         if (!config.isInterestEnabled()) {
             return;

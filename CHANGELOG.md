@@ -9,13 +9,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
+  and the leaderboard refresh read their intervals from `interest.interval` and
+  `leaderboard.update-interval` through a framework feature added in UltiTools 6.3.0
+  (UltiKits/UltiTools-Reborn#531). An older framework would silently ignore that and pay interest
+  once at load and never again, so it refuses to load this module instead.
+- **需要 UltiTools 6.3.0。** `plugin.yml` 现声明 `api-version: 630`。利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
+  （UltiKits/UltiTools-Reborn#531）从 `interest.interval` 与 `leaderboard.update-interval` 读取间隔。旧版框架会静默忽略这一点，
+  导致加载时发放一次利息之后再不发放，因此旧版框架会拒绝加载本模块。
 - **Upgrade consequence — interest may start being paid.** `interest.enabled` in
   `config/config.yml` now takes effect (UltiKits/UltiEconomy#15). Previously nothing ever scheduled
   the payment, so no interest was paid on any server whatever the key said. The shipped file said
   `interest.enabled: true` in both 1.0.0 and 2.0.0, so every server that has run either holds `true`
   unless its operator changed it — **on such a server, upgrading starts paying interest, which creates money**:
-  every 1800 seconds (30 minutes, a fixed period; the first payment 30 minutes after the module
-  loads), a player's primary-currency bank balance — the one `/bank`, `/money`, `/eco check <player>`
+  every `interest.interval` seconds (1800, 30 minutes, by default; the first payment one interval
+  after the module loads), a player's primary-currency bank balance — the one `/bank`, `/money`, `/eco check <player>`
   and Vault show, paid once per player and not also on the separate per-currency row that
   `/bank <primary currency>` shows (UltiKits/UltiEconomy#25) — and their bank balance in every other
   currency with `bank-enabled: true` in `config/currencies.yml` each earn `interest.rate` of itself (`0.03`, 3%, by
@@ -26,14 +34,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   database, each server with interest on pays the full rate on every balance in it: turn interest
   on for exactly one of them.** The value in the file is the one that applies. While it is `true`
   the module logs one WARNING at every boot naming the rate, the interval, the cap and the
-  shared-database rule. To not
+  shared-database rule. `/ul reload UltiTools-Economy` applies a changed `interest.interval` keeping
+  the payment's place in its cycle: the next payment is the last one (or, before the first, the
+  module load) plus the new interval, or at once if that moment has passed — a reload never pays
+  early and never postpones a payment. A value below 1 or above 107374182 refuses the module at
+  load, naming the key; at `/ul reload` it is not applied, the running interval is kept and a
+  WARNING names the key. To not
   pay interest, set `interest.enabled: false` and run `/ul reload UltiTools-Economy`; the switch is
   read at every payment, so the next one is skipped. The declared default and the shipped file now
   say `false`, which reaches only a file that does not hold the key yet.
 - **升级后果——可能开始发放利息。** `config/config.yml` 中的 `interest.enabled` 现在生效
   （UltiKits/UltiEconomy#15）。此前从未有任何代码调度利息发放，因此无论该键如何设置，任何服务器上都从未发放过利息。
   1.0.0 与 2.0.0 的出厂文件都写的是 `interest.enabled: true`，所以所有运行过其中任一版本的服务器，除非运维改过，文件里都是 `true`——
-  **这样的服务器升级后开始发放利息，这会凭空产生货币**：每 1800 秒（30 分钟，固定周期；模块加载 30 分钟后首次发放），
+  **这样的服务器升级后开始发放利息，这会凭空产生货币**：每 `interest.interval` 秒（默认 1800，即 30 分钟；模块加载后满一个间隔首次发放），
   玩家的主货币银行余额——即 `/bank`、`/money`、`/eco check <玩家>` 与 Vault 显示的那一个，每名玩家只计一次，
   不会再对 `/bank <主货币>` 显示的那一行单独货币余额重复计息（UltiKits/UltiEconomy#25）——以及其在 `config/currencies.yml`
   中其他所有 `bank-enabled: true` 货币的银行余额，各自获得其自身
@@ -41,6 +54,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   且不会使余额超过其银行上限（`bank.max-balance`，或该货币自己的 `max-bank-balance`，大于 0 时生效——已达上限的余额不再获得利息），
   利息写入成功后在线玩家才会收到聊天提示。**若多台服务器共用同一个数据库，每台开启利息的服务器都会对其中每个余额按全额利率发放：
   请只在其中一台上开启利息。** 以文件中的值为准。该值为 `true` 时，本模块每次启动都会记录一条 WARNING，点名利率、间隔、上限与共用数据库的规则。
+  `/ul reload UltiTools-Economy` 会应用修改后的 `interest.interval` 并保持发放节拍：下一次发放 = 上一次发放（首次发放前则为模块加载时刻）
+  加新间隔，若该时刻已过则立即发放——重载既不会提前发放，也不会推迟发放。小于 1 或大于 107374182 的值在加载时使模块拒载并点名该键；
+  在 `/ul reload` 时则不生效，保留正在使用的间隔并记录一条点名该键的 WARNING。
   若不想发放利息，请设置 `interest.enabled: false` 并执行 `/ul reload UltiTools-Economy`；该开关在每次发放时读取，
   下一次发放即被跳过。声明默认值与出厂文件现均为 `false`，只影响尚未包含该键的文件。
 - **Upgrade consequence — the transfer tax may stop.** `tax.enabled` in `config/config.yml` now
@@ -64,32 +80,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   本模块每次启动都会记录一条 WARNING 说明这一点。若要继续对转账征税，请设置 `tax.enabled: true` 并执行
   `/ul reload UltiTools-Economy`；该开关在每次转账时读取。声明默认值现为 `true`，只影响尚未包含该键的文件。
 
-### Removed
-
-- `interest.interval` is removed from `config/config.yml`: nothing ever read it. Interest is paid
-  every 1800 seconds, a fixed period in the code. Making the period configurable is requested of the
-  framework as UltiKits/UltiTools-Reborn#531 — removing the key is not a rejection of that. If your
-  file still holds the key, the module names it in a WARNING at every boot; it can be deleted
-  (UltiKits/UltiEconomy#15).
-- `interest.interval` 已从 `config/config.yml` 中移除：从未有代码读取它。利息每 1800 秒发放一次，周期在代码中固定。
-  「周期可配置」已作为框架功能请求 UltiKits/UltiTools-Reborn#531 提出——移除该键并不意味着否决这一功能。
-  若你的文件中仍有该键，本模块每次启动都会以 WARNING 点名；可以删除（UltiKits/UltiEconomy#15）。
-- `leaderboard.update-interval` is removed from `config/config.yml`: nothing ever read it. The
-  leaderboard is refreshed every 60 seconds, a fixed period in the code. Making the period
-  configurable is requested of the framework as UltiKits/UltiTools-Reborn#531 — removing the key is
-  not a rejection of that. If your file still holds the key, the module names it in a WARNING at
-  every boot; it can be deleted (UltiKits/UltiEconomy#15).
-- `leaderboard.update-interval` 已从 `config/config.yml` 中移除：从未有代码读取它。排行榜每 60 秒刷新一次，周期在代码中固定。
-  「周期可配置」已作为框架功能请求 UltiKits/UltiTools-Reborn#531 提出——移除该键并不意味着否决这一功能。
-  若你的文件中仍有该键，本模块每次启动都会以 WARNING 点名；可以删除（UltiKits/UltiEconomy#15）。
-
 ### Fixed
 
-- The wealth leaderboard is now refreshed: once as soon as the module loads, then every 60 seconds.
+- The wealth leaderboard is now refreshed: once as soon as the module loads, then every
+  `leaderboard.update-interval` seconds (60 by default; `/ul reload` applies a change, and a value
+  below 1 or above 107374182 refuses the module at load or is ignored with a WARNING at reload).
   Previously nothing refreshed it, so `%ultieconomy_rank%` and `%ultieconomy_<currency>_rank%` always
   returned `-`, `%ultieconomy_top_name_<N>%` always `-` and `%ultieconomy_top_balance_<N>%` always
   `0.00`, whatever the players' balances (UltiKits/UltiEconomy#15).
-- 财富排行榜现在会刷新：模块加载后立即刷新一次，之后每 60 秒一次。此前从未刷新，因此无论玩家余额如何，
+- 财富排行榜现在会刷新：模块加载后立即刷新一次，之后每 `leaderboard.update-interval` 秒一次（默认 60；`/ul reload` 生效，
+  小于 1 或大于 107374182 的值在加载时使模块拒载，在重载时不生效并记录 WARNING）。此前从未刷新，因此无论玩家余额如何，
   `%ultieconomy_rank%` 与 `%ultieconomy_<currency>_rank%` 始终返回 `-`，`%ultieconomy_top_name_<N>%` 始终为 `-`，
   `%ultieconomy_top_balance_<N>%` 始终为 `0.00`（UltiKits/UltiEconomy#15）。
 - `/upm uninstall UltiTools-Economy` now runs the framework's own command and listener cleanup,

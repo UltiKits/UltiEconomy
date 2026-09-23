@@ -17,19 +17,21 @@ bank:
   max-balance: -1
 
 # Interest settings / 利息设置
-# Interest is paid every 1800 seconds (30 minutes), a fixed period.
-# 利息每 1800 秒（30 分钟）发放一次，周期固定。
 interest:
   # Pay bank interest (creates money) / 发放银行利息（会凭空产生货币）
   enabled: false
   # Interest rate per payment / 每次发放的利率
   rate: 0.03
+  # Seconds between payments, and before the first one (1 to 107374182); /ul reload applies it
+  # 发放间隔（秒），也是加载后首次发放前的等待（1 到 107374182）；/ul reload 生效
+  interval: 1800
   # Maximum interest per payment (-1 = unlimited) / 每次最大利息 (-1 = 无限)
   max-interest: 10000.0
 
 # Leaderboard settings / 排行榜设置
-# The leaderboard is refreshed every 60 seconds, a fixed period.
-# 排行榜每 60 秒刷新一次，周期固定。
 leaderboard:
+  # Seconds between refreshes (1 to 107374182); /ul reload applies it
+  # 刷新间隔（秒，1 到 107374182）；/ul reload 生效
+  update-interval: 60
   # Default entries shown / 默认显示数量
   display-count: 10
