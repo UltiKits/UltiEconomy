@@ -56,7 +56,12 @@ class InterestServiceTest {
             "    display-name: 'Gems'\n" +
             "    symbol: 'G'\n" +
             "    primary: false\n" +
-            "    bank-enabled: false\n";
+            "    bank-enabled: false\n" +
+            "  silver:\n" +
+            "    display-name: 'Silver'\n" +
+            "    symbol: 'S'\n" +
+            "    primary: false\n" +
+            "    bank-enabled: true\n";
 
     @BeforeEach
     void setUp() {
@@ -269,7 +274,7 @@ class InterestServiceTest {
     class CurrencyInterestTests {
 
         @Test
-        @DisplayName("distributes interest for bank-enabled currency balances")
+        @DisplayName("distributes interest for bank-enabled non-primary currency balances")
         void distributesToBankEnabledCurrencies() throws Exception {
             try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
                 bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);
@@ -277,7 +282,7 @@ class InterestServiceTest {
 
                 CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                         .uuid(PLAYER1_UUID.toString())
-                        .currencyId("coins")
+                        .currencyId("silver")
                         .cash(100.0)
                         .bank(5000.0)
                         .build();
@@ -286,7 +291,7 @@ class InterestServiceTest {
                 service.distributeInterest();
 
                 // 5000 * 0.03 = 150
-                assertCurrencyBankWritten(PLAYER1_UUID, "coins", 5150.0);
+                assertCurrencyBankWritten(PLAYER1_UUID, "silver", 5150.0);
             }
         }
 
@@ -323,7 +328,7 @@ class InterestServiceTest {
 
                 CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                         .uuid(PLAYER1_UUID.toString())
-                        .currencyId("coins")
+                        .currencyId("silver")
                         .cash(0.0)
                         .bank(50000.0)
                         .build();
@@ -332,7 +337,7 @@ class InterestServiceTest {
                 service.distributeInterest();
 
                 // 50000 * 0.1 = 5000, capped at 200
-                assertCurrencyBankWritten(PLAYER1_UUID, "coins", 50200.0);
+                assertCurrencyBankWritten(PLAYER1_UUID, "silver", 50200.0);
             }
         }
 
@@ -344,11 +349,11 @@ class InterestServiceTest {
                 when(onlinePlayer.isOnline()).thenReturn(true);
                 bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(onlinePlayer);
                 when(dataOperator.getAll()).thenReturn(Collections.emptyList());
-                when(economyService.formatAmount(150.0, "coins")).thenReturn("$150.00");
+                when(economyService.formatAmount(150.0, "silver")).thenReturn("$150.00");
 
                 CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                         .uuid(PLAYER1_UUID.toString())
-                        .currencyId("coins")
+                        .currencyId("silver")
                         .cash(0.0)
                         .bank(5000.0)
                         .build();
@@ -358,7 +363,7 @@ class InterestServiceTest {
 
                 ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
                 verify(onlinePlayer).sendMessage(captor.capture());
-                assertThat(captor.getValue()).contains("Coins").contains("$150.00");
+                assertThat(captor.getValue()).contains("Silver").contains("$150.00");
             }
         }
 
@@ -371,7 +376,7 @@ class InterestServiceTest {
 
                 CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                         .uuid(PLAYER1_UUID.toString())
-                        .currencyId("coins")
+                        .currencyId("silver")
                         .cash(500.0)
                         .bank(0.0)
                         .build();
@@ -521,7 +526,7 @@ class InterestServiceTest {
         void creditsTheRowsItReadWithoutQueryingAgain() throws Exception {
             PlayerAccountEntity a = account(PLAYER1_UUID, 1000.0);
             PlayerAccountEntity b = account(PLAYER2_UUID, 2000.0);
-            CurrencyBalanceEntity coins = balance(PLAYER1_UUID, "coins", 3000.0);
+            CurrencyBalanceEntity coins = balance(PLAYER1_UUID, "silver", 3000.0);
             when(dataOperator.getAll()).thenReturn(Arrays.asList(a, b));
             when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(coins));
 
@@ -571,11 +576,12 @@ class InterestServiceTest {
             CurrencyManager capped = new CurrencyManager(YamlConfiguration.loadConfiguration(new StringReader(
                     "currencies:\n"
                             + "  coins:\n    display-name: 'Coins'\n    symbol: '$'\n    primary: true\n"
+                            + "  silver:\n    display-name: 'Silver'\n    symbol: 'S'\n    primary: false\n"
                             + "    bank-enabled: true\n    max-bank-balance: 1000.0\n")));
             InterestService cappedService = InterestService.createForTest(
                     plugin, economyService, config, dataOperator, currencyDataOperator, capped);
-            CurrencyBalanceEntity atCap = balance(PLAYER1_UUID, "coins", 1000.0);
-            CurrencyBalanceEntity nearCap = balance(PLAYER2_UUID, "coins", 990.0);
+            CurrencyBalanceEntity atCap = balance(PLAYER1_UUID, "silver", 1000.0);
+            CurrencyBalanceEntity nearCap = balance(PLAYER2_UUID, "silver", 990.0);
             when(dataOperator.getAll()).thenReturn(Collections.emptyList());
             when(currencyDataOperator.getAll()).thenReturn(Arrays.asList(atCap, nearCap));
 
@@ -648,6 +654,50 @@ class InterestServiceTest {
             verify(dataOperator, never()).update(any(PlayerAccountEntity.class));
             verify(owner, never()).sendMessage(anyString());
             assertThat(saver.getBank()).isEqualTo(10000.0);
+        }
+
+        /**
+         * Maintainer ruling 2026-09-23 ("interest is paid on one wallet only"; UltiKits/UltiEconomy#25):
+         * the primary currency is held twice -- the account row every bare command and Vault read
+         * (`/bank`, `/money`, `/eco check <player>`, `/deposit <amount>`), and a per-currency row for
+         * the primary id created on join. Interest is paid once, on the account row.
+         */
+        @Test
+        @DisplayName("a player with bank money in both primary wallets gets one payment, from the account's bank balance")
+        void primaryCurrencyIsPaidOnceFromTheAccount() throws Exception {
+            PlayerAccountEntity account = account(PLAYER1_UUID, 10000.0);
+            CurrencyBalanceEntity primaryRow = balance(PLAYER1_UUID, "coins", 10000.0);
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(account));
+            lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(primaryRow));
+            Player owner = mock(Player.class);
+            when(owner.isOnline()).thenReturn(true);
+            when(economyService.formatAmount(300.0)).thenReturn("$300.00");
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(owner);
+                service.distributeInterest();
+            }
+
+            assertThat(account.getBank()).isCloseTo(10300.0, within(1e-6));
+            verify(currencyDataOperator, never()).update(any(CurrencyBalanceEntity.class));
+            assertThat(primaryRow.getBank()).isEqualTo(10000.0);
+            verify(owner, times(1)).sendMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("the per-payment cap binds at interest.max-interest for the primary currency, not twice that")
+        void primaryCurrencyCapIsTheDeclaredOne() throws Exception {
+            config.setInterestRate(0.03);
+            config.setMaxInterest(10000.0);
+            PlayerAccountEntity account = account(PLAYER1_UUID, 1000000.0);
+            CurrencyBalanceEntity primaryRow = balance(PLAYER1_UUID, "coins", 1000000.0);
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(account));
+            lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(primaryRow));
+
+            runPayment();
+
+            double credited = (account.getBank() - 1000000.0) + (primaryRow.getBank() - 1000000.0);
+            assertThat(credited).isCloseTo(10000.0, within(1e-6));
         }
 
         private void runPayment() {
