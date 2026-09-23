@@ -51,8 +51,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
     private int leaderboardDisplayCount = 10;
 
-    @ConfigEntry(path = "tax.enabled", comment = "Enable tax system")
-    private boolean taxEnabled = false;
+    @ConfigEntry(path = "tax.enabled", comment = "Master switch for all taxation: false collects no transaction tax and no wealth tax")
+    private boolean taxEnabled = true;
 
     @ConfigEntry(path = "tax.transaction-tax.enabled", comment = "Enable transaction tax on transfers")
     private boolean transactionTaxEnabled = true;

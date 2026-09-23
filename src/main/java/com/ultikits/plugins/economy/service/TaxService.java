@@ -18,8 +18,15 @@ public class TaxService {
         this.treasuryDataOperator = treasuryDataOperator;
     }
 
+    /**
+     * The tax a transfer of {@code amount} pays, or 0 when no transaction tax applies.
+     *
+     * <p>{@code tax.enabled} is the master switch over all taxation and is checked first, then
+     * {@code tax.transaction-tax.enabled}. Both are read on every call rather than cached, so a
+     * {@code /ul reload} that changes either one applies to the next transfer (UltiKits/UltiEconomy#16).
+     */
     public double calculateTransactionTax(double amount) {
-        if (!config.isTransactionTaxEnabled()) {
+        if (!config.isTaxEnabled() || !config.isTransactionTaxEnabled()) {
             return 0.0;
         }
         return amount * config.getTransactionTaxRate();
