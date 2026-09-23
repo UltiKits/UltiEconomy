@@ -97,6 +97,33 @@ class ReloadKeepsOneTaskTest {
         assertThat(h.liveTasks()).as("live tasks after two reloads").containsExactlyInAnyOrder(
                 "runTaskTimer(delay=36000, period=36000)",
                 "runTaskTimer(delay=0, period=1200)");
+        // Untouched means not re-armed at all: a reload that cancelled and re-armed each task with its
+        // original delay would print the same strings and restart the clock (a postponed payment).
+        assertThat(h.tasks).as("tasks created since load").hasSize(2);
+    }
+
+    /**
+     * The common operator case: interest has already been paid, then the interval is changed. The
+     * next payment must be the last payment plus the new interval -- not a fresh interval from the
+     * reload (postponed), not at once (early) -- and there must still be one live interest task.
+     */
+    @Test
+    @DisplayName("after a payment, a reload with a changed interest.interval puts the next payment at last payment + new interval, one live task per method")
+    void reloadAfterAPaymentKeepsThePhaseFromThatPayment() throws Exception {
+        EconomyConfig config = new EconomyConfig();
+        Harness h = new Harness(config);
+
+        h.load();                                    // armed at tick 100: delay 36000
+        h.runInterestTaskAt(40000);                  // the scheduler fires it: the last payment is at 40000
+        ConfigEntryAccess.set(config, "interest.interval", 900);
+        h.reload(41000);                             // 1000 ticks after that payment
+
+        assertThat(h.warnings).as("framework warnings while running the task").isEmpty();
+        // Next payment: 40000 + 18000 = 58000, i.e. 17000 ticks after the reload at 41000.
+        assertThat(h.liveTasks()).as("live tasks after a changed interval").containsExactlyInAnyOrder(
+                "runTaskTimer(delay=17000, period=18000)",
+                "runTaskTimer(delay=0, period=1200)");
+        assertThat(h.tasks).as("the interest task was replaced once, the leaderboard task not at all").hasSize(3);
     }
 
     @Test
@@ -125,6 +152,8 @@ class ReloadKeepsOneTaskTest {
         final ConfigManager configManager = mock(ConfigManager.class);
         final List<String[]> created = new ArrayList<>();
         final List<BukkitTask> tasks = new ArrayList<>();
+        final List<Runnable> runnables = new ArrayList<>();
+        final List<String> warnings = new ArrayList<>();
         final AtomicInteger tick = new AtomicInteger(100);
         final BukkitScheduler scheduler;
         final TaskManager taskManager;
@@ -141,6 +170,7 @@ class ReloadKeepsOneTaskTest {
                 }
                 BukkitTask task = mock(BukkitTask.class);
                 Object[] args = invocation.getArguments();
+                runnables.add(args.length > 1 && args[1] instanceof Runnable ? (Runnable) args[1] : null);
                 created.add(new String[] {invocation.getMethod().getName(),
                         args.length > 2 ? String.valueOf(args[2]) : "?",
                         args.length > 3 ? String.valueOf(args[3]) : "-"});
@@ -172,6 +202,21 @@ class ReloadKeepsOneTaskTest {
             }
         }
 
+        /** Runs the live interest task's runnable as the scheduler would, at {@code atTick}. */
+        void runInterestTaskAt(int atTick) {
+            tick.set(atTick);
+            int index = -1;
+            for (int i = 0; i < created.size(); i++) {
+                if ("36000".equals(created.get(i)[2])) {
+                    index = i;
+                }
+            }
+            assertThat(index).as("an interest task with period 36000 was created").isGreaterThanOrEqualTo(0);
+            try (MockedStatic<Bukkit> bukkit = bukkit()) {
+                runnables.get(index).run();
+            }
+        }
+
         void reload(int atTick) {
             tick.set(atTick);
             try (MockedStatic<Bukkit> bukkit = bukkit()) {
@@ -182,7 +227,27 @@ class ReloadKeepsOneTaskTest {
         private MockedStatic<Bukkit> bukkit() {
             MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
-            bukkit.when(Bukkit::getLogger).thenReturn(Logger.getLogger("ultieconomy-reload-test"));
+            Logger logger = Logger.getLogger("ultieconomy-reload-test-" + System.identityHashCode(this));
+            logger.setUseParentHandlers(false);
+            if (logger.getHandlers().length == 0) {
+                logger.addHandler(new java.util.logging.Handler() {
+                    @Override
+                    public void publish(java.util.logging.LogRecord record) {
+                        if (record.getLevel().intValue() >= java.util.logging.Level.WARNING.intValue()) {
+                            warnings.add(record.getMessage() + (record.getThrown() == null ? "" : " :: " + record.getThrown()));
+                        }
+                    }
+
+                    @Override
+                    public void flush() {
+                    }
+
+                    @Override
+                    public void close() {
+                    }
+                });
+            }
+            bukkit.when(Bukkit::getLogger).thenReturn(logger);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
             bukkit.when(Bukkit::getCurrentTick).thenAnswer(inv -> tick.get());
             return bukkit;
