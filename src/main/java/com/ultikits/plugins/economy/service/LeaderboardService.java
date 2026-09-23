@@ -67,33 +67,34 @@ public class LeaderboardService {
     /**
      * The scheduled refresh: rebuilds the primary leaderboard and every configured currency's own
      * leaderboard (UltiKits/UltiEconomy#15). Runs once as soon as the module has loaded, so the rank
-     * and top-N placeholders are filled from the start, and then every 60 seconds. Before 6.3.0
-     * nothing called either refresh method and every such placeholder read an empty cache.
+     * and top-N placeholders are filled from the start, and then every 60 seconds. Before this
+     * release nothing called either refresh method and every such placeholder read an empty cache.
      *
-     * <p>Runs on the main thread, like the rest of this module's data access; the refresh only reads
-     * and then swaps the two volatile snapshots, so readers never see a half-built list.
+     * <p>Runs on the main thread, like the rest of this module's data access, and reads each table
+     * once per run however many currencies are configured (gate-1 WR-01). It only reads and then
+     * swaps the two volatile snapshots, so readers never see a half-built list.
      */
     @Scheduled(period = REFRESH_PERIOD_TICKS)
     public void refreshAll() {
-        refreshLeaderboard();
-        if (currencyManager == null) {
+        List<PlayerAccountEntity> accounts = dataOperator.getAll();
+        cachedLeaderboard = primaryEntries(accounts);
+        if (currencyManager == null || currencyDataOperator == null) {
             return;
         }
+        Map<String, String> nameMap = nameMap(accounts);
+        List<CurrencyBalanceEntity> balances = currencyDataOperator.getAll();
+        Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
         for (CurrencyDefinition currency : currencyManager.getAllCurrencies()) {
-            refreshCurrencyLeaderboard(currency.getId());
+            updated.put(currency.getId(), currencyEntries(currency.getId(), balances, nameMap));
         }
+        currencyLeaderboards = Collections.unmodifiableMap(updated);
     }
 
     /**
      * Refreshes the leaderboard cache from the database.
-     * Called by {@link #refreshAll()} on the framework's schedule.
      */
     public void refreshLeaderboard() {
-        List<PlayerAccountEntity> accounts = dataOperator.getAll();
-        cachedLeaderboard = accounts.stream()
-                .map(a -> new LeaderboardEntry(a.getUuid(), a.getPlayerName(), a.getTotalWealth()))
-                .sorted(Comparator.comparingDouble(LeaderboardEntry::getTotalWealth).reversed())
-                .collect(Collectors.toList());
+        cachedLeaderboard = primaryEntries(dataOperator.getAll());
     }
 
     /**
@@ -105,15 +106,32 @@ public class LeaderboardService {
         if (currencyDataOperator == null) {
             return;
         }
+        List<LeaderboardEntry> entries = currencyEntries(
+                currencyId, currencyDataOperator.getAll(), nameMap(dataOperator.getAll()));
+        Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
+        updated.put(currencyId, entries);
+        currencyLeaderboards = Collections.unmodifiableMap(updated);
+    }
 
-        // Build UUID → playerName map from primary accounts
+    private static List<LeaderboardEntry> primaryEntries(List<PlayerAccountEntity> accounts) {
+        return accounts.stream()
+                .map(a -> new LeaderboardEntry(a.getUuid(), a.getPlayerName(), a.getTotalWealth()))
+                .sorted(Comparator.comparingDouble(LeaderboardEntry::getTotalWealth).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private static Map<String, String> nameMap(List<PlayerAccountEntity> accounts) {
         Map<String, String> nameMap = new HashMap<>();
-        for (PlayerAccountEntity account : dataOperator.getAll()) {
+        for (PlayerAccountEntity account : accounts) {
             nameMap.put(account.getUuid(), account.getPlayerName());
         }
+        return nameMap;
+    }
 
-        List<CurrencyBalanceEntity> balances = currencyDataOperator.getAll();
-        List<LeaderboardEntry> entries = balances.stream()
+    private static List<LeaderboardEntry> currencyEntries(String currencyId,
+                                                          List<CurrencyBalanceEntity> balances,
+                                                          Map<String, String> nameMap) {
+        return balances.stream()
                 .filter(b -> currencyId.equals(b.getCurrencyId()))
                 .map(b -> new LeaderboardEntry(
                         b.getUuid(),
@@ -121,10 +139,6 @@ public class LeaderboardService {
                         b.getTotalWealth()))
                 .sorted(Comparator.comparingDouble(LeaderboardEntry::getTotalWealth).reversed())
                 .collect(Collectors.toList());
-
-        Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
-        updated.put(currencyId, entries);
-        currencyLeaderboards = Collections.unmodifiableMap(updated);
     }
 
     /**

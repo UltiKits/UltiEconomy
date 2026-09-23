@@ -6,7 +6,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 /**
  * Warnings this module logs once per boot about settings whose effect changed in 6.3.0.
  *
- * <p><b>Switches that now take effect.</b> Before 6.3.0 nothing read {@code tax.enabled}, and
+ * <p><b>Switches that now take effect.</b> Before this release (UltiEconomy 2.0.0 and earlier)
+ * nothing read {@code tax.enabled}, and
  * nothing ever scheduled the interest payment {@code interest.enabled} was declared to control, so
  * whatever an operator's file held for either had no effect. 6.3.0 makes both take effect, and the
  * maintainer decided (2026-09-23) that the value already on the operator's disk is the one that
@@ -54,7 +55,7 @@ public final class StartupWarnings {
 
     /**
      * Logs one warning per switch whose current value changes what this server does compared with
-     * the release before 6.3.0.
+     * UltiEconomy 2.0.0 and earlier.
      *
      * @param config the module's configuration, after the framework has loaded it; may be null, in
      *               which case nothing is reported
@@ -74,8 +75,11 @@ public final class StartupWarnings {
                     "%s: interest.enabled is true in %s, so interest is paid: every 1800 seconds"
                             + " (30 minutes, a fixed period), every positive bank balance -- in the"
                             + " primary currency and in every currency with bank-enabled: true -- earns"
-                            + " interest.rate = %s of itself, %s. This creates money. Before 6.3.0 this"
-                            + " switch had no effect and no interest was ever paid. To stop paying"
+                            + " interest.rate = %s of itself, %s, never above the bank's own maximum"
+                            + " balance. This creates money. Before this release (UltiEconomy 2.0.0 and"
+                            + " earlier) this switch had no effect and no interest was ever paid. If"
+                            + " several servers share this database, each one that has interest on pays"
+                            + " the full rate, so turn it on for exactly one of them. To stop paying"
                             + " interest, set interest.enabled: false in %s and run /ul reload %s; the"
                             + " next payment is skipped.",
                     MODULE, file, config.getInterestRate(), capText, file, RUNTIME_NAME));
@@ -84,7 +88,8 @@ public final class StartupWarnings {
             logger.warn(String.format(
                     "%s: tax.enabled is false in %s, so no tax is collected at all: transfers pay no"
                             + " transaction tax, whatever tax.transaction-tax.* says, and no wealth tax"
-                            + " is taken. Before 6.3.0 this switch had no effect and transfers were"
+                            + " is taken. Before this release (UltiEconomy 2.0.0 and earlier) this switch"
+                            + " had no effect and transfers were"
                             + " taxed whenever tax.transaction-tax.enabled was true. To collect taxes,"
                             + " set tax.enabled: true in %s and run /ul reload %s; the next transfer"
                             + " is taxed.",

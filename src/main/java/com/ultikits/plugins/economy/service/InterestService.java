@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * <p>The service is created whatever {@code interest.enabled} says at boot. The switch is read at
  * every scheduled run instead, so a {@code /ul reload} that turns interest on or off takes effect at
- * the next payment without rescheduling anything (UltiKits/UltiEconomy#15). Before 6.3.0 this class
+ * the next payment without rescheduling anything (UltiKits/UltiEconomy#15). Before this release this class
  * was {@code @ConditionalOnConfig} on the same key but nothing ever scheduled it, so no interest was
  * paid on any server.
  */
@@ -82,9 +82,14 @@ public class InterestService {
      * would pay an extra time on every server restart, which a player could not cause but an
      * operator restarting often would turn into free money.
      *
-     * <p>Runs on the main thread. A payment is a read-modify-write of every bank balance, and the
-     * rest of this module's balance changes (commands, Vault calls from other plugins) run on the
-     * main thread; running it there means no payment can interleave with them and lose an update.
+     * <p>Runs on the main thread. A payment is a read-modify-write of every bank balance, and this
+     * module's own commands change balances on the main thread; running it there means no payment
+     * can interleave with them and lose an update. (A third-party plugin calling Vault from another
+     * thread is outside this module's control.)
+     *
+     * <p>Every server that runs this task pays the full rate on every balance in its database. If
+     * several servers share one database, interest must be on for exactly one of them (gate-1
+     * WR-02; the load-time warning says so).
      */
     @Scheduled(delay = PAYMENT_PERIOD_TICKS, period = PAYMENT_PERIOD_TICKS)
     public void payInterestIfEnabled() {
@@ -99,24 +104,36 @@ public class InterestService {
      * Handles both primary currency (PlayerAccountEntity) and per-currency balances
      * (CurrencyBalanceEntity) for bank-enabled currencies.
      * Called by {@link #payInterestIfEnabled()} on the framework's schedule.
+     *
+     * <p>How a payment writes (gate-1 review of UltiKits/UltiEconomy#15):
+     * <ul>
+     *   <li>It credits the rows {@code getAll()} returned and writes each one once. It does not look a
+     *       row up again: this runs on the main thread, and a per-row lookup by {@code uuid} (an
+     *       unindexed column) made each payment cost accounts x rows. Nothing else can change a row
+     *       between the read and the write, because both happen in the same tick on the main thread.</li>
+     *   <li>A payment never takes a bank balance above its cap -- {@code bank.max-balance} for the
+     *       primary currency, the currency's own {@code max-bank-balance} otherwise, each only when
+     *       above 0, the same caps a deposit obeys. The credit is the smallest of rate x balance,
+     *       {@code interest.max-interest} (when above 0) and the room left under the cap; a balance
+     *       with no room gets nothing.</li>
+     *   <li>The owner is told only after the write succeeded. A write that fails is logged, the row
+     *       keeps its old balance, and the payment carries on with the next row.</li>
+     * </ul>
      */
     public void distributeInterest() {
-        double rate = config.getInterestRate();
-        double maxInterest = config.getMaxInterest();
-
         // Primary currency interest
         List<PlayerAccountEntity> accounts = dataOperator.getAll();
         for (PlayerAccountEntity account : accounts) {
-            if (account.getBank() <= 0) {
+            double interest = creditFor(account.getBank(), config.getMaxBankBalance());
+            if (interest <= 0) {
                 continue;
             }
-
-            double interest = account.getBank() * rate;
-            if (maxInterest > 0 && interest > maxInterest) {
-                interest = maxInterest;
+            double before = account.getBank();
+            account.setBank(before + interest);
+            if (!write(dataOperator, account)) {
+                account.setBank(before);
+                continue;
             }
-
-            economyService.addBank(UUID.fromString(account.getUuid()), interest);
             notifyPlayer(account.getUuid(), interest);
         }
 
@@ -131,17 +148,43 @@ public class InterestService {
             if (def == null || !def.isBankEnabled()) {
                 continue;
             }
-            if (balance.getBank() <= 0) {
+            double interest = creditFor(balance.getBank(), def.getMaxBankBalance());
+            if (interest <= 0) {
                 continue;
             }
-
-            double interest = balance.getBank() * rate;
-            if (maxInterest > 0 && interest > maxInterest) {
-                interest = maxInterest;
+            double before = balance.getBank();
+            balance.setBank(before + interest);
+            if (!write(currencyDataOperator, balance)) {
+                balance.setBank(before);
+                continue;
             }
-
-            economyService.addBank(UUID.fromString(balance.getUuid()), interest, balance.getCurrencyId());
             notifyPlayer(balance.getUuid(), interest, balance.getCurrencyId());
+        }
+    }
+
+    /**
+     * The interest one payment credits to a bank balance: {@link #calculateInterest(double)}, then
+     * limited to the room left under {@code maxBankBalance} when that is above 0. Zero or less means
+     * "credit nothing".
+     */
+    private double creditFor(double bankBalance, double maxBankBalance) {
+        double interest = calculateInterest(bankBalance);
+        if (maxBankBalance > 0) {
+            interest = Math.min(interest, maxBankBalance - bankBalance);
+        }
+        return interest;
+    }
+
+    /** Writes one row; returns false, having logged why, if the write failed. */
+    private <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> boolean write(
+            DataOperator<T> operator, T row) {
+        try {
+            operator.update(row);
+            return true;
+        } catch (IllegalAccessException | RuntimeException e) {
+            plugin.getLogger().error("Interest payment: failed to write a bank balance, it was not credited: "
+                    + e.getMessage());
+            return false;
         }
     }
 

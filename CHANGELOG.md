@@ -17,9 +17,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   every 1800 seconds (30 minutes, a fixed period; the first payment 30 minutes after the module
   loads), every positive bank balance — in the primary currency and in every currency with
   `bank-enabled: true` in `config/currencies.yml` — earns `interest.rate` of itself (`0.03`, 3%, by
-  default), capped at `interest.max-interest` per payment (`10000.0` by default; `-1` means no cap),
-  and an online player is told in chat. The value in the file is the one that applies. While it is
-  `true` the module logs one WARNING at every boot naming the rate, the interval and the cap. To not
+  default), capped at `interest.max-interest` per payment (`10000.0` by default; `-1` means no cap)
+  and never taking a balance above its bank maximum (`bank.max-balance`, or the currency's own
+  `max-bank-balance`, when set above 0 — a balance already at the maximum earns nothing), and an
+  online player is told in chat once the credit has been written. **If several servers share one
+  database, each server with interest on pays the full rate on every balance in it: turn interest
+  on for exactly one of them.** The value in the file is the one that applies. While it is `true`
+  the module logs one WARNING at every boot naming the rate, the interval, the cap and the
+  shared-database rule. To not
   pay interest, set `interest.enabled: false` and run `/ul reload UltiTools-Economy`; the switch is
   read at every payment, so the next one is skipped. The declared default and the shipped file now
   say `false`, which reaches only a file that does not hold the key yet.
@@ -29,7 +34,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   **这样的服务器升级后开始发放利息，这会凭空产生货币**：每 1800 秒（30 分钟，固定周期；模块加载 30 分钟后首次发放），
   每个为正的银行余额——主货币以及 `config/currencies.yml` 中所有 `bank-enabled: true` 的货币——获得其自身
   `interest.rate`（默认 `0.03`，即 3%）的利息，单次上限为 `interest.max-interest`（默认 `10000.0`；`-1` 表示无上限），
-  在线玩家会收到聊天提示。以文件中的值为准。该值为 `true` 时，本模块每次启动都会记录一条 WARNING，点名利率、间隔与上限。
+  且不会使余额超过其银行上限（`bank.max-balance`，或该货币自己的 `max-bank-balance`，大于 0 时生效——已达上限的余额不再获得利息），
+  利息写入成功后在线玩家才会收到聊天提示。**若多台服务器共用同一个数据库，每台开启利息的服务器都会对其中每个余额按全额利率发放：
+  请只在其中一台上开启利息。** 以文件中的值为准。该值为 `true` 时，本模块每次启动都会记录一条 WARNING，点名利率、间隔、上限与共用数据库的规则。
   若不想发放利息，请设置 `interest.enabled: false` 并执行 `/ul reload UltiTools-Economy`；该开关在每次发放时读取，
   下一次发放即被跳过。声明默认值与出厂文件现均为 `false`，只影响尚未包含该键的文件。
 - **Upgrade consequence — the transfer tax may stop.** `tax.enabled` in `config/config.yml` now
