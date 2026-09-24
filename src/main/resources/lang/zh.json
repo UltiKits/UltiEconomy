@@ -30,6 +30,7 @@
   "economy.money.total": "总资产: %s",
   "economy.pay.sent": "成功转账 %s 给 %s",
   "economy.pay.received": "%s 向你转账了 %s",
+  "economy.pay.self": "不能向自己转账",
   "economy.deposit.success": "成功存入 %s 到银行",
   "economy.withdraw.success": "成功从银行取出 %s",
   "economy.admin.gave": "已给予 %s %s",

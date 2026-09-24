@@ -30,6 +30,7 @@
   "economy.money.total": "Total wealth: %s",
   "economy.pay.sent": "Successfully transferred %s to %s",
   "economy.pay.received": "%s transferred %s to you",
+  "economy.pay.self": "You cannot pay yourself",
   "economy.deposit.success": "Successfully deposited %s to bank",
   "economy.withdraw.success": "Successfully withdrew %s from bank",
   "economy.admin.gave": "Gave %s %s",

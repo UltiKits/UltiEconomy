@@ -51,7 +51,7 @@ public class PayCommand extends BaseCommandExecutor {
         }
 
         if (target.getUniqueId().equals(sender.getUniqueId())) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.pay.self"));
             return;
         }
 
@@ -95,7 +95,7 @@ public class PayCommand extends BaseCommandExecutor {
         }
 
         if (target.getUniqueId().equals(sender.getUniqueId())) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.pay.self"));
             return;
         }
 
