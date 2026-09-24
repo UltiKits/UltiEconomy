@@ -89,13 +89,13 @@ class-level `@CmdTarget` (both mapped methods carry their own method-level
 `@CmdTarget(PLAYER)`). Gated at the method body by `EconomyConfig#isBankEnabled` (shipped
 default: `true`).
 
-**Fixed in wave 3 (UltiKits/UltiEconomy#14):** the success lines of both rows below used to render
+**Fixed (UltiKits/UltiEconomy#14):** the success lines of both rows below used to render
 the raw Chinese source text in every language, because the key the source passed had no catalogue
 entry. Every key is now an ASCII key present in both catalogues, so the lines follow `language`.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.bank.balance | View the sender's own primary-currency bank balance. Success line: `Your bank balance: <amount>` under `language: en` (UltiKits/UltiEconomy#14 fixed in wave 3) | command | `/bank` | ultieconomy.bank | player | player | brief | BankCommand#onBank |
+| ultieconomy.bank.balance | View the sender's own primary-currency bank balance. Success line: `Your bank balance: <amount>` under `language: en` (UltiKits/UltiEconomy#14) | command | `/bank` | ultieconomy.bank | player | player | brief | BankCommand#onBank |
 | ultieconomy.bank.balance-currency | View the sender's bank balance in a named non-primary currency | command | `/bank <currency>` | ultieconomy.bank | player | player | brief | BankCommand#onBankCurrency |
 
 ## Deposit
@@ -109,7 +109,7 @@ down) — see the `.neg-*` checklist rows for the practical consequence.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.deposit.deposit | Move cash into the primary-currency bank balance, subject to the configured minimum deposit and maximum bank balance. Success line: `Successfully deposited <amount> to bank` under `language: en` (UltiKits/UltiEconomy#14 fixed in wave 3) | command | `/deposit <amount>` | ultieconomy.deposit | player | player | brief | DepositCommand#onDeposit |
+| ultieconomy.deposit.deposit | Move cash into the primary-currency bank balance, subject to the configured minimum deposit and maximum bank balance. Success line: `Successfully deposited <amount> to bank` under `language: en` (UltiKits/UltiEconomy#14) | command | `/deposit <amount>` | ultieconomy.deposit | player | player | brief | DepositCommand#onDeposit |
 | ultieconomy.deposit.deposit-currency | Deposit into a named non-primary currency's bank balance, enforcing that currency's own `bank-enabled`/`min-deposit`/`max-bank-balance` one call down in `EconomyServiceImpl`, but with none of the `bank.enabled` (global) or `bank.min-deposit` (`EconomyConfig`) checks this row's sibling applies. Success line as `ultieconomy.deposit.deposit` | command | `/deposit <amount> <currency>` | ultieconomy.deposit | player | player | brief | DepositCommand#onDepositCurrency |
 
 ## Withdraw
@@ -120,7 +120,7 @@ primary-currency mapping only, the same asymmetry as Deposit above.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.withdraw.withdraw | Move cash out of the primary-currency bank balance back into cash. Success line: `Successfully withdrew <amount> from bank` under `language: en` (UltiKits/UltiEconomy#14 fixed in wave 3) | command | `/withdraw <amount>` | ultieconomy.withdraw | player | player | brief | WithdrawCommand#onWithdraw |
+| ultieconomy.withdraw.withdraw | Move cash out of the primary-currency bank balance back into cash. Success line: `Successfully withdrew <amount> from bank` under `language: en` (UltiKits/UltiEconomy#14) | command | `/withdraw <amount>` | ultieconomy.withdraw | player | player | brief | WithdrawCommand#onWithdraw |
 | ultieconomy.withdraw.withdraw-currency | Withdraw from a named non-primary currency's bank balance; no `bank.enabled` (global) gate applies to this mapping. Success line as `ultieconomy.withdraw.withdraw` | command | `/withdraw <amount> <currency>` | ultieconomy.withdraw | player | player | brief | WithdrawCommand#onWithdrawCurrency |
 
 ## Pay
@@ -131,7 +131,7 @@ atomic across sender-deduct and receiver-credit (see `EconomyServiceImpl#transfe
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.pay.pay | Transfer primary-currency cash to another online player; the sender's cash always drops by the full requested amount, and the receiver's cash rises by that amount minus the transaction tax (if both `tax.enabled` and `tax.transaction-tax.enabled` are true; otherwise by the full amount) — but BOTH the sender's own success line and the receiver's own notification format the ORIGINAL gross `amount` variable, never the net figure actually credited, so a taxed transfer's chat text overstates what the receiver got by the tax amount (a distinct discrepancy from the language fix). Under `language: en` the lines read `Successfully transferred <amount> to <target>` and `<sender> transferred <amount> to you` (UltiKits/UltiEconomy#14 fixed in wave 3) | command | `/pay <player> <amount>` | ultieconomy.pay | player | player | brief | PayCommand#onPay |
+| ultieconomy.pay.pay | Transfer primary-currency cash to another online player; the sender's cash always drops by the full requested amount, and the receiver's cash rises by that amount minus the transaction tax (if both `tax.enabled` and `tax.transaction-tax.enabled` are true; otherwise by the full amount) — but BOTH the sender's own success line and the receiver's own notification format the ORIGINAL gross `amount` variable, never the net figure actually credited, so a taxed transfer's chat text overstates what the receiver got by the tax amount (a distinct discrepancy from the language fix). Under `language: en` the lines read `Successfully transferred <amount> to <target>` and `<sender> transferred <amount> to you` (UltiKits/UltiEconomy#14) | command | `/pay <player> <amount>` | ultieconomy.pay | player | player | brief | PayCommand#onPay |
 | ultieconomy.pay.pay-currency | Transfer cash in a named non-primary currency to another online player, same tax and atomicity behaviour, and the same two lines | command | `/pay <player> <amount> <currency>` | ultieconomy.pay | player | player | brief | PayCommand#onPayWithCurrency |
 
 ## Money (balance display)
@@ -141,7 +141,7 @@ atomic across sender-deduct and receiver-credit (see `EconomyServiceImpl#transfe
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.money.balance | View the sender's own primary-currency cash, bank, and total-wealth figures in one block. Under `language: en`: `=== Economy System ===`, `Your balance: …`, `Your bank balance: …`, `Total wealth: …` (the three body lines rendered raw Chinese source text before wave 3, UltiKits/UltiEconomy#14) | command | `/money` | ultieconomy.money | player | player | brief | MoneyCommand#onBalance |
+| ultieconomy.money.balance | View the sender's own primary-currency cash, bank, and total-wealth figures in one block. Under `language: en`: `=== Economy System ===`, `Your balance: …`, `Your bank balance: …`, `Total wealth: …` (the three body lines rendered raw Chinese source text before this fix, UltiKits/UltiEconomy#14) | command | `/money` | ultieconomy.money | player | player | brief | MoneyCommand#onBalance |
 | ultieconomy.money.balance-currency | Same three-figure view, scoped to a named non-primary currency. Same four lines as the row above, the header naming the currency | command | `/money <currency>` | ultieconomy.money | player | player | brief | MoneyCommand#onCurrencyBalance |
 
 ## Money Notes
@@ -170,7 +170,7 @@ supports offline targets via `Bukkit#getOfflinePlayer`.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.admin.check | View a target player's primary-currency cash, bank, and total wealth. Under `language: en`: `<target>'s balance: …`, `<target>'s bank balance: …`, `Total wealth: …` (UltiKits/UltiEconomy#14 fixed in wave 3) | command | `/eco check <player>` | ultieconomy.admin | both | admin | brief | EcoAdminCommand#onCheck |
+| ultieconomy.admin.check | View a target player's primary-currency cash, bank, and total wealth. Under `language: en`: `<target>'s balance: …`, `<target>'s bank balance: …`, `Total wealth: …` (UltiKits/UltiEconomy#14) | command | `/eco check <player>` | ultieconomy.admin | both | admin | brief | EcoAdminCommand#onCheck |
 | ultieconomy.admin.check-currency | Same view scoped to a named non-primary currency. Same lines as the row above | command | `/eco check <player> <currency>` | ultieconomy.admin | both | admin | brief | EcoAdminCommand#onCheckCurrency |
 | ultieconomy.admin.give | Add primary-currency cash to a target player's balance, online or offline. Success line: `Gave <target> <amount>` under `language: en` | command | `/eco give <player> <amount>` | ultieconomy.admin | both | admin | brief | EcoAdminCommand#onGive |
 | ultieconomy.admin.give-currency | Add cash in a named non-primary currency. Success line as `ultieconomy.admin.give` | command | `/eco give <player> <amount> <currency>` | ultieconomy.admin | both | admin | brief | EcoAdminCommand#onGiveCurrency |
@@ -309,9 +309,9 @@ intervals through the framework's config-bound `@Scheduled` (UltiKits/UltiTools-
 value an operator kept in the file from 1.0.0 or 2.0.0 takes effect on upgrade. See
 `## Scheduled tasks` for reload and invalid-value behaviour.
 
-**Language (wave 3):** every chat, GUI and console line this module writes goes through its
+**Language:** every chat, GUI and console line this module writes goes through its
 language catalogue with an ASCII key (`economy.money.cash`), so it follows the framework's
-`language` setting. Before wave 3, 23 of the 44 keys the source passed had no entry in either
+`language` setting. Before this fix, 23 of the 44 keys the source passed had no entry in either
 catalogue and rendered their raw Chinese source text in every language (UltiKits/UltiEconomy#14),
 and the help headers, the money note's name and lore, both startup warnings and three console
 error lines were fixed English. Two JUnit guards (`UltiEconomyLanguageCatalogueTest`,
@@ -351,4 +351,4 @@ Every chat, GUI and console line this module writes follows the framework-wide `
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultieconomy.i18n.language | All of this module's chat, GUI and console text in the server's language: `lang/en.json` under `language: en`, `lang/zh.json` under `language: zh`, including the 23 command messages that rendered raw Chinese source text in every language before wave 3 (UltiKits/UltiEconomy#14) | config | framework `config.yml: language` | n/a | both | admin | none | `lang/en.json`, `lang/zh.json`, every `i18n(...)` call |
+| ultieconomy.i18n.language | All of this module's chat, GUI and console text in the server's language: `lang/en.json` under `language: en`, `lang/zh.json` under `language: zh`, including the 23 command messages that rendered raw Chinese source text in every language before this fix (UltiKits/UltiEconomy#14) | config | framework `config.yml: language` | n/a | both | admin | none | `lang/en.json`, `lang/zh.json`, every `i18n(...)` call |
