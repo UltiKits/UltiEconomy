@@ -175,23 +175,34 @@ class UltiEconomyLanguageCatalogueTest {
 
     static List<String> unlistedOrStaleDynamicSites(List<SourceFile> files, List<DynamicSite> table) {
         List<String> problems = new ArrayList<>();
-        Set<DynamicSite> used = new LinkedHashSet<>();
+        // Sites and entries pair up by (file, expression), one entry per site: two sites printing the
+        // same expression in one file need two entries, so an entry written for one site cannot
+        // silently cover a site added later whose keys nobody enumerated.
+        Map<String, List<Integer>> siteLines = new LinkedHashMap<>();
         for (SourceFile f : files) {
             for (KeySite s : f.sites) {
                 if (s.isLiteral() || s.passThrough) {
                     continue;
                 }
-                DynamicSite entry = find(table, f.path, s.expression);
-                if (entry == null) {
+                if (findAll(table, f.path, s.expression).isEmpty()) {
                     problems.add(f.path + ":" + s.line + " passes a non-literal key (" + s.kind + " "
                             + s.expression + ") that DYNAMIC_KEY_SITES does not enumerate");
                 } else {
-                    used.add(entry);
+                    siteLines.computeIfAbsent(f.path + SEP + s.expression, k -> new ArrayList<>()).add(s.line);
                 }
             }
         }
+        for (Map.Entry<String, List<Integer>> e : siteLines.entrySet()) {
+            String[] fileAndExpression = e.getKey().split(SEP, 2);
+            int listed = findAll(table, fileAndExpression[0], fileAndExpression[1]).size();
+            if (listed != e.getValue().size()) {
+                problems.add(fileAndExpression[0] + " has " + e.getValue().size() + " non-literal key sites printing "
+                        + fileAndExpression[1] + " (lines " + e.getValue() + ") but DYNAMIC_KEY_SITES lists " + listed
+                        + "; list each site once, with its own keys");
+            }
+        }
         for (DynamicSite d : table) {
-            if (!used.contains(d)) {
+            if (!siteLines.containsKey(d.file + SEP + d.expression)) {
                 problems.add("stale DYNAMIC_KEY_SITES entry: " + d.file + " " + d.expression
                         + " matches no key site");
             }
@@ -291,11 +302,13 @@ class UltiEconomyLanguageCatalogueTest {
 
     /**
      * {@code {NAME}}/{@code {0}} tokens, {@code %%}, and {@code String.format} specifiers with a
-     * {@code s}, {@code d}, {@code f} or {@code x} conversion not followed by a letter -- so prose such
-     * as "100% of" or "50%off" is not mistaken for a specifier.
+     * {@code s}, {@code d}, {@code f} or {@code x} conversion. A letter right after the conversion does
+     * not end it early: {@code java.util.Formatter} reads {@code "%dh"} as {@code %d} then {@code h}, so
+     * the pattern does too. Prose such as "100% of" or "50%off" is still not a specifier -- a space is
+     * not one of the flags matched here, and {@code o} is not one of the conversions.
      */
     private static final Pattern PLACEHOLDER =
-            Pattern.compile("\\{[A-Za-z0-9_]+}|%%|%(\\d+\\$)?[-#+0,(]*\\d*(\\.\\d+)?[sdfx](?![A-Za-z])");
+            Pattern.compile("\\{[A-Za-z0-9_]+}|%%|%(\\d+\\$)?[-#+0,(]*\\d*(\\.\\d+)?[sdfx]");
 
     static List<String> placeholderMismatches(List<Catalogue> cats) {
         List<String> problems = new ArrayList<>();
@@ -365,23 +378,24 @@ class UltiEconomyLanguageCatalogueTest {
         for (SourceFile f : files) {
             for (KeySite s : f.sites) {
                 if (!s.isLiteral() && !s.passThrough) {
-                    DynamicSite entry = find(table, f.path, s.expression);
-                    if (entry != null) {
-                        matched.add(entry);
-                    }
+                    matched.addAll(findAll(table, f.path, s.expression));
                 }
             }
         }
         return matched;
     }
 
-    private static DynamicSite find(List<DynamicSite> table, String file, String expression) {
+    /** Separates file and expression in a pairing key; neither a path nor printed Java contains it. */
+    private static final String SEP = "\u0000";
+
+    private static List<DynamicSite> findAll(List<DynamicSite> table, String file, String expression) {
+        List<DynamicSite> found = new ArrayList<>();
         for (DynamicSite d : table) {
             if (d.file.equals(file) && d.expression.equals(expression)) {
-                return d;
+                found.add(d);
             }
         }
-        return null;
+        return found;
     }
 
     // ================================================================== catalogue loading
@@ -649,6 +663,22 @@ class UltiEconomyLanguageCatalogueTest {
         }
 
         @Test
+        @DisplayName("two sites printing the same expression in one file need one entry each (Codex, UltiBackup#22)")
+        void sameExpressionTwiceNeedsTwoEntries() throws IOException {
+            List<SourceFile> files = Collections.singletonList(source(
+                    "String a(String key) { return plugin.i18n(key); }\n"
+                            + "String b(String key) { return plugin.i18n(key); }"));
+            DynamicSite one = new DynamicSite("src/main/java/Sample.java", "key", "a's keys", "a.one");
+            assertThat(unlistedOrStaleDynamicSites(files, Collections.singletonList(one)))
+                    .as("one entry must not silently cover a second site").singleElement().asString()
+                    .contains("2 non-literal key sites").contains("lists 1");
+            DynamicSite two = new DynamicSite("src/main/java/Sample.java", "key", "b's keys", "b.one");
+            assertThat(unlistedOrStaleDynamicSites(files, Arrays.asList(one, two))).isEmpty();
+            assertThat(unreachableCatalogueKeys(files, Arrays.asList(one, two),
+                    Collections.singletonList(yaml("en", "a.one: \"x\"\nb.one: \"y\"\n")))).isEmpty();
+        }
+
+        @Test
         @DisplayName("a method reference to i18n is a site that must be enumerated")
         void methodReferenceIsASite() {
             SourceFile f = source("void m() { keys.stream().map(plugin::i18n); }");
@@ -723,6 +753,17 @@ class UltiEconomyLanguageCatalogueTest {
             assertThat(placeholderMismatches(Arrays.asList(
                     yaml("en", "a: \"Saved 100% of items\"\n"), yaml("zh", "a: \"\u5df2\u4fdd\u5b58100%\"\n"))))
                     .isEmpty();
+        }
+
+        @Test
+        @DisplayName("a specifier followed by a letter is still a specifier, as java.util.Formatter reads it (%dh)")
+        void specifierFollowedByALetter() throws IOException {
+            assertThat(placeholderMismatches(Arrays.asList(
+                    yaml("en", "h: \"%dh\"\n"), yaml("zh", "h: \"%d\u5c0f\u65f6\"\n"))))
+                    .as("the same %d in both languages").isEmpty();
+            assertThat(placeholderMismatches(Arrays.asList(
+                    yaml("en", "h: \"%dh\"\n"), yaml("zh", "h: \"\u5c0f\u65f6\"\n"))))
+                    .as("a translation that dropped the %d before a letter").singleElement().asString().startsWith("\"h\"");
         }
 
         @Test
