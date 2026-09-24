@@ -1,5 +1,7 @@
 package com.ultikits.plugins.economy;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.context.SimpleContainer;
@@ -161,6 +163,28 @@ class StartupWarningsTest {
         }
     }
 
+    @Nested
+    @DisplayName("the warnings follow the language setting")
+    class LanguageSetting {
+
+        @Test
+        @DisplayName("under language: zh both warnings are Chinese, keeping the key names, the file and the values")
+        void warningsInChinese() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(true);
+            config.setTaxEnabled(false);
+            List<String> warnings = bootWith(config, new YamlConfiguration(), "zh");
+            assertThat(warnings).hasSize(2);
+            for (String warning : warnings) {
+                assertThat(warning).as(warning).matches("(?s).*\\p{IsHan}.*")
+                        .doesNotContain("so interest is paid").doesNotContain("so no tax is collected")
+                        .contains("UltiEconomy").contains(CONFIG_FILE);
+            }
+            assertThat(warnings.get(0)).contains("interest.enabled: false").contains("/ul reload UltiTools-Economy");
+            assertThat(warnings.get(1)).contains("tax.enabled: true").contains("/ul reload UltiTools-Economy");
+        }
+    }
+
     // ==================== helpers ====================
 
     static List<String> warningsMentioning(String needle, List<String> warnings) {
@@ -189,6 +213,11 @@ class StartupWarningsTest {
      * "this key is still in your file".
      */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk) {
+        return bootWith(config, onDisk, "en");
+    }
+
+    /** As {@link #bootWith(EconomyConfig, YamlConfiguration)}, with the module speaking {@code language}. */
+    static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk, String language) {
         EconomyConfig effective = org.mockito.Mockito.spy(config);
         when(effective.getConfig()).thenReturn(onDisk);
         when(effective.getConfigFilePath()).thenReturn(CONFIG_FILE);
@@ -196,6 +225,8 @@ class StartupWarningsTest {
         UltiEconomy plugin = mock(UltiEconomy.class);
         PluginLogger logger = mock(PluginLogger.class);
         when(plugin.getLogger()).thenReturn(logger);
+        // Answer i18n from the real shipped catalogue of the language the case names.
+        when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer(language));
         when(plugin.getConfig(EconomyConfig.class)).thenReturn(effective);
         SimpleContainer context = mock(SimpleContainer.class);
         when(plugin.getContext()).thenReturn(context);

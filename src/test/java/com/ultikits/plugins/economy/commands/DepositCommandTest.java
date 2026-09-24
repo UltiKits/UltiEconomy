@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -32,7 +33,7 @@ class DepositCommandTest {
     @BeforeEach
     void setUp() {
         config = new EconomyConfig();
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         command = new DepositCommand(plugin, economyService, config);
     }
@@ -182,7 +183,7 @@ class DepositCommandTest {
     void handleHelpShowsCommands() throws Exception {
         @SuppressWarnings("unchecked")
         CommandSender sender = mock(CommandSender.class);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         java.lang.reflect.Method helpMethod = DepositCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
         helpMethod.setAccessible(true);

@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
@@ -37,7 +38,7 @@ class EcoAdminCommandTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(targetPlayer.getUniqueId()).thenReturn(TARGET_UUID);
         lenient().when(targetPlayer.getName()).thenReturn("Steve");
         lenient().when(targetPlayer.hasPlayedBefore()).thenReturn(true);
@@ -184,7 +185,8 @@ class EcoAdminCommandTest {
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(sender, atLeast(4)).sendMessage(captor.capture());
-            assertThat(captor.getAllValues().get(0)).contains("UltiEconomy Admin");
+            // The header comes from the zh catalogue this class answers from.
+            assertThat(captor.getAllValues().get(0)).contains("UltiEconomy 管理");
         }
     }
 
@@ -428,7 +430,7 @@ class EcoAdminCommandTest {
 
         @BeforeEach
         void setUp() {
-            lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             treasuryCommand = EcoAdminCommand.createForTest(plugin, economyService, taxService, currencyManager);
         }
 

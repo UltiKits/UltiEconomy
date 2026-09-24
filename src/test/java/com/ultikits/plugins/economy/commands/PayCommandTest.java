@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.Bukkit;
@@ -35,7 +36,7 @@ class PayCommandTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(sender.getUniqueId()).thenReturn(SENDER_UUID);
         lenient().when(sender.getName()).thenReturn("Alice");
         lenient().when(target.getUniqueId()).thenReturn(TARGET_UUID);
@@ -252,7 +253,7 @@ class PayCommandTest {
     void handleHelpShowsCommands() throws Exception {
         @SuppressWarnings("unchecked")
         CommandSender helpSender = mock(CommandSender.class);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         java.lang.reflect.Method helpMethod = PayCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
         helpMethod.setAccessible(true);

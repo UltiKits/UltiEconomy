@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -68,7 +69,7 @@ class InterestServiceTest {
         config = new EconomyConfig();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.emptyList());
         service = InterestService.createForTest(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
     }
@@ -647,6 +648,10 @@ class InterestServiceTest {
 
             verify(failingOwner, never()).sendMessage(anyString());
             verify(nextOwner).sendMessage(contains("$300.00"));
+            // The operator reads the failure in the server's language (zh here).
+            String text = CatalogueText.entries("zh").get("economy.log.interest_write_failed");
+            verify(logger).error(text == null ? "<lang/zh.json has no economy.log.interest_write_failed>"
+                    : String.format(text, "write failed"));
             assertThat(next.getBank()).isCloseTo(10300.0, within(1e-6));
         }
 
