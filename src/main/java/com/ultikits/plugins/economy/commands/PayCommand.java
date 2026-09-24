@@ -113,7 +113,7 @@ public class PayCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Pay ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.pay") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/pay <player> <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.pay"));
         sender.sendMessage(ChatColor.YELLOW + "/pay <player> <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.pay_currency"));
     }

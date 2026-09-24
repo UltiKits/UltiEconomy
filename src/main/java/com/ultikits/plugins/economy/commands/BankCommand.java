@@ -82,7 +82,7 @@ public class BankCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Bank ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.bank") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/bank" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.bank"));
         sender.sendMessage(ChatColor.YELLOW + "/bank <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.bank_currency"));
     }

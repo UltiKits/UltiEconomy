@@ -100,7 +100,7 @@ public class DepositCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Deposit ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.deposit") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/deposit <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.deposit"));
         sender.sendMessage(ChatColor.YELLOW + "/deposit <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.deposit_currency"));
     }

@@ -132,7 +132,7 @@ public class NoteCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== Money Notes ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.notes") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/note <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_create"));
         sender.sendMessage(ChatColor.YELLOW + "/note <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_create_currency"));
         sender.sendMessage(ChatColor.YELLOW + "/note redeem" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_redeem"));

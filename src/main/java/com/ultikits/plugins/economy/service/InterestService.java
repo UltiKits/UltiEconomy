@@ -194,8 +194,7 @@ public class InterestService {
             operator.update(row);
             return true;
         } catch (IllegalAccessException | RuntimeException e) {
-            plugin.getLogger().error("Interest payment: failed to write a bank balance, it was not credited: "
-                    + e.getMessage());
+            plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"), e.getMessage()));
             return false;
         }
     }

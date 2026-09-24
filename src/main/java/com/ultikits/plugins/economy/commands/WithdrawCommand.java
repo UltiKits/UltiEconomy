@@ -87,7 +87,7 @@ public class WithdrawCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Withdraw ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.withdraw") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/withdraw <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.withdraw"));
         sender.sendMessage(ChatColor.YELLOW + "/withdraw <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.withdraw_currency"));
     }

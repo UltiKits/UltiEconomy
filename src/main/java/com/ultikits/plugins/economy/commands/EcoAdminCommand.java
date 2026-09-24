@@ -346,7 +346,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Admin ===");
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.admin") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/eco give <player> <amount> [currency]");
         sender.sendMessage(ChatColor.YELLOW + "/eco take <player> <amount> [currency]");
         sender.sendMessage(ChatColor.YELLOW + "/eco set <player> <amount> [currency]");
