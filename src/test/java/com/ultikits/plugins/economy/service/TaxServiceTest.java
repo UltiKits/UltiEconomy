@@ -42,6 +42,16 @@ class TaxServiceTest {
     @DisplayName("Transaction Tax")
     class TransactionTaxTests {
 
+        /**
+         * These cases are about the transaction-tax sub-switch and its rate, so the master switch
+         * above it (UltiKits/UltiEconomy#16) is held on. Lenient because the disabled-sub-switch
+         * case below never needs to read it.
+         */
+        @BeforeEach
+        void masterSwitchOn() {
+            lenient().when(config.isTaxEnabled()).thenReturn(true);
+        }
+
         @Test
         @DisplayName("calculates 5% transaction tax")
         void calculates5Percent() {
@@ -79,6 +89,48 @@ class TaxServiceTest {
 
             double tax = taxService.calculateTransactionTax(0.0);
             assertThat(tax).isEqualTo(0.0);
+        }
+    }
+
+    /**
+     * {@code tax.enabled} is the master switch over all taxation (UltiKits/UltiEconomy#16). Before
+     * 6.3.0 nothing read it, so a transfer was taxed whenever {@code tax.transaction-tax.enabled}
+     * was true regardless of this key.
+     */
+    @Nested
+    @DisplayName("Master switch tax.enabled (UltiEconomy#16)")
+    class MasterSwitchTests {
+
+        @Test
+        @DisplayName("tax.enabled: false takes no transaction tax even when the transaction tax is enabled")
+        void masterOffTakesNoTransactionTax() {
+            lenient().when(config.isTaxEnabled()).thenReturn(false);
+            lenient().when(config.isTransactionTaxEnabled()).thenReturn(true);
+            lenient().when(config.getTransactionTaxRate()).thenReturn(0.05);
+
+            assertThat(taxService.calculateTransactionTax(100.0)).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("tax.enabled: true takes the transaction tax at its configured rate")
+        void masterOnTakesTransactionTax() {
+            lenient().when(config.isTaxEnabled()).thenReturn(true);
+            lenient().when(config.isTransactionTaxEnabled()).thenReturn(true);
+            lenient().when(config.getTransactionTaxRate()).thenReturn(0.05);
+
+            assertThat(taxService.calculateTransactionTax(100.0)).isEqualTo(5.0);
+        }
+
+        @Test
+        @DisplayName("tax.enabled is read at every transfer, so a reload that flips it applies to the next one")
+        void masterSwitchIsReadAtEveryCall() {
+            lenient().when(config.isTaxEnabled()).thenReturn(true, false, true);
+            lenient().when(config.isTransactionTaxEnabled()).thenReturn(true);
+            lenient().when(config.getTransactionTaxRate()).thenReturn(0.05);
+
+            assertThat(taxService.calculateTransactionTax(100.0)).isEqualTo(5.0);
+            assertThat(taxService.calculateTransactionTax(100.0)).isEqualTo(0.0);
+            assertThat(taxService.calculateTransactionTax(100.0)).isEqualTo(5.0);
         }
     }
 

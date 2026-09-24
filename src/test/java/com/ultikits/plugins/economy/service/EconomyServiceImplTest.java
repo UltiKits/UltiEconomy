@@ -1214,4 +1214,117 @@ class EconomyServiceImplTest {
             assertThat(service.getCurrencyManager()).isSameAs(currencyManager);
         }
     }
+
+    /**
+     * {@code tax.enabled} gates the transaction tax at both places a transfer applies it -- the
+     * primary-currency and the per-currency {@code transfer} overloads (UltiKits/UltiEconomy#16).
+     * These cases use a real {@link TaxService} over the same {@link EconomyConfig} the service
+     * reads, so what is asserted is the money that actually moves, not a stubbed tax figure.
+     */
+    @Nested
+    @DisplayName("Master tax switch at the transfer sites (UltiEconomy#16)")
+    class TaxMasterSwitchAtTransferTests {
+
+        @Mock private DataOperator<com.ultikits.plugins.economy.entity.TreasuryEntity> treasuryDataOperator;
+
+        @BeforeEach
+        void realTaxService() {
+            config.setTransactionTaxEnabled(true);
+            config.setTransactionTaxRate(0.05);
+            lenient().when(treasuryDataOperator.query())
+                    .thenReturn(new MockQuery<>(Collections.emptyList()));
+            service.setTaxService(new TaxService(config, treasuryDataOperator));
+        }
+
+        @Test
+        @DisplayName("tax.enabled: false -- the receiver gets the full amount and the treasury gets nothing")
+        void masterOffTransfersUntaxed() throws Exception {
+            config.setTaxEnabled(false);
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 0, 0);
+            stubTwoAccounts(sender, receiver);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 100)).isTrue();
+
+            assertThat(sender.getCash()).isEqualTo(900.0);
+            assertThat(receiver.getCash()).isEqualTo(100.0);
+            verify(treasuryDataOperator, never()).insert(any());
+            verify(treasuryDataOperator, never()).update(any());
+        }
+
+        @Test
+        @DisplayName("tax.enabled: true -- the receiver gets the amount less 5% and the treasury gets the 5%")
+        void masterOnTransfersTaxed() throws Exception {
+            config.setTaxEnabled(true);
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 0, 0);
+            stubTwoAccounts(sender, receiver);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 100)).isTrue();
+
+            assertThat(sender.getCash()).isEqualTo(900.0);
+            assertThat(receiver.getCash()).isEqualTo(95.0);
+            ArgumentCaptor<com.ultikits.plugins.economy.entity.TreasuryEntity> deposited =
+                    ArgumentCaptor.forClass(com.ultikits.plugins.economy.entity.TreasuryEntity.class);
+            verify(treasuryDataOperator).insert(deposited.capture());
+            assertThat(deposited.getValue().getBalance()).isEqualTo(5.0);
+        }
+
+        @Test
+        @DisplayName("tax.enabled: false -- a per-currency transfer is untaxed too")
+        void masterOffTransfersCurrencyUntaxed() throws Exception {
+            config.setTaxEnabled(false);
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+            stubTwoBalances(sender, receiver);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems")).isTrue();
+
+            assertThat(sender.getCash()).isEqualTo(300.0);
+            assertThat(receiver.getCash()).isEqualTo(300.0);
+            verify(treasuryDataOperator, never()).insert(any());
+            verify(treasuryDataOperator, never()).update(any());
+        }
+
+        @Test
+        @DisplayName("tax.enabled: true -- a per-currency transfer is taxed at the same rate")
+        void masterOnTransfersCurrencyTaxed() throws Exception {
+            config.setTaxEnabled(true);
+            CurrencyBalanceEntity sender = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(500.0).bank(0.0).build();
+            CurrencyBalanceEntity receiver = CurrencyBalanceEntity.builder()
+                    .uuid(OTHER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+            stubTwoBalances(sender, receiver);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems")).isTrue();
+
+            assertThat(sender.getCash()).isEqualTo(300.0);
+            assertThat(receiver.getCash()).isEqualTo(290.0);
+            verify(treasuryDataOperator).insert(any());
+        }
+
+        private void stubTwoAccounts(PlayerAccountEntity sender, PlayerAccountEntity receiver) {
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+        }
+
+        private void stubTwoBalances(CurrencyBalanceEntity sender, CurrencyBalanceEntity receiver) {
+            when(currencyDataOperator.query()).thenReturn(currencyQuery);
+            when(currencyQuery.where("uuid")).thenReturn(currencyQuery);
+            when(currencyQuery.eq(PLAYER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.eq(OTHER_UUID.toString())).thenReturn(currencyQuery);
+            when(currencyQuery.and("currency_id")).thenReturn(currencyQuery);
+            when(currencyQuery.eq("gems")).thenReturn(currencyQuery);
+            when(currencyQuery.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+        }
+    }
 }

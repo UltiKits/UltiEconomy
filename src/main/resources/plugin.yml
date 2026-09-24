@@ -2,7 +2,7 @@ name: UltiTools-Economy
 version: '${project.version}'
 main: com.ultikits.plugins.economy.UltiEconomy
 base-package: com.ultikits.plugins.economy
-api-version: 621
+api-version: 630
 authors: [ wisdomme ]
 depend: [ Vault ]
 softdepend: [ PlaceholderAPI ]

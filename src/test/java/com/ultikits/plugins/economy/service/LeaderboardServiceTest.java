@@ -337,4 +337,94 @@ class LeaderboardServiceTest {
             assertThat(service.getDefaultDisplayCount()).isEqualTo(config.getLeaderboardDisplayCount());
         }
     }
+
+    /**
+     * The leaderboard cache is refreshed on a schedule the framework runs (UltiKits/UltiEconomy#15).
+     * Before 6.3.0 nothing called either refresh method, so every rank and top-N placeholder read an
+     * empty cache for the life of the server.
+     *
+     * <p>The period is {@code leaderboard.update-interval} seconds, bound through the framework's
+     * config-bound {@code @Scheduled} (UltiKits/UltiTools-Reborn#531); the first refresh runs at load.
+     */
+    @Nested
+    @DisplayName("Scheduled refresh (UltiEconomy#15)")
+    class ScheduleTests {
+
+        @Test
+        @DisplayName("leaderboard.update-interval at its declared 60: one repeating sync task, first run at once, then every 1200 ticks")
+        void registersOneSyncTaskEvery60Seconds() {
+            assertThat(com.ultikits.plugins.economy.config.ConfigEntryAccess.get(config, "leaderboard.update-interval"))
+                    .isEqualTo(60);
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
+
+            assertThat(calls).hasSize(1);
+            ScheduledRegistration.Call call = calls.get(0);
+            assertThat(call.method).isEqualTo("runTaskTimer");
+            assertThat(call.period).isEqualTo(1200L);
+            assertThat(call.delay).isEqualTo(0L);
+            assertThat(call.task).isNotNull();
+        }
+
+        @Test
+        @DisplayName("leaderboard.update-interval: 30 -- first run at once, then every 600 ticks (UltiTools-Reborn#531 binding)")
+        void registersOnTheConfiguredInterval() {
+            com.ultikits.plugins.economy.config.ConfigEntryAccess.set(config, "leaderboard.update-interval", 30);
+
+            List<ScheduledRegistration.Call> calls = ScheduledRegistration.register(service, config);
+
+            assertThat(calls).hasSize(1);
+            assertThat(calls.get(0).method).isEqualTo("runTaskTimer");
+            assertThat(calls.get(0).period).isEqualTo(600L);
+            assertThat(calls.get(0).delay).isEqualTo(0L);
+        }
+
+        @Test
+        @DisplayName("a scheduled run fills the primary leaderboard and every configured currency's own leaderboard")
+        void scheduledRunRefreshesPrimaryAndEveryCurrency() {
+            when(dataOperator.getAll()).thenReturn(Arrays.asList(
+                    PlayerAccountEntity.builder().uuid(UUID_POOR.toString()).playerName("Poor").cash(100).bank(0).build(),
+                    PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(5000).bank(10000).build()));
+            // In gems the order is the reverse of the primary one, so a gems result that fell back
+            // to the primary leaderboard would put Rich first and fail.
+            when(currencyDataOperator.getAll()).thenReturn(Arrays.asList(
+                    CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(1).bank(0).build(),
+                    CurrencyBalanceEntity.builder().uuid(UUID_POOR.toString()).currencyId("gems").cash(900).bank(0).build()));
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
+
+            try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
+                         org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            assertThat(service.getPlayerRank(UUID_RICH)).isEqualTo(1);
+            assertThat(service.getTopPlayers(1).get(0).getPlayerName()).isEqualTo("Rich");
+            assertThat(service.getPlayerRank(UUID_POOR, "gems")).isEqualTo(1);
+            assertThat(service.getTopPlayers(1, "gems").get(0).getPlayerName()).isEqualTo("Poor");
+        }
+
+        /**
+         * The refresh runs on the main thread every 60 seconds. Gate-1 review (WR-01): with two
+         * configured currencies it read the accounts table three times and the balances table twice
+         * per run. One read of each is enough.
+         */
+        @Test
+        @DisplayName("a scheduled run reads each table once, however many currencies are configured")
+        void scheduledRunReadsEachTableOnce() {
+            when(dataOperator.getAll()).thenReturn(Collections.singletonList(
+                    PlayerAccountEntity.builder().uuid(UUID_RICH.toString()).playerName("Rich").cash(10).bank(0).build()));
+            when(currencyDataOperator.getAll()).thenReturn(Collections.singletonList(
+                    CurrencyBalanceEntity.builder().uuid(UUID_RICH.toString()).currencyId("gems").cash(5).bank(0).build()));
+            Runnable task = ScheduledRegistration.register(service, config).get(0).task;
+
+            try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
+                         org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+                assertThat(ScheduledRegistration.runAndCollectWarnings(task, bukkit)).isEmpty();
+            }
+
+            org.mockito.Mockito.verify(dataOperator, org.mockito.Mockito.times(1)).getAll();
+            org.mockito.Mockito.verify(currencyDataOperator, org.mockito.Mockito.times(1)).getAll();
+            assertThat(service.getPlayerRank(UUID_RICH, "gems")).isEqualTo(1);
+            assertThat(service.getTopPlayers(1, "gems").get(0).getTotalWealth()).isEqualTo(5.0);
+        }
+    }
 }

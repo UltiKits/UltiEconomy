@@ -33,26 +33,36 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited)")
     private double maxBankBalance = -1;
 
-    @ConfigEntry(path = "interest.enabled", comment = "Enable interest")
-    private boolean interestEnabled = true;
+    @ConfigEntry(path = "interest.enabled", comment = "Pay bank interest every interest.interval seconds; read at each payment")
+    private boolean interestEnabled = false;
 
-    @ConfigEntry(path = "interest.rate", comment = "Interest rate per interval")
+    @ConfigEntry(path = "interest.rate", comment = "Interest rate per payment")
     private double interestRate = 0.03;
 
-    @ConfigEntry(path = "interest.interval", comment = "Interval in seconds")
+    /**
+     * Seconds between interest payments, and before the first one after load. Bound to
+     * {@code InterestService#payInterestIfEnabled} through the framework's config-bound
+     * {@code @Scheduled} (UltiKits/UltiTools-Reborn#531): 1 to 107374182; an invalid value refuses the
+     * module at load and is ignored, with a WARNING, at {@code /ul reload}.
+     */
+    @ConfigEntry(path = "interest.interval", comment = "Seconds between interest payments (1 to 107374182); /ul reload applies a change without moving the next payment earlier or later than the new interval allows")
     private int interestInterval = 1800;
 
     @ConfigEntry(path = "interest.max-interest", comment = "Max interest per payment")
     private double maxInterest = 10000.0;
 
-    @ConfigEntry(path = "leaderboard.update-interval", comment = "Leaderboard update interval in seconds")
+    /**
+     * Seconds between leaderboard refreshes; the first runs at load. Bound to
+     * {@code LeaderboardService#refreshAll} (UltiKits/UltiTools-Reborn#531): 1 to 107374182.
+     */
+    @ConfigEntry(path = "leaderboard.update-interval", comment = "Seconds between leaderboard refreshes (1 to 107374182)")
     private int leaderboardUpdateInterval = 60;
 
     @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
     private int leaderboardDisplayCount = 10;
 
-    @ConfigEntry(path = "tax.enabled", comment = "Enable tax system")
-    private boolean taxEnabled = false;
+    @ConfigEntry(path = "tax.enabled", comment = "Master switch for all taxation: false collects no transaction tax and no wealth tax")
+    private boolean taxEnabled = true;
 
     @ConfigEntry(path = "tax.transaction-tax.enabled", comment = "Enable transaction tax on transfers")
     private boolean transactionTaxEnabled = true;
