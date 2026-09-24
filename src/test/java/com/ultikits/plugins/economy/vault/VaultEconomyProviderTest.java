@@ -1,7 +1,9 @@
 package com.ultikits.plugins.economy.vault;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.OfflinePlayer;
 import org.junit.jupiter.api.*;
@@ -9,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,9 +33,50 @@ class VaultEconomyProviderTest {
     @BeforeEach
     void setUp() {
         config = new EconomyConfig();
-        provider = new VaultEconomyProvider(economyService, config);
+        provider = new VaultEconomyProvider(economyService, config, mock(UltiToolsPlugin.class));
         lenient().when(offlinePlayer.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(offlinePlayer.getName()).thenReturn("Steve");
+    }
+
+    @Nested
+    @DisplayName("Error messages follow the language setting: shop plugins show them to players")
+    class ErrorMessageLanguageTests {
+
+        private VaultEconomyProvider speaking(String code) {
+            UltiToolsPlugin plugin = mock(UltiToolsPlugin.class);
+            lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer(code));
+            return new VaultEconomyProvider(economyService, config, plugin);
+        }
+
+        private List<String> failures(VaultEconomyProvider p) {
+            when(economyService.takeCash(PLAYER_UUID, 50.0)).thenReturn(false);
+            when(economyService.addCash(PLAYER_UUID, 50.0)).thenReturn(false);
+            return Arrays.asList(
+                    p.withdrawPlayer(offlinePlayer, 50.0).errorMessage,
+                    p.withdrawPlayer(offlinePlayer, -1.0).errorMessage,
+                    p.depositPlayer(offlinePlayer, 50.0).errorMessage,
+                    p.depositPlayer(offlinePlayer, -1.0).errorMessage,
+                    p.createBank("guild", offlinePlayer).errorMessage);
+        }
+
+        @Test
+        @DisplayName("under language: zh, insufficient funds, negative amounts, a failed deposit and shared banks are Chinese")
+        void chinese() {
+            for (String message : failures(speaking("zh"))) {
+                assertThat(message).matches(".*\\p{IsHan}.*");
+            }
+        }
+
+        @Test
+        @DisplayName("under language: en the messages are the English texts callers received before")
+        void english() {
+            assertThat(failures(speaking("en"))).containsExactly(
+                    "Insufficient funds",
+                    "Cannot withdraw negative amount",
+                    "Deposit failed",
+                    "Cannot deposit negative amount",
+                    "UltiEconomy does not support Vault shared banks");
+        }
     }
 
     @Nested
