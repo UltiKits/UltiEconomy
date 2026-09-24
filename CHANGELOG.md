@@ -112,18 +112,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   language because their keys were missing from both language files: the `/money` and `/bank`
   balance lines, the `/pay`, `/deposit` and `/withdraw` success lines, the `/eco give`, `take`, `set`
   and `check` lines, the primary-currency interest notification, and the `/bank`, `/deposit`,
-  `/withdraw`, `/pay` and `/money` help and command descriptions (UltiKits/UltiEconomy#14).
+  `/withdraw`, `/pay` and `/money` help and command descriptions, and the `/eco` and `/note` command
+  descriptions (UltiKits/UltiEconomy#14).
   `language: zh` now also applies to text that was fixed English: the six help headers
   (`=== UltiEconomy Bank ===` and the rest), a money note's name and lore (`[Money Note] …`,
   `Currency:`, `Value:`, `Created by:`), the two startup warnings about `interest.enabled` and
-  `tax.enabled`, and three console errors (a failed account, balance or interest write). English
-  wording is unchanged. A money note made before this change keeps the name it was made with; notes
+  `tax.enabled`, three console errors (a failed account, balance or interest write), and the messages
+  the Vault bridge returns when a withdrawal or deposit fails, which shop plugins show to the player.
+  English wording is unchanged. A money note made before this change keeps the name it was made with; notes
   are recognised by their stored data, not their name, so old and new notes both redeem.
 - `language: en` 现在对以下命令消息生效（它们的键在两份语言文件中都缺失，因此在任何语言下都显示中文源文本）：`/money` 与
   `/bank` 的余额行，`/pay`、`/deposit`、`/withdraw` 的成功提示，`/eco give`、`take`、`set`、`check` 的提示，主货币利息到账通知，
-  以及 `/bank`、`/deposit`、`/withdraw`、`/pay`、`/money` 的帮助与命令描述（UltiKits/UltiEconomy#14）。`language: zh` 现在也对
+  以及 `/bank`、`/deposit`、`/withdraw`、`/pay`、`/money` 的帮助与命令描述和 `/eco`、`/note` 的命令描述（UltiKits/UltiEconomy#14）。`language: zh` 现在也对
   原先写死为英文的文本生效：六个帮助标题（`=== UltiEconomy Bank ===` 等）、纸币的名称与说明、`interest.enabled` 与
-  `tax.enabled` 的两条启动警告，以及三条控制台错误（账户、余额或利息写入失败）。英文措辞不变。改动前制作的纸币保留原名称；
+  `tax.enabled` 的两条启动警告、三条控制台错误（账户、余额或利息写入失败），以及 Vault 接口在扣款或存款失败时返回的消息
+  （商店插件会把它显示给玩家）。英文措辞不变。改动前制作的纸币保留原名称；
   纸币按存储的数据识别而非名称，新旧纸币都能兑换。
 
 - The wealth leaderboard is now refreshed: once as soon as the module loads, then every

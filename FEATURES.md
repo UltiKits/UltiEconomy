@@ -316,9 +316,11 @@ catalogue and rendered their raw Chinese source text in every language (UltiKits
 and the help headers, the money note's name and lore, both startup warnings and three console
 error lines were fixed English. Two JUnit guards (`UltiEconomyLanguageCatalogueTest`,
 `UltiEconomyCjkLiteralScopeTest`) now fail the build on a missing key or on Chinese text outside a
-catalogue. The exception messages `CurrencyManager` throws for a malformed `currencies.yml` and the
-refusal texts the Vault bridge returns to calling plugins stay English: they are messages to code,
-reported by the framework or the calling plugin, not lines this module shows.
+catalogue. The exception messages `CurrencyManager` throws for a malformed `currencies.yml` stay
+English: they are messages to code, reported by the framework, not lines this module shows. The
+refusal texts the Vault bridge returns to a calling plugin (insufficient funds, a negative amount, a
+failed deposit, shared banks not supported) follow the language, because shop and sign plugins show
+them to the player; only the deprecated name-based Vault methods keep a fixed English text.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
