@@ -124,6 +124,19 @@ class EconomyLanguageTest {
     }
 
     @Test
+    @DisplayName("/pay to yourself under language: en says you cannot pay yourself, not that the amount is invalid")
+    void payYourselfInEnglish() {
+        speak("en");
+        Player alice = mock(Player.class);
+        when(alice.getUniqueId()).thenReturn(PLAYER);
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(() -> Bukkit.getPlayer("Alice")).thenReturn(alice);
+            new PayCommand(plugin, economy).onPay(alice, "Alice", "10");
+        }
+        assertThat(said(alice)).containsExactly(ChatColor.RED + "You cannot pay yourself");
+    }
+
+    @Test
     @DisplayName("/eco check and /eco take under language: en are English, with the English word order")
     @SuppressWarnings("deprecation")
     void ecoAdminInEnglish() {

@@ -131,7 +131,8 @@ class PayCommandTest {
 
                 ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
                 verify(sender).sendMessage(captor.capture());
-                assertThat(captor.getValue()).contains("无效的金额");
+                // Paying yourself is its own refusal, not an invalid amount.
+                assertThat(captor.getValue()).contains("不能向自己转账");
             }
         }
 
@@ -228,7 +229,8 @@ class PayCommandTest {
 
                 ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
                 verify(sender).sendMessage(captor.capture());
-                assertThat(captor.getValue()).contains("无效的金额");
+                // Paying yourself is its own refusal, not an invalid amount.
+                assertThat(captor.getValue()).contains("不能向自己转账");
             }
         }
 
