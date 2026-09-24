@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 
 @CmdExecutor(
         permission = "ultieconomy.bank",
-        description = "查看银行存款",
+        description = "economy.help.bank",
         alias = {"bank"}
 )
 public class BankCommand extends BaseCommandExecutor {
@@ -57,13 +57,13 @@ public class BankCommand extends BaseCommandExecutor {
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onBank(@CmdSender Player player) {
         if (!config.isBankEnabled()) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("银行功能未启用"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.bank_disabled"));
             return;
         }
 
         double bank = economyService.getBank(player.getUniqueId());
         String formatted = economyService.formatAmount(bank);
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formatted));
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.bank"), formatted));
     }
 
     @CmdMapping(format = "<currency>")
@@ -71,19 +71,19 @@ public class BankCommand extends BaseCommandExecutor {
     public void onBankCurrency(@CmdSender Player player, @CmdParam("currency") String currencyId) {
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
 
         double bank = economyService.getBank(player.getUniqueId(), currency.getId());
         String formatted = economyService.formatAmount(bank, currency.getId());
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formatted));
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.bank"), formatted));
     }
 
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Bank ===");
-        sender.sendMessage(ChatColor.YELLOW + "/bank" + ChatColor.GRAY + " - " + plugin.i18n("查看银行存款"));
-        sender.sendMessage(ChatColor.YELLOW + "/bank <currency>" + ChatColor.GRAY + " - " + plugin.i18n("查看指定货币银行存款"));
+        sender.sendMessage(ChatColor.YELLOW + "/bank" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.bank"));
+        sender.sendMessage(ChatColor.YELLOW + "/bank <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.bank_currency"));
     }
 }

@@ -222,7 +222,7 @@ public class InterestService {
             if (player != null && player.isOnline()) {
                 String formatted = economyService.formatAmount(interest);
                 player.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("银行利息到账: %s"), formatted));
+                        plugin.i18n("economy.interest.received"), formatted));
             }
         } catch (IllegalArgumentException ignored) {
             // Invalid UUID — skip notification
@@ -237,7 +237,7 @@ public class InterestService {
                 CurrencyDefinition def = currencyManager.getCurrency(currencyId);
                 String currencyName = def != null ? def.getDisplayName() : currencyId;
                 player.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("%s 银行利息到账: %s"), currencyName, formatted));
+                        plugin.i18n("economy.interest.received_currency"), currencyName, formatted));
             }
         } catch (IllegalArgumentException ignored) {
             // Invalid UUID — skip notification

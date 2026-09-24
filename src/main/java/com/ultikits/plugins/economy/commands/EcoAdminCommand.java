@@ -17,7 +17,7 @@ import org.bukkit.command.CommandSender;
 
 @CmdExecutor(
         permission = "ultieconomy.admin",
-        description = "经济管理命令",
+        description = "economy.command.eco.description",
         alias = {"eco"}
 )
 public class EcoAdminCommand extends BaseCommandExecutor {
@@ -90,9 +90,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount);
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已给予 %s %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.gave"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -112,9 +112,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount);
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已扣除 %s %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.took"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
         }
     }
 
@@ -134,9 +134,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount);
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已设置 %s 的余额为 %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.set"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -154,11 +154,11 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         sender.sendMessage(ChatColor.GOLD + "=== " + target.getName() + " ===");
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的余额: %s"), target.getName(), economyService.formatAmount(cash)));
+                plugin.i18n("economy.admin.check_cash"), target.getName(), economyService.formatAmount(cash)));
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的银行存款: %s"), target.getName(), economyService.formatAmount(bank)));
+                plugin.i18n("economy.admin.check_bank"), target.getName(), economyService.formatAmount(bank)));
         sender.sendMessage(ChatColor.GREEN + String.format(
-                plugin.i18n("总资产: %s"), economyService.formatAmount(total)));
+                plugin.i18n("economy.money.total"), economyService.formatAmount(total)));
     }
 
     // --- Currency-aware overloads ---
@@ -178,7 +178,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
 
@@ -186,9 +186,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已给予 %s %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.gave"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -207,7 +207,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
 
@@ -215,9 +215,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已扣除 %s %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.took"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
         }
     }
 
@@ -236,7 +236,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
 
@@ -244,9 +244,9 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount, currency.getId());
             sender.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("已设置 %s 的余额为 %s"), target.getName(), formatted));
+                    plugin.i18n("economy.admin.set"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -261,7 +261,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
         String resolvedId = currency.getId();
@@ -272,17 +272,17 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
         sender.sendMessage(ChatColor.GOLD + "=== " + target.getName() + " (" + resolvedId + ") ===");
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的余额: %s"), target.getName(), economyService.formatAmount(cash, resolvedId)));
+                plugin.i18n("economy.admin.check_cash"), target.getName(), economyService.formatAmount(cash, resolvedId)));
         sender.sendMessage(ChatColor.YELLOW + String.format(
-                plugin.i18n("%s 的银行存款: %s"), target.getName(), economyService.formatAmount(bank, resolvedId)));
+                plugin.i18n("economy.admin.check_bank"), target.getName(), economyService.formatAmount(bank, resolvedId)));
         sender.sendMessage(ChatColor.GREEN + String.format(
-                plugin.i18n("总资产: %s"), economyService.formatAmount(total, resolvedId)));
+                plugin.i18n("economy.money.total"), economyService.formatAmount(total, resolvedId)));
     }
 
     @CmdMapping(format = "treasury")
     public void onTreasury(@CmdSender CommandSender sender) {
         if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
             return;
         }
         if (currencyManager != null) {
@@ -299,7 +299,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             @CmdSender CommandSender sender,
             @CmdParam("amount") String amountStr) {
         if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
             return;
         }
         double amount = parseAmount(sender, amountStr);
@@ -310,12 +310,12 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             if (success) {
                 String formatted = economyService.formatAmount(amount, primaryId);
                 sender.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("已从国库提取 %s"), formatted));
+                        plugin.i18n("economy.treasury.withdrawn"), formatted));
             } else {
-                sender.sendMessage(ChatColor.RED + plugin.i18n("国库余额不足"));
+                sender.sendMessage(ChatColor.RED + plugin.i18n("economy.treasury.insufficient"));
             }
         } catch (IllegalAccessException e) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -325,7 +325,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             @CmdParam("amount") String amountStr,
             @CmdParam("currency") String currencyId) {
         if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("税收系统未启用"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
             return;
         }
         double amount = parseAmount(sender, amountStr);
@@ -335,12 +335,12 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             if (success) {
                 String formatted = economyService.formatAmount(amount, currencyId);
                 sender.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("已从国库提取 %s"), formatted));
+                        plugin.i18n("economy.treasury.withdrawn"), formatted));
             } else {
-                sender.sendMessage(ChatColor.RED + plugin.i18n("国库余额不足"));
+                sender.sendMessage(ChatColor.RED + plugin.i18n("economy.treasury.insufficient"));
             }
         } catch (IllegalAccessException e) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("操作失败"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
         }
     }
 
@@ -359,7 +359,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
     private OfflinePlayer resolvePlayer(CommandSender sender, String name) {
         OfflinePlayer player = Bukkit.getOfflinePlayer(name);
         if (!player.hasPlayedBefore() && !player.isOnline()) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("玩家不存在"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.player_not_found"));
             return null;
         }
         return player;
@@ -369,12 +369,12 @@ public class EcoAdminCommand extends BaseCommandExecutor {
         try {
             double amount = Double.parseDouble(amountStr);
             if (amount < 0) {
-                sender.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+                sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
                 return -1;
             }
             return amount;
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
             return -1;
         }
     }
