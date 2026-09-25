@@ -312,6 +312,12 @@ public final class PrimaryWalletMerge {
             double targetCash = exactCash;
             double targetBank = exactBank;
             if (account != null && holds(account, targetCash, targetBank)) {
+                if (!withinMarker(m, markedRows)) {
+                    // What an interrupted removal leaves is some of the marked rows, so never more than
+                    // the marker's amounts; more means these rows were not marked by this merge.
+                    leaveUnsettled(uuid, account, markedRows.get(0));
+                    continue;
+                }
                 // Credited by an earlier, interrupted start: only the removal is left.
                 markedDone.addAll(markedRows);
                 continue;
@@ -441,6 +447,17 @@ public final class PrimaryWalletMerge {
             bank = bank.add(positivePart(row.getBank()));
         }
         return cash.compareTo(m.cashToAdd) == 0 && bank.compareTo(m.bankToAdd) == 0;
+    }
+
+    /** Whether the rows hold, together, no more than the marker's amounts (the part of them left). */
+    private static boolean withinMarker(Marker m, List<CurrencyBalanceEntity> rows) {
+        BigDecimal cash = BigDecimal.ZERO;
+        BigDecimal bank = BigDecimal.ZERO;
+        for (CurrencyBalanceEntity row : rows) {
+            cash = cash.add(positivePart(row.getCash()));
+            bank = bank.add(positivePart(row.getBank()));
+        }
+        return cash.compareTo(m.cashToAdd) <= 0 && bank.compareTo(m.bankToAdd) <= 0;
     }
 
     /** {@code amount} when it is above 0, as the exact decimal it prints as; otherwise 0. */
