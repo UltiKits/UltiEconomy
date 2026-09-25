@@ -351,7 +351,7 @@ class PrimaryWalletMergeTest {
          * Four players covering every case: both wallets, three duplicate rows (so a resumed merge has
          * more than one unmarked row left; gate-1 WR-01), an empty wallet, only a second wallet.
          */
-        private void seed(EconomyTestWorld world) {
+        private void seed(EconomyTestWorld world, boolean withEmptyWallet) {
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
             world.seedBalance(STEVE, "coins", 1000.0, 50.0);
             world.seedAccount(ALEX, "Alex", 10.0, 0.0);
@@ -359,23 +359,30 @@ class PrimaryWalletMergeTest {
             world.seedBalance(ALEX, "coins", 5.0, 7.0);
             world.seedBalance(ALEX, "coins", 3.0, 0.0);
             world.seedAccount(NOOR, "Noor", 1.0, 2.0);
-            world.seedBalance(NOOR, "coins", 0.0, 0.0);
+            if (withEmptyWallet) {
+                world.seedBalance(NOOR, "coins", 0.0, 0.0);
+            }
             world.seedBalance(ZED, "coins", 300.0, 20.0);
             world.seedBalance(STEVE, "gems", 3617.0, 350.0);
         }
 
+        /**
+         * {@code backend}: "relational", "cached" or "cached-eager" ("eager": the framework's
+         * background flush writes every change at the worst moment), optionally suffixed
+         * "-no-empty" to leave out the empty wallet, whose durable removal would otherwise flush the
+         * markers as a side effect and hide a missing flush.
+         */
         private EconomyTestWorld world(String backend) {
-            EconomyTestWorld world = "relational".equals(backend) ? EconomyTestWorld.relational() : EconomyTestWorld.cached();
-            // "cached-eager": the framework's background flush writes every change at the worst moment.
-            world.accounts.setEagerFlush("cached-eager".equals(backend));
-            world.balances.setEagerFlush("cached-eager".equals(backend));
-            seed(world);
+            EconomyTestWorld world = backend.startsWith("relational") ? EconomyTestWorld.relational() : EconomyTestWorld.cached();
+            world.accounts.setEagerFlush(backend.contains("eager"));
+            world.balances.setEagerFlush(backend.contains("eager"));
+            seed(world, !backend.endsWith("-no-empty"));
             // Seeding writes straight to disk; nothing is pending.
             return world;
         }
 
         @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {"relational", "cached", "cached-eager"})
+        @ValueSource(strings = {"relational", "cached", "cached-eager", "relational-no-empty", "cached-no-empty"})
         @DisplayName("the next start ends with exactly the balances an uninterrupted merge produces")
         void crashAtEveryStepThenRestart(String backend) {
             EconomyTestWorld reference = world(backend);
@@ -420,7 +427,7 @@ class PrimaryWalletMergeTest {
         }
 
         @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {"relational", "cached", "cached-eager"})
+        @ValueSource(strings = {"relational", "cached", "cached-eager", "relational-no-empty", "cached-no-empty"})
         @DisplayName("a second crash while the next start is finishing the first one's merge still ends exactly right")
         void crashTwiceThenRestart(String backend) {
             EconomyTestWorld reference = world(backend);
