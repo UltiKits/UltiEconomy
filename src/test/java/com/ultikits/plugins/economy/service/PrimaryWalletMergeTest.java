@@ -117,7 +117,8 @@ class PrimaryWalletMergeTest {
 
             assertThat(world.account(STEVE).getCash()).isEqualTo(2788.0);
             assertThat(world.account(STEVE).getBank()).isEqualTo(400.0);
-            assertThat(world.account(ALEX).getCash()).isEqualTo(0.5 + 1000.95);
+            // The printed amounts added as decimals: 0.5 + 1000.95 = 1001.45 exactly as printed.
+            assertThat(world.account(ALEX).getCash()).isEqualTo(1001.45);
             assertThat(world.account(NOOR).getCash()).isEqualTo(2000.0);
             assertThat(logged(world, "info")).last().isEqualTo(
                     en("economy.log.wallet_merge.total", 3, "3588.95", "0", 0, 0));
@@ -238,6 +239,34 @@ class PrimaryWalletMergeTest {
                     en("economy.log.wallet_merge.too_large", "1.0", "0", "Steve"));
             assertThat(logged(world, "info")).containsExactly(
                     en("economy.log.wallet_merge.total", 0, "0", "0", 0, 1));
+        }
+
+        @Test
+        @DisplayName("amounts are added as the decimals they print as, so 0.1 + 0.2 is stored as 0.3 (Codex round 5: one rule for exactness)")
+        void decimalArithmetic() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 0.1, 0.0);
+            world.seedBalance(STEVE, "coins", 0.2, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(0.3);
+        }
+
+        @Test
+        @DisplayName("rows whose sum has more digits than a balance keeps are not merged or lost (Codex round 5)")
+        void aggregateBeyondPrecisionIsLeftAlone() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 0.0, 0.0);
+            world.seedBalance(STEVE, "coins", 1.0e16, 0.0);
+            world.seedBalance(STEVE, "coins", 1.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(0.0);
+            assertThat(world.balanceRows("coins")).hasSize(2);
+            assertThat(logged(world, "warn")).containsExactly(
+                    en("economy.log.wallet_merge.too_large", "10000000000000001.0", "0", "Steve"));
         }
 
         @Test
