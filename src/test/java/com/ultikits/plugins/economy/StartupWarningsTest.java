@@ -3,7 +3,11 @@ package com.ultikits.plugins.economy;
 import static org.mockito.ArgumentMatchers.anyString;
 import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
+import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.plugins.economy.testsupport.InMemoryDataOperator;
 import com.ultikits.ultitools.context.SimpleContainer;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import org.bukkit.Bukkit;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.invocation.Invocation;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -130,6 +135,25 @@ class StartupWarningsTest {
         }
 
         @Test
+        @DisplayName("interest.enabled: true describes the primary currency's one wallet, in both languages (UltiKits/UltiEconomy#25)")
+        void interestWarningDescribesOneWallet() {
+            EconomyConfig config = new EconomyConfig();
+            config.setInterestEnabled(true);
+
+            List<String> en = warningsMentioning("interest.enabled is true", bootWith(config));
+            List<String> zh = warningsMentioning("interest.enabled", bootWith(config, new YamlConfiguration(), "zh"));
+
+            assertThat(en).hasSize(1);
+            assertThat(en.get(0))
+                    .contains("paid once per player")
+                    .doesNotContain("per-currency row");
+            assertThat(zh).hasSize(1);
+            assertThat(zh.get(0))
+                    .contains("每位玩家只发放一次")
+                    .doesNotContain("那一行上重复发放");
+        }
+
+        @Test
         @DisplayName("Control: interest.enabled: false logs no interest warning")
         void interestOffIsNotAnnounced() {
             EconomyConfig config = new EconomyConfig();
@@ -230,6 +254,15 @@ class StartupWarningsTest {
         when(plugin.getConfig(EconomyConfig.class)).thenReturn(effective);
         SimpleContainer context = mock(SimpleContainer.class);
         when(plugin.getContext()).thenReturn(context);
+        // The primary-currency block agrees with config.yml's defaults, and storage is empty, so
+        // loading logs nothing about either (UltiKits/UltiEconomy#25).
+        when(plugin.getCurrencyManager()).thenReturn(new CurrencyManager(YamlConfiguration.loadConfiguration(
+                new StringReader("currencies:\n  coins:\n    initial-cash: 1000.0\n    bank-enabled: true\n"
+                        + "    min-deposit: 100.0\n    max-bank-balance: -1\n    primary: true\n"))));
+        when(plugin.getDataOperator(PlayerAccountEntity.class)).thenReturn(
+                InMemoryDataOperator.relational("economy_accounts", PlayerAccountEntity.class, null));
+        when(plugin.getDataOperator(CurrencyBalanceEntity.class)).thenReturn(
+                InMemoryDataOperator.relational("currency_balances", CurrencyBalanceEntity.class, null));
         when(context.getBean(EconomyService.class)).thenReturn(mock(EconomyService.class));
         when(plugin.registerSelf()).thenCallRealMethod();
 
