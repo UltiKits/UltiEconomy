@@ -35,6 +35,7 @@ class PrimaryWalletMergeTest {
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-00000000000b");
     private static final UUID NOOR = UUID.fromString("00000000-0000-0000-0000-00000000000c");
     private static final UUID ZED = UUID.fromString("00000000-0000-0000-0000-00000000000d");
+    private static final UUID PEAR = UUID.fromString("00000000-0000-0000-0000-00000000000e");
 
     private static PrimaryWalletMerge merge(EconomyTestWorld world) {
         return new PrimaryWalletMerge(world.plugin, world.accounts, world.balances,
@@ -64,7 +65,8 @@ class PrimaryWalletMergeTest {
     private static Map<String, String> accountsOf(EconomyTestWorld world) {
         Map<String, String> out = new TreeMap<>();
         for (PlayerAccountEntity a : world.accounts.getAll()) {
-            out.put(a.getUuid(), a.getPlayerName() + " " + a.getCash() + "/" + a.getBank());
+            String previous = out.put(a.getUuid(), a.getPlayerName() + " " + a.getCash() + "/" + a.getBank());
+            assertThat(previous).as("a second account for %s", a.getUuid()).isNull();
         }
         return out;
     }
@@ -167,6 +169,37 @@ class PrimaryWalletMergeTest {
             assertThat(world.balances.getAll()).isEmpty();
             assertThat(logged(world, "info")).containsExactly(
                     en("economy.log.wallet_merge.total", 0, "0", "0", 1, 0));
+        }
+
+        @Test
+        @DisplayName("a player whose only primary wallet is empty keeps an account holding nothing, so a first join does not grant the starting amount (Codex round 9)")
+        void emptyWalletOnly() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedBalance(PEAR, "coins", 0.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(accountsOf(world)).containsOnly(
+                    org.assertj.core.api.Assertions.entry(PEAR.toString(), "offline-e 0.0/0.0"));
+            assertThat(world.balances.getAll()).isEmpty();
+            // Joining later finds that account: no initial-cash appears from nowhere.
+            assertThat(world.service.getOrCreateAccount(PEAR, "Pear").getCash()).isEqualTo(0.0);
+            assertThat(accountsOf(world)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("the same for a player whose only primary wallet holds a negative amount, which is logged and not carried over")
+        void negativeWalletOnly() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedBalance(PEAR, "coins", -5.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(accountsOf(world)).containsOnly(
+                    org.assertj.core.api.Assertions.entry(PEAR.toString(), "offline-e 0.0/0.0"));
+            assertThat(world.balances.getAll()).isEmpty();
+            assertThat(logged(world, "warn")).containsExactly(
+                    en("economy.log.wallet_merge.negative_cash", "offline-e", "-5.0"));
         }
 
         @Test
@@ -361,6 +394,8 @@ class PrimaryWalletMergeTest {
             world.seedAccount(NOOR, "Noor", 1.0, 2.0);
             if (withEmptyWallet) {
                 world.seedBalance(NOOR, "coins", 0.0, 0.0);
+                // And a player whose only primary wallet is empty: the merge creates their account (0/0).
+                world.seedBalance(PEAR, "coins", 0.0, 0.0);
             }
             world.seedBalance(ZED, "coins", 300.0, 20.0);
             world.seedBalance(STEVE, "gems", 3617.0, 350.0);
@@ -391,11 +426,15 @@ class PrimaryWalletMergeTest {
             reference.balances.flush();
             reference.balances.gc();
             Map<String, String> expectedAccounts = accountsOf(reference);
-            assertThat(expectedAccounts).containsOnly(
-                    org.assertj.core.api.Assertions.entry(STEVE.toString(), "Steve 1500.0/150.0"),
-                    org.assertj.core.api.Assertions.entry(ALEX.toString(), "Alex 1018.0/7.0"),
-                    org.assertj.core.api.Assertions.entry(NOOR.toString(), "Noor 1.0/2.0"),
-                    org.assertj.core.api.Assertions.entry(ZED.toString(), "offline-d 300.0/20.0"));
+            Map<String, String> uninterrupted = new TreeMap<>();
+            uninterrupted.put(STEVE.toString(), "Steve 1500.0/150.0");
+            uninterrupted.put(ALEX.toString(), "Alex 1018.0/7.0");
+            uninterrupted.put(NOOR.toString(), "Noor 1.0/2.0");
+            uninterrupted.put(ZED.toString(), "offline-d 300.0/20.0");
+            if (!backend.endsWith("-no-empty")) {
+                uninterrupted.put(PEAR.toString(), "offline-e 0.0/0.0");
+            }
+            assertThat(expectedAccounts).isEqualTo(uninterrupted);
 
             EconomyTestWorld counting = world(backend);
             counting.crash.armAt(0);
