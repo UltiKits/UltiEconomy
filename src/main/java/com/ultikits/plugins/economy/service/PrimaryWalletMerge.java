@@ -134,6 +134,14 @@ public final class PrimaryWalletMerge {
             }
             PlayerAccountEntity account = byUuid.get(player.getKey());
             String name = nameFor(player.getKey(), account);
+            CurrencyBalanceEntity nonFinite = firstNonFinite(player.getValue());
+            if (nonFinite != null) {
+                // Not an amount of money: leave it for an operator rather than stop the module.
+                unsettledPlayers.add(player.getKey());
+                plugin.getLogger().warn(String.format(plugin.i18n("economy.log.wallet_merge.too_large"),
+                        String.valueOf(nonFinite.getCash()), String.valueOf(nonFinite.getBank()), name));
+                continue;
+            }
             BigDecimal addCash = BigDecimal.ZERO;
             BigDecimal addBank = BigDecimal.ZERO;
             for (CurrencyBalanceEntity row : player.getValue()) {
@@ -158,9 +166,8 @@ public final class PrimaryWalletMerge {
             }
             double beforeCash = account == null ? 0.0 : account.getCash();
             double beforeBank = account == null ? 0.0 : account.getBank();
-            if (Double.isInfinite(beforeCash + addCash.doubleValue())
-                    || Double.isInfinite(beforeBank + addBank.doubleValue())) {
-                // The account could not store the result: move nothing and keep the rows unmarked.
+            if (!storable(beforeCash, addCash) || !storable(beforeBank, addBank)) {
+                // The account could not hold the result exactly: move nothing, keep the rows unmarked.
                 unsettledPlayers.add(player.getKey());
                 plugin.getLogger().warn(String.format(plugin.i18n("economy.log.wallet_merge.too_large"),
                         addCash.toPlainString(), addBank.toPlainString(), name));
@@ -239,8 +246,8 @@ public final class PrimaryWalletMerge {
             }
             double targetCash = m.hasBefore ? m.cashBefore + m.cashToAdd.doubleValue() : m.cashToAdd.doubleValue();
             double targetBank = m.hasBefore ? m.bankBefore + m.bankToAdd.doubleValue() : m.bankToAdd.doubleValue();
-            if (Double.isInfinite(targetCash) || Double.isInfinite(targetBank)
-                    || Double.isNaN(targetCash) || Double.isNaN(targetBank)) {
+            if (!storable(m.hasBefore ? m.cashBefore : 0.0, m.cashToAdd)
+                    || !storable(m.hasBefore ? m.bankBefore : 0.0, m.bankToAdd)) {
                 // Marking never records such a merge; a marker that leads here was not written by it.
                 leaveUnsettled(uuid, account, markedRows.get(0));
                 continue;
@@ -308,6 +315,30 @@ public final class PrimaryWalletMerge {
                 m != null ? m.cashToAdd.toPlainString() : plain(row.getCash()),
                 m != null ? m.bankToAdd.toPlainString() : plain(row.getBank()),
                 row.getCurrencyId()));
+    }
+
+    /**
+     * Whether adding {@code add} to a stored {@code before} gives a balance the account can hold and
+     * that differs from {@code before} whenever something is added. The credit writes absolute values
+     * and "the account already holds the target" means "credited", so a sum that overflows to
+     * infinity, or an amount too small to change a balance that large, must never be marked.
+     */
+    private static boolean storable(double before, BigDecimal add) {
+        if (!Double.isFinite(before)) {
+            return false;
+        }
+        double target = before + add.doubleValue();
+        return Double.isFinite(target) && (add.signum() == 0 || target != before);
+    }
+
+    /** The first row holding an amount that is not a finite number, or null. */
+    private static CurrencyBalanceEntity firstNonFinite(List<CurrencyBalanceEntity> rows) {
+        for (CurrencyBalanceEntity row : rows) {
+            if (!Double.isFinite(row.getCash()) || !Double.isFinite(row.getBank())) {
+                return row;
+            }
+        }
+        return null;
     }
 
     /** Whether every marked row carries the same marker, as one marking writes. */
