@@ -27,18 +27,17 @@ for real-machine verification, not user-facing documentation.
 - **Layer**, copied verbatim from Laojun's own `ultitools-real-client-uat` skill: `protocol`,
   `java-client`, `os-input`, `pixel`, `server`, `human`. This module has no panel-facing surface,
   so no row below carries `human`.
-- **Covers** back-references a Phase 9 GUI-excluded class name; left blank when no such class
-  applies. UltiEconomy is not one of the nine modules in Phase 9's GUI-exclusion register (no
-  `UltiEconomy.md` file exists under `.planning/phases/09-module-ecosystem-readiness-and-test-coverage/gui-exclusions/`),
-  so every row below leaves `Covers` blank.
+- **Covers** back-references a GUI class excluded from the JaCoCo coverage gate; left blank when no such class
+  applies. UltiEconomy has no GUI class excluded from the coverage gate (it ships no GUI page), so every
+  row below leaves `Covers` blank.
 - A row whose Preconditions cite a prior row's checklist ID must appear after that row in file
   order — asserted mechanically: for every row, every checklist ID literally cited in its
   Preconditions cell must have a strictly smaller line number in this file than the row citing it
-  (sweep class 8, D-27a). A Preconditions cell that merely *describes* a state to set up (e.g. "a
+ . A Preconditions cell that merely *describes* a state to set up (e.g. "a
   second, non-primary currency configured") without citing another row's ID by name is not
   subject to this check.
 - **Expected** must name an observable truth — an exact chat line, a log line, a database row —
-  and never the words "it works". **This document is English-only (D-02) — a raw Chinese message
+  and never the words "it works". **This document is English-only — a raw Chinese message
   literal is never reproduced inline.** Every chat and console line this module writes goes through
   its language catalogue with an ASCII key (the 23 keys UltiKits/UltiEconomy#14
   found missing are in both catalogues), so a row quoting a line carries `language: en`. For a row
@@ -52,10 +51,10 @@ for real-machine verification, not user-facing documentation.
   it can be exercised at all — stated in that row's own Preconditions, not cited from a shared
   row, since adding a currency is a file edit, not a feature this document gives its own
   checklist row (see `## Configuration` below for why).
-- **Config-per-file rule (D-06), narrowed for this module's own layout:** UltiEconomy ships two
+- **Config-per-file rule, narrowed for this module's own layout:** UltiEconomy ships two
   yml resources — `config/config.yml` (the module's one `@ConfigEntity`-bound file) and
-  `config/currencies.yml` (read directly via `YamlConfiguration`, not `@ConfigEntity`-bound). Per
-  this plan's own explicit instruction ("exactly one config row for the single `@ConfigEntity`
+  `config/currencies.yml` (read directly via `YamlConfiguration`, not `@ConfigEntity`-bound). By
+  design ("exactly one config row for the single `@ConfigEntity`
   class"), this document carries exactly ONE config-per-file row, `ultieconomy.config.config-yml`,
   whose Steps exercise BOTH shipped files in the same pass — they load during the same server
   startup with no interdependent ordering, and `currencies.yml`'s own single row in `FEATURES.md`

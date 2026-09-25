@@ -197,7 +197,7 @@ class MoneyCommandTest {
         }
 
         @Test
-        @DisplayName("A padded but otherwise valid identifier resolves the same currency (WR-02)")
+        @DisplayName("A padded but otherwise valid identifier resolves the same currency")
         void aPaddedButOtherwiseValidIdentifierResolvesTheSameCurrency() {
             lenient().when(currencyManager.resolve(" gems "))
                     .thenReturn(CurrencyDefinition.builder().id("gems").build());

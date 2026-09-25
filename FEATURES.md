@@ -300,8 +300,8 @@ documents for `ultipanel.commands.blocklist`/`ultipanel.files.editable-roots`. A
 booted this module at least once therefore has all 19 keys on disk even though the packaged jar's
 default resource ships only 12. `config/currencies.yml` is this module's second shipped yml
 resource; it is **not** `@ConfigEntity`-bound (see `## Currencies` above for its own single row)
-and — per this plan's own instruction that this module carries exactly one config-per-file
-checklist row, for the single `@ConfigEntity` class — its loading is folded into that same
+and — because this module carries exactly one config-per-file checklist row, for the
+single `@ConfigEntity` class — its loading is folded into that same
 checklist row rather than given a second one; see that row's own Preconditions/Steps for how.
 
 **Two keys are bound to the scheduled tasks:** `interest.interval` and `leaderboard.update-interval`.

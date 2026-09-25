@@ -86,8 +86,8 @@ public class InterestService {
      * thread is outside this module's control.)
      *
      * <p>Every server that runs this task pays the full rate on every balance in its database. If
-     * several servers share one database, interest must be on for exactly one of them (gate-1
-     * WR-02; the load-time warning says so).
+     * several servers share one database, interest must be on for exactly one of them (the load-time
+     * warning says so).
      */
     @Scheduled(config = EconomyConfig.class, periodKey = "interest.interval", delayKey = "interest.interval")
     public void payInterestIfEnabled() {
@@ -112,7 +112,7 @@ public class InterestService {
      * is paid once for the primary currency and the per-payment cap is
      * {@code interest.max-interest}, not twice it (maintainer ruling 2026-09-23).
      *
-     * <p>How a payment writes (gate-1 review of UltiKits/UltiEconomy#15):
+     * <p>How a payment writes (found reviewing UltiKits/UltiEconomy#15):
      * <ul>
      *   <li>It credits the rows {@code getAll()} returned and writes each one once. It does not look a
      *       row up again: this runs on the main thread, and a per-row lookup by {@code uuid} (an

@@ -37,8 +37,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * exemption that no longer matches a literal fails the build, so the file cannot drift.
  * <p>
  * One structural category is skipped without an exemption line: the value of a {@code @ConfigEntry}
- * annotation's {@code comment} element, and nothing else (maintainer ruling 2026-09-24). The reason
- * is written next to the skip in {@link #reportable}.
+ * annotation's {@code comment} element, and nothing else. The reason is written next to the skip in
+ * {@link #reportable}.
  * <p>
  * This file is copied unchanged into every module; only its package line and class name differ.
  */
@@ -167,8 +167,8 @@ class UltiEconomyCjkLiteralScopeTest {
         }
         // Skipped by structure, not by exemption line: @ConfigEntry(comment = ...) text. The
         // framework writes comment() verbatim into the operator's YAML and the panel
-        // (AbstractConfigEntity#setComments); there is no catalogue path for it, and Phase 17
-        // forbids a framework change (D-02). Translatable config comments are requested in
+        // (AbstractConfigEntity#setComments); there is no catalogue path for it, and a module
+        // cannot add one without a framework change. Translatable config comments are requested in
         // UltiKits/UltiTools-Reborn#542. Only that one element of that one annotation is
         // skipped -- not @ConfigEntry's path, not another annotation's comment, not the
         // field's default value (pinned by the ConfigEntryComment tests below).
@@ -380,7 +380,7 @@ class UltiEconomyCjkLiteralScopeTest {
         }
 
         @Test
-        @DisplayName("each occurrence of an exempted literal needs its own line (Codex, UltiBackup#22)")
+        @DisplayName("each occurrence of an exempted literal needs its own line")
         void eachOccurrenceNeedsItsOwnExemption() {
             String body = "String a = \"\u4e2d\"; String b = \"\u4e2d\";";
             List<String> one = Collections.singletonList("src/main/java/Sample.java\t\u4e2d\tfile header");
@@ -415,7 +415,7 @@ class UltiEconomyCjkLiteralScopeTest {
     }
 
     @Nested
-    @DisplayName("@ConfigEntry(comment = ...) is skipped, and nothing else is (maintainer ruling 2026-09-24)")
+    @DisplayName("@ConfigEntry(comment = ...) is skipped, and nothing else is")
     class ConfigEntryComment {
 
         @Test
@@ -442,7 +442,7 @@ class UltiEconomyCjkLiteralScopeTest {
         }
 
         @Test
-        @DisplayName("the skip is bound to the field and the annotation the compiler resolved, not to matching text (Codex, UltiBackup#22)")
+        @DisplayName("the skip is bound to the field and the annotation the compiler resolved, not to matching text")
         void skipIsBoundToTheResolvedAnnotation() {
             SourceFile f = SourceFile.of("src/main/java/Sample.java", "class Sample {\n"
                     + "@ConfigEntry(path = \"a\", comment = \"\u4e2d\u6587\u8bf4\u660e\") String a;\n"

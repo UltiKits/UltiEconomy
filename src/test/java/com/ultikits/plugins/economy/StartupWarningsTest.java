@@ -101,7 +101,7 @@ class StartupWarningsTest {
                     .contains("every interest.interval = 1800 seconds")
                     .contains("interest.max-interest = 10000.0")
                     .contains("interest.enabled: false")
-                    // Gate-1 WR-02: servers sharing one database each pay the full rate.
+                    // Servers sharing one database each pay the full rate.
                     .contains("If several servers share this database")
                     .contains("exactly one of them");
         }
