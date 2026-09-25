@@ -127,9 +127,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   resumes without adding anything twice. Stopping the server at any point during the merge is safe on
   SQLite and MySQL; on JSON storage it is safe too, except that a stop while a player's file is being
   rewritten can leave that one file unreadable, which the JSON storage risks at every save. **Servers that
-  share one database:** stop them all, upgrade them all, start one and let it finish its start before
-  starting the others, and never run 2.0.0 against that database again — a 2.0.0 server gives each
-  joining player a new second wallet, which the next start would merge as more money. A currency id
+  share one database** can be started together: one of them runs the merge — it takes a claim, a row
+  in a new table `economy_wallet_merge_claim` that it removes when the merge is done — and the others
+  wait for it, logging every 10 seconds that they are waiting, then start without merging anything
+  again. If the server running the merge stops in the middle, the next one takes the claim over
+  after 30 seconds and finishes the merge without adding anything twice. Stop every server still
+  running 2.0.0 before starting the first upgraded one, and never run 2.0.0 against that database
+  again — a 2.0.0 server gives each joining player a new second wallet, which the next start would
+  merge as more money, and it takes no part in the claim. JSON storage cannot be shared by two
+  servers at all (each keeps its own copy of the records). A currency id
   starting with `~merging-into-account:` is reserved for the merge; `currencies.yml` defining one is
   refused at load.
 - **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
@@ -139,8 +145,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   在一台 103 名玩家的测试服务器上，共并入 103,588.95，其中 101,000 是从未动用的重复初始金额。若合并过程中存储出错，模块不会启动
   （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。使用 SQLite 与 MySQL 时，
   在合并过程中的任何时刻停止服务器都是安全的；使用 JSON 存储时同样安全，只是在某个玩家的文件正被改写时停止，可能使该文件无法读取——
-  这是 JSON 存储每次保存都存在的风险。**多台服务器共用一个数据库时：** 先全部停止、全部升级，再启动其中一台并等它完成启动，
-  然后才启动其他服务器；此后不要再让 2.0.0 连接该数据库——2.0.0 服务器会给每位进服玩家新建一个第二钱包，下次启动时会被当作更多的钱并入。
+  这是 JSON 存储每次保存都存在的风险。**多台服务器共用一个数据库时**可以同时启动：其中一台执行合并——它先取得认领，即新表
+  `economy_wallet_merge_claim` 中的一行，合并完成后由它删除——其余服务器等待它完成（每 10 秒记录一次正在等待），随后启动且不再重复合并。
+  若执行合并的服务器中途停止，下一台服务器会在 30 秒后接手认领并完成合并，不会重复并入。启动第一台升级后的服务器之前，
+  请停止所有仍在运行 2.0.0 的服务器，此后也不要再让 2.0.0 连接该数据库——2.0.0 服务器会给每位进服玩家新建一个第二钱包，
+  下次启动时会被当作更多的钱并入，而且它不参与认领。JSON 存储根本无法由两台服务器共用（每台服务器各自保留一份记录副本）。
   以 `~merging-into-account:` 开头的货币 ID 保留给合并使用；`currencies.yml` 若定义这样的货币，加载时会被拒绝。
 
 - When `config/currencies.yml` gives the primary currency an `initial-cash`, `bank-enabled`,
