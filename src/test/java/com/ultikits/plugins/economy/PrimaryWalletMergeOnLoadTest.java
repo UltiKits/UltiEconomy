@@ -156,14 +156,15 @@ class PrimaryWalletMergeOnLoadTest {
         com.ultikits.ultitools.abstracts.UltiToolsPlugin other = mock(com.ultikits.ultitools.abstracts.UltiToolsPlugin.class);
         when(other.getLogger()).thenReturn(otherLogger);
         when(other.i18n(anyString())).thenAnswer(CatalogueText.answer("en"));
-        // The other server finishes its merge while this module sleeps its first second (a real one:
-        // the module's own clock), i.e. before the second time the module looks at whose claim it is.
+        // The other server finishes its merge and removes its claim while this module sleeps its first
+        // second (a real one: the module's own clock), before the module looks at the claim again.
         boolean[] otherFinished = {false};
         int[] looks = {0};
         DataOperator<WalletMergeClaimEntity> claimsSeenByThisModule = new SteppedOperator<>("claims", claims, call -> {
             if (call.startsWith("getById") && ++looks[0] == 2) {
                 otherFinished[0] = true;
                 new PrimaryWalletMerge(other, accounts, balances, "coins", uuid -> "x").run();
+                claims.delById("primary-wallet-merge");
             }
         });
         // What this module writes to the wallets.
@@ -199,7 +200,8 @@ class PrimaryWalletMergeOnLoadTest {
         assertThat(accounts.getAll().get(0).getBank()).isEqualTo(150.0);
         verify(logger).info(String.format(CatalogueText.text("en", "economy.log.wallet_merge.claim_waiting"),
                 "2026-09-25T08:00:00Z"));
-        verify(logger).info(CatalogueText.text("en", "economy.log.wallet_merge.claim_finished_elsewhere"));
+        verify(logger).info(CatalogueText.text("en", "economy.log.wallet_merge.claim_wait_over"));
+        assertThat(claims.durable()).isEmpty();
         verify(services).register(eq(Economy.class), any(Economy.class), any(Plugin.class), any(ServicePriority.class));
     }
 }

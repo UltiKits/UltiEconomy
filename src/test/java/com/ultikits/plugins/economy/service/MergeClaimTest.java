@@ -170,8 +170,9 @@ class MergeClaimTest {
             world.seedClaim("other-server", "1", "2026-09-25T08:00:00Z");
             ManualTiming timing = new ManualTiming();
             timing.onSleep = n -> {
-                // The other server finishes on this server's first sleep.
+                // The other server finishes, and removes its claim, on this server's first sleep.
                 merge(world).run();
+                world.claims.delById(MergeClaim.CLAIM_ID);
             };
 
             assertThat(claim(world, timing).runExclusively(merge(world))).isTrue();
@@ -185,7 +186,7 @@ class MergeClaimTest {
     class Waiting {
 
         @Test
-        @DisplayName("waits while the holder's heartbeat changes -- five minutes and more -- makes no write, and starts once the holder has merged")
+        @DisplayName("waits while the holder's heartbeat changes -- five minutes and more -- makes no write, and starts once the holder has merged and removed its claim")
         void waitsForABeatingHolder() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
@@ -204,8 +205,9 @@ class MergeClaimTest {
                             writesBeforeTheHolderMerged.add(step);
                         }
                     }
-                    // The holder finishes its merge; its claim is still there.
+                    // The holder finishes its merge and removes its claim.
                     merge(world).run();
+                    world.claims.delById(MergeClaim.CLAIM_ID);
                 }
             };
 
@@ -219,9 +221,9 @@ class MergeClaimTest {
             String waiting = en("economy.log.wallet_merge.claim_waiting", "2026-09-25T08:00:00Z");
             assertThat(logged(world, "info").stream().filter(waiting::equals)).hasSize(40);
             assertThat(logged(world, "info")).last()
-                    .isEqualTo(en("economy.log.wallet_merge.claim_finished_elsewhere"));
-            // The holder's claim is the holder's to remove.
-            assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getClaimOwner()).isEqualTo("other-server");
+                    .isEqualTo(en("economy.log.wallet_merge.claim_wait_over"));
+            // This server then held the claim for a merge that found nothing, and removed it.
+            assertThat(world.claims.durable()).isEmpty();
         }
 
         @Test

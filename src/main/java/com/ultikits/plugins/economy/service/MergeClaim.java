@@ -28,8 +28,10 @@ import java.util.function.Supplier;
  * table's primary key makes inserting it succeed for exactly one server: on SQLite and MySQL the
  * framework's insert of an existing id throws (the database refuses the duplicate primary key), and
  * this class reads the row back to see whose it is. A server that holds it merges, then deletes it. A
- * server that does not hold it waits, and starts only when the merge is finished -- because there is
- * nothing left to merge, or because the claim became free and its own merge found the rest. Waiting,
+ * server that does not hold it waits, reading only the claim row, and goes on only once it holds the
+ * claim itself -- after the holder removed it, or after taking it over (below) -- and has run the merge,
+ * which then finds nothing left or finishes what is left; so it never starts before the merge is
+ * finished. Waiting,
  * not refusing to start, because the wait is short (the length of the other server's merge, once, at
  * the upgrade) and needs nobody to restart anything; every ten seconds it logs that it is waiting.
  *
@@ -125,12 +127,11 @@ public final class MergeClaim {
      *         this server lost the claim, which the caller must treat as "do not start"
      */
     public boolean runExclusively(PrimaryWalletMerge merge) {
-        boolean holding;
         try {
             if (!merge.pending()) {
                 return true;
             }
-            holding = acquire(merge);
+            acquire();
         } catch (RuntimeException e) {
             logFailure(e);
             return false;
@@ -139,10 +140,8 @@ public final class MergeClaim {
             logFailure(e);
             return false;
         }
-        if (!holding) {
-            return true;
-        }
         try {
+            // After another server's merge, this finds nothing left and writes nothing.
             return merge.withHeartbeat(this::beat).run();
         } finally {
             release();
@@ -150,18 +149,17 @@ public final class MergeClaim {
     }
 
     /**
-     * Takes the claim, waiting while another server holds it.
-     *
-     * @return true when this server holds the claim; false when, while it waited, the merge was
-     *         finished by the server holding it
+     * Takes the claim, waiting while another server holds it. While waiting it reads only the claim
+     * row, once a second, never the wallets.
      */
-    private boolean acquire(PrimaryWalletMerge merge) throws InterruptedException {
+    private void acquire() throws InterruptedException {
         claims = store.get();
         String seenOwner = null;
         String seenBeat = null;
         long seenSince = 0L;
         long lastWaitLog = 0L;
-        boolean waitLogged = false;
+        boolean waited = false;
+        boolean tookOver = false;
         int vanished = 0;
         while (true) {
             RuntimeException refused = null;
@@ -182,12 +180,11 @@ public final class MergeClaim {
             }
             vanished = 0;
             if (owner.equals(held.getClaimOwner())) {
+                if (waited && !tookOver) {
+                    plugin.getLogger().info(plugin.i18n("economy.log.wallet_merge.claim_wait_over"));
+                }
                 lastBeat = timing.millis();
-                return true;
-            }
-            if (!merge.pending()) {
-                plugin.getLogger().info(plugin.i18n("economy.log.wallet_merge.claim_finished_elsewhere"));
-                return false;
+                return;
             }
             long now = timing.millis();
             if (!Objects.equals(held.getClaimOwner(), seenOwner) || !Objects.equals(held.getHeartbeat(), seenBeat)) {
@@ -200,15 +197,16 @@ public final class MergeClaim {
                 // Only the exact claim seen: never one another waiting server has taken meanwhile.
                 claims.del(exactly(seenOwner, seenBeat));
                 flushAndGc();
+                tookOver = true;
                 seenOwner = null;
                 seenBeat = null;
                 continue;
             }
-            if (!waitLogged || now - lastWaitLog >= WAIT_LOG_MILLIS) {
+            if (!waited || now - lastWaitLog >= WAIT_LOG_MILLIS) {
                 plugin.getLogger().info(String.format(plugin.i18n("economy.log.wallet_merge.claim_waiting"),
                         String.valueOf(held.getClaimedAt())));
                 lastWaitLog = now;
-                waitLogged = true;
+                waited = true;
             }
             timing.sleep(POLL_MILLIS);
         }
