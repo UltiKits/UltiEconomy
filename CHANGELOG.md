@@ -124,15 +124,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   starting amount 2.0.0 credited a second time stays in circulation — on a 103-player test server,
   103,588.95 was merged, 101,000 of it untouched duplicated starting amounts. If storage fails during
   the merge, the module does not start (so no balance changes); fix storage and restart, and the merge
-  resumes without adding anything twice. It is safe to stop the server at any point during the merge,
-  on SQLite, MySQL and JSON storage alike.
+  resumes without adding anything twice. Stopping the server at any point during the merge is safe on
+  SQLite and MySQL; on JSON storage it is safe too, except that a stop while a player's file is being
+  rewritten can leave that one file unreadable, which the JSON storage risks at every save. **Servers that
+  share one database:** stop them all, upgrade them all, start one and let it finish its start before
+  starting the others, and never run 2.0.0 against that database again — a 2.0.0 server gives each
+  joining player a new second wallet, which the next start would merge as more money.
 - **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
   第二个主货币钱包会并入其账户钱包——现金并入现金，存款并入存款——随后删除。服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），
   并记录一行总计。之后的启动不会再合并任何内容。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
   并会记入日志。合并后的存款可能高于 `bank.max-balance`；此后存款与利息照旧在上限处停止。**已知取舍：** 2.0.0 重复发放的初始金额会继续流通——
   在一台 103 名玩家的测试服务器上，共并入 103,588.95，其中 101,000 是从未动用的重复初始金额。若合并过程中存储出错，模块不会启动
-  （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。无论使用 SQLite、MySQL 还是 JSON 存储，
-  在合并过程中的任何时刻停止服务器都是安全的。
+  （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。使用 SQLite 与 MySQL 时，
+  在合并过程中的任何时刻停止服务器都是安全的；使用 JSON 存储时同样安全，只是在某个玩家的文件正被改写时停止，可能使该文件无法读取——
+  这是 JSON 存储每次保存都存在的风险。**多台服务器共用一个数据库时：** 先全部停止、全部升级，再启动其中一台并等它完成启动，
+  然后才启动其他服务器；此后不要再让 2.0.0 连接该数据库——2.0.0 服务器会给每位进服玩家新建一个第二钱包，下次启动时会被当作更多的钱并入。
 
 - When `config/currencies.yml` gives the primary currency an `initial-cash`, `bank-enabled`,
   `min-deposit` or `max-bank-balance` different from `config/config.yml`'s `initial-cash`,

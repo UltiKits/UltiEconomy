@@ -107,8 +107,9 @@ public class InterestService {
      * ({@link PlayerAccountEntity}, what {@code /bank}, {@code /money}, {@code /eco check} and Vault
      * show), once per player; and the bank balance of every other currency whose
      * {@code bank-enabled} is true. The account row is the primary currency's only wallet
-     * (UltiKits/UltiEconomy#25): the module no longer creates a per-currency row for it. Should one
-     * exist (a server that ran 2.0.0 has one per player), it earns nothing, so a player is paid once for the primary currency and the per-payment cap is
+     * (UltiKits/UltiEconomy#25): the module creates no per-currency row for it, and merges the ones
+     * 2.0.0 created into the accounts at load. Should one exist anyway, it earns nothing, so a player
+     * is paid once for the primary currency and the per-payment cap is
      * {@code interest.max-interest}, not twice it (maintainer ruling 2026-09-23).
      *
      * <p>How a payment writes (gate-1 review of UltiKits/UltiEconomy#15):

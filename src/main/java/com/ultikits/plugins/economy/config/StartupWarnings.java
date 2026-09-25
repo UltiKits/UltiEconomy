@@ -98,11 +98,17 @@ public final class StartupWarnings {
             warnConflict(logger, plugin, prefix + "min-deposit", String.valueOf(primary.getDouble("min-deposit")),
                     file, "bank.min-deposit", String.valueOf(config.getMinDeposit()));
         }
+        // Every reader treats a cap of 0 or below as "no cap", so 0 and -1 agree.
         if (primary.contains("max-bank-balance")
-                && Double.compare(primary.getDouble("max-bank-balance"), config.getMaxBankBalance()) != 0) {
+                && Double.compare(cap(primary.getDouble("max-bank-balance")), cap(config.getMaxBankBalance())) != 0) {
             warnConflict(logger, plugin, prefix + "max-bank-balance", String.valueOf(primary.getDouble("max-bank-balance")),
                     file, "bank.max-balance", String.valueOf(config.getMaxBankBalance()));
         }
+    }
+
+    /** A bank cap as every reader applies it: a value of 0 or below means "no cap". */
+    private static double cap(double maxBalance) {
+        return maxBalance > 0 ? maxBalance : -1;
     }
 
     private static void warnConflict(PluginLogger logger, UltiToolsPlugin plugin, String currenciesKey,

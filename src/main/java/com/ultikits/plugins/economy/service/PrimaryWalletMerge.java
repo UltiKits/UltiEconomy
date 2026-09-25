@@ -36,7 +36,8 @@ import java.util.function.Function;
  *   <li>credit: if the account still holds the recorded "before" balances, it is set to "before plus
  *       the amounts"; if it already holds that, the credit happened in an earlier, interrupted start;
  *       anything else means the account changed since, and the row is left for an operator;</li>
- *   <li>remove the player's second-wallet rows, the marked ones last.</li>
+ *   <li>remove the player's second-wallet rows; only marked rows are ever removed (a start that
+ *       finds a player's marking interrupted finishes it first).</li>
  * </ol>
  * The credit writes absolute values computed from the marker, not an increment, so repeating it
  * changes nothing; a start first settles any marker an earlier start left. Every step is made durable
@@ -158,7 +159,7 @@ public final class PrimaryWalletMerge {
             }
             String marker = MARKER_PREFIX
                     + (account == null ? NONE : account.getCash() + "/" + account.getBank())
-                    + ":" + addCash.toPlainString() + "/" + addBank.toPlainString();
+                    + ":" + encode(addCash) + "/" + encode(addBank);
             for (CurrencyBalanceEntity row : player.getValue()) {
                 row.setCurrencyId(marker);
                 balances.update(row);
@@ -173,14 +174,14 @@ public final class PrimaryWalletMerge {
 
     /**
      * Steps 2 and 3 for every player with a marked row: credit the account once, then remove the
-     * player's second-wallet rows -- the unmarked ones first, the marked ones last, so a row that
-     * still has to be accounted for is never left without its marker.
+     * player's rows. Only marked rows are ever removed, so once removal has started every row the
+     * player has left is marked, and an account holding the marker's target means "done".
      *
      * <p>A start interrupted while marking can leave a player with some rows marked and some not.
      * The marker records the sum of all the player's rows at marking time, and marking changes only
      * {@code currency_id}, so those unmarked rows are the ones whose amounts, added to the marked
-     * rows', give the recorded sum; they are settled with the marker. Anything that does not add up
-     * is left for an operator.
+     * rows', give the recorded sum. This start finishes that marking (durably) before it credits or
+     * removes anything. Rows that do not add up are left for an operator.
      */
     private void settleMarked() throws IllegalAccessException {
         Map<String, List<CurrencyBalanceEntity>> markedByPlayer = new LinkedHashMap<>();
@@ -198,9 +199,9 @@ public final class PrimaryWalletMerge {
             return;
         }
         Map<String, PlayerAccountEntity> byUuid = accountsByUuid();
-        List<CurrencyBalanceEntity> unmarkedDone = new ArrayList<>();
         List<CurrencyBalanceEntity> markedDone = new ArrayList<>();
         boolean credited = false;
+        boolean completedMarking = false;
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : markedByPlayer.entrySet()) {
             String uuid = player.getKey();
             List<CurrencyBalanceEntity> markedRows = player.getValue();
@@ -212,15 +213,23 @@ public final class PrimaryWalletMerge {
                 leaveUnsettled(uuid, account, markedRows.get(0));
                 continue;
             }
-            if (!unmarkedRows.isEmpty() && !addsUpTo(m, markedRows, unmarkedRows)) {
-                leaveUnsettled(uuid, account, markedRows.get(0));
-                continue;
+            if (!unmarkedRows.isEmpty()) {
+                if (!addsUpTo(m, markedRows, unmarkedRows)) {
+                    leaveUnsettled(uuid, account, markedRows.get(0));
+                    continue;
+                }
+                // Finish the interrupted marking, so that no row is ever removed unmarked.
+                for (CurrencyBalanceEntity row : unmarkedRows) {
+                    row.setCurrencyId(markedRows.get(0).getCurrencyId());
+                    balances.update(row);
+                    markedRows.add(row);
+                }
+                completedMarking = true;
             }
             double targetCash = m.hasBefore ? m.cashBefore + m.cashToAdd.doubleValue() : m.cashToAdd.doubleValue();
             double targetBank = m.hasBefore ? m.bankBefore + m.bankToAdd.doubleValue() : m.bankToAdd.doubleValue();
             if (account != null && holds(account, targetCash, targetBank)) {
                 // Credited by an earlier, interrupted start: only the removal is left.
-                unmarkedDone.addAll(unmarkedRows);
                 markedDone.addAll(markedRows);
                 continue;
             }
@@ -241,7 +250,6 @@ public final class PrimaryWalletMerge {
                 continue;
             }
             credited = true;
-            unmarkedDone.addAll(unmarkedRows);
             markedDone.addAll(markedRows);
             merged++;
             cashAdded = cashAdded.add(m.cashToAdd);
@@ -250,11 +258,14 @@ public final class PrimaryWalletMerge {
                     m.cashToAdd.toPlainString(), m.bankToAdd.toPlainString(), nameFor(uuid, account),
                     plain(targetCash), plain(targetBank)));
         }
+        if (completedMarking) {
+            // Every row is marked on disk before any row is removed.
+            flush(balances);
+        }
         if (credited) {
             // Every credit is on disk before any row is removed.
             flush(accounts);
         }
-        remove(unmarkedDone);
         remove(markedDone);
     }
 
@@ -348,6 +359,22 @@ public final class PrimaryWalletMerge {
 
     private static boolean holds(PlayerAccountEntity account, double cash, double bank) {
         return account.getCash() == cash && account.getBank() == bank;
+    }
+
+    /**
+     * An amount as the marker stores it, short enough that a whole marker fits the
+     * {@code VARCHAR(255)} column the framework gives {@code currency_id}: the plain decimal when it
+     * is short (every realistic balance), else its scientific form, else -- only for an absurd sum
+     * with hundreds of significant digits -- the nearest {@code double}, which then fails
+     * {@link #addsUpTo} and leaves the player for an operator rather than moving a wrong amount.
+     */
+    private static String encode(BigDecimal amount) {
+        String plain = amount.toPlainString();
+        if (plain.length() <= 40) {
+            return plain;
+        }
+        String scientific = amount.stripTrailingZeros().toString();
+        return scientific.length() <= 40 ? scientific : Double.toString(amount.doubleValue());
     }
 
     private static String plain(double amount) {
