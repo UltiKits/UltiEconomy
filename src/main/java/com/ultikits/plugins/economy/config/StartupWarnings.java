@@ -51,7 +51,7 @@ public final class StartupWarnings {
             String capText = cap > 0
                     ? String.format(plugin.i18n("economy.warn.interest_cap"), cap)
                     : String.format(plugin.i18n("economy.warn.interest_no_cap"), cap);
-            logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled"),
+            logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled_one_wallet"),
                     MODULE, file, config.getInterestInterval(), config.getInterestRate(), capText, file,
                     RUNTIME_NAME));
         }

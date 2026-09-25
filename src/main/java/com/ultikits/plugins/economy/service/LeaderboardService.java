@@ -80,8 +80,13 @@ public class LeaderboardService {
         Map<String, String> nameMap = nameMap(accounts);
         List<CurrencyBalanceEntity> balances = currencyDataOperator.getAll();
         Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
+        String primaryId = currencyManager.getPrimaryCurrencyId();
         for (CurrencyDefinition currency : currencyManager.getAllCurrencies()) {
-            updated.put(currency.getId(), currencyEntries(currency.getId(), balances, nameMap));
+            // The primary currency's one wallet is the account row, so its named board is the
+            // primary board (UltiKits/UltiEconomy#25).
+            updated.put(currency.getId(), primaryId.equals(currency.getId())
+                    ? cachedLeaderboard
+                    : currencyEntries(currency.getId(), balances, nameMap));
         }
         currencyLeaderboards = Collections.unmodifiableMap(updated);
     }
@@ -102,8 +107,10 @@ public class LeaderboardService {
         if (currencyDataOperator == null) {
             return;
         }
-        List<LeaderboardEntry> entries = currencyEntries(
-                currencyId, currencyDataOperator.getAll(), nameMap(dataOperator.getAll()));
+        List<LeaderboardEntry> entries = currencyManager != null
+                && currencyManager.getPrimaryCurrencyId().equals(currencyId)
+                ? primaryEntries(dataOperator.getAll())
+                : currencyEntries(currencyId, currencyDataOperator.getAll(), nameMap(dataOperator.getAll()));
         Map<String, List<LeaderboardEntry>> updated = new HashMap<>(currencyLeaderboards);
         updated.put(currencyId, entries);
         currencyLeaderboards = Collections.unmodifiableMap(updated);

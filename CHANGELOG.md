@@ -94,6 +94,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   本模块每次启动都会记录一条 WARNING 说明这一点。若要继续对转账征税，请设置 `tax.enabled: true` 并执行
   `/ul reload UltiTools-Economy`；该开关在每次转账时读取。声明默认值现为 `true`，只影响尚未包含该键的文件。
 
+- **The primary currency now has one wallet** (UltiKits/UltiEconomy#25). Since 2.0.0 every player
+  also had a second primary-currency wallet, credited with its own starting amount when they first
+  joined. The commands and placeholders that name the currency — `/money coins`, `/bank coins`,
+  `/pay <player> <amount> coins`, `/deposit <amount> coins`, `/withdraw <amount> coins`,
+  `/eco give|take|set|check <player> … coins`, `/note <amount> coins`, `%ultieconomy_coins_*%` and the
+  `coins` leaderboard — used that second wallet, while Vault, `/money`, `/pay` and `/bank` used the
+  account wallet. All of them now use the account wallet, and a player joining for the first time is
+  given `initial-cash` once. The primary currency's starting cash, bank switch, minimum deposit and
+  maximum bank balance are read from `config/config.yml`; the primary entry's `initial-cash`,
+  `bank-enabled`, `min-deposit` and `max-bank-balance` in `config/currencies.yml` are no longer read
+  (its `display-name` and `symbol` still are). Every other currency keeps its own wallet.
+- **主货币现在只有一个钱包**（UltiKits/UltiEconomy#25）。自 2.0.0 起，每位玩家还有第二个主货币钱包，首次进服时按其自身的
+  初始金额入账。带货币名的命令与占位符——`/money coins`、`/bank coins`、`/pay <玩家> <金额> coins`、`/deposit <金额> coins`、
+  `/withdraw <金额> coins`、`/eco give|take|set|check <玩家> … coins`、`/note <金额> coins`、`%ultieconomy_coins_*%` 以及
+  `coins` 排行榜——使用的是这第二个钱包，而 Vault、`/money`、`/pay`、`/bank` 使用账户钱包。现在它们全部使用账户钱包，
+  新玩家首次进服只获得一次 `initial-cash`。主货币的初始金额、银行开关、最低存款与银行上限读取 `config/config.yml`；
+  `config/currencies.yml` 中主货币条目的 `initial-cash`、`bank-enabled`、`min-deposit`、`max-bank-balance` 不再被读取
+  （其 `display-name` 与 `symbol` 仍被读取）。其他货币仍各自拥有独立的钱包。
+
 ### Removed
 
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen
