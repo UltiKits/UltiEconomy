@@ -151,7 +151,7 @@ class CurrencyManagerTest {
     }
 
     @Test
-    @DisplayName("no currencies.yml key can give a currency the merge marker's prefix: a '.' in a key nests it (UltiKits/UltiEconomy#25, Codex rounds 2, 10, 11)")
+    @DisplayName("no currencies.yml key can give a currency the merge marker's prefix: a '.' in a key nests it (UltiKits/UltiEconomy#25)")
     void noCurrencyIdCanHaveTheMarkerPrefix() {
         // The prefix carries a '.', and Bukkit reads a '.' in a key as a path separator, so a key written
         // with the whole prefix becomes a section named by the part before the '.'.

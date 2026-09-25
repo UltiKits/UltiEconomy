@@ -122,7 +122,7 @@ class PrimaryWalletMergeOnLoadTest {
         UltiEconomy module = module(accounts, broken, logger);
         PluginManager pluginManager = mock(PluginManager.class);
         // Vault present, PlaceholderAPI absent: a module that went on loading would register with Vault,
-        // which is what the assertion below looks for (gate-1 IN-03).
+        // which is what the assertion below looks for.
         when(pluginManager.getPlugin("Vault")).thenReturn(mock(Plugin.class));
         ServicesManager services = mock(ServicesManager.class);
 

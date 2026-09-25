@@ -252,7 +252,7 @@ class StartupWarningsTest {
         }
 
         @Test
-        @DisplayName("two ways of writing \"no cap\" (0 and -1) are not a conflict (gate-1 IN-07)")
+        @DisplayName("two ways of writing \"no cap\" (0 and -1) are not a conflict")
         void twoUnlimitedCapsAgree() {
             assertThat(conflicts("currencies:\n  coins:\n    max-bank-balance: 0\n    primary: true\n", "en")).isEmpty();
             // Control: a real cap against "no cap" is still named.

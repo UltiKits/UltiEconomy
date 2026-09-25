@@ -169,7 +169,7 @@ class PrimaryWalletRoutingTest {
         }
 
         @Test
-        @DisplayName("a withdrawal by currency name obeys config.yml's bank.enabled, as the plain /withdraw does (Codex round 3)")
+        @DisplayName("a withdrawal by currency name obeys config.yml's bank.enabled, as the plain /withdraw does")
         void withdrawByNameObeysBankEnabled() {
             world.seedAccount(STEVE, "Steve", 0.0, 500.0);
             world.config.setBankEnabled(false);

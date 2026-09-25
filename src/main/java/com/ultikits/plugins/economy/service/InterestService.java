@@ -110,7 +110,7 @@ public class InterestService {
      * (UltiKits/UltiEconomy#25): the module creates no per-currency row for it, and merges the ones
      * 2.0.0 created into the accounts at load. Should one exist anyway, it earns nothing, so a player
      * is paid once for the primary currency and the per-payment cap is
-     * {@code interest.max-interest}, not twice it (maintainer ruling 2026-09-23).
+     * {@code interest.max-interest}, not twice it.
      *
      * <p>How a payment writes (found reviewing UltiKits/UltiEconomy#15):
      * <ul>
@@ -153,8 +153,7 @@ public class InterestService {
         for (CurrencyBalanceEntity balance : currencyBalances) {
             // The primary currency is paid once, above, on the account row -- its only wallet, the
             // bank balance /bank, /money, /eco check and Vault show. A per-currency row for it is no
-            // longer created (UltiKits/UltiEconomy#25); should one exist it earns nothing
-            // (maintainer ruling 2026-09-23).
+            // longer created (UltiKits/UltiEconomy#25); should one exist it earns nothing.
             if (currencyManager.getPrimaryCurrencyId().equals(balance.getCurrencyId())) {
                 continue;
             }

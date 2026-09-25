@@ -172,7 +172,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("a player whose only primary wallet is empty keeps an account holding nothing, so a first join does not grant the starting amount (Codex round 9)")
+        @DisplayName("a player whose only primary wallet is empty keeps an account holding nothing, so a first join does not grant the starting amount")
         void emptyWalletOnly() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedBalance(PEAR, "coins", 0.0, 0.0);
@@ -235,7 +235,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("a sum too large to store is not merged: nothing moves, the row stays, an operator is told (Codex round 3)")
+        @DisplayName("a sum too large to store is not merged: nothing moves, the row stays, an operator is told")
         void sumTooLargeIsLeftAlone() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 1.0e308, 0.0);
@@ -258,7 +258,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("an amount too small to change a balance that large is not merged or lost: the row stays, an operator is told (Codex round 4)")
+        @DisplayName("an amount too small to change a balance that large is not merged or lost: the row stays, an operator is told")
         void amountBelowPrecisionIsLeftAlone() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 1.0e16, 0.0);
@@ -275,7 +275,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("amounts are added as the decimals they print as, so 0.1 + 0.2 is stored as 0.3 (Codex round 5: one rule for exactness)")
+        @DisplayName("amounts are added as the decimals they print as, so 0.1 + 0.2 is stored as 0.3 (one rule for exactness)")
         void decimalArithmetic() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 0.1, 0.0);
@@ -287,7 +287,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("rows whose sum has more digits than a balance keeps are not merged or lost (Codex round 5)")
+        @DisplayName("rows whose sum has more digits than a balance keeps are not merged or lost")
         void aggregateBeyondPrecisionIsLeftAlone() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 0.0, 0.0);
@@ -382,7 +382,7 @@ class PrimaryWalletMergeTest {
 
         /**
          * Four players covering every case: both wallets, three duplicate rows (so a resumed merge has
-         * more than one unmarked row left; gate-1 WR-01), an empty wallet, only a second wallet.
+         * more than one unmarked row left), an empty wallet, only a second wallet.
          */
         private void seed(EconomyTestWorld world, boolean withEmptyWallet) {
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
@@ -520,7 +520,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("a marker stays short enough for a VARCHAR(255) column, however large the amounts (gate-1 IN-04)")
+        @DisplayName("a marker stays short enough for a VARCHAR(255) column, however large the amounts")
         void markerFitsTheColumn() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 1.0e200, 1.0e200);
@@ -541,7 +541,7 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
-        @DisplayName("JSON-like storage: removing an empty second wallet reaches disk, so a restart does not bring it back (Codex round 1)")
+        @DisplayName("JSON-like storage: removing an empty second wallet reaches disk, so a restart does not bring it back")
         void emptyWalletRemovalIsDurableOnCachedStorage() {
             EconomyTestWorld world = EconomyTestWorld.cached();
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
@@ -600,7 +600,7 @@ class PrimaryWalletMergeTest {
     class NotAMarker {
 
         @Test
-        @DisplayName("creates no account from the amounts in its currency id, and is left, with its balance, for an operator (Codex round 10)")
+        @DisplayName("creates no account from the amounts in its currency id, and is left, with its balance, for an operator")
         void orphanMarkerCreatesNothing() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             // A row with a marker's currency id that holds 50, not the 1/1 the id records: this merge
