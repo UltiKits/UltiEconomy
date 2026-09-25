@@ -420,7 +420,7 @@ class MergeClaimTest {
     class Lost {
 
         @Test
-        @DisplayName("stops at its next heartbeat, refuses the module, and leaves the new holder's claim alone")
+        @DisplayName("stops at its next heartbeat, before touching a row, refuses the module, and leaves the new holder's claim alone")
         void stops() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
@@ -450,6 +450,10 @@ class MergeClaimTest {
                     CatalogueText.text("en", "economy.log.wallet_merge.claim_lost")));
             assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getClaimOwner()).isEqualTo("taker");
             assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
+            // It stopped at that heartbeat, before touching a row: Steve's second wallet is not even marked,
+            // and the new holder's heartbeat was not written by it.
+            assertThat(world.balanceRows("coins")).hasSize(1);
+            assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getHeartbeat()).isEqualTo("0");
         }
     }
 
