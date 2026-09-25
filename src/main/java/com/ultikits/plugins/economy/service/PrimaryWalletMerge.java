@@ -156,6 +156,16 @@ public final class PrimaryWalletMerge {
                 emptyRemoved += player.getValue().size();
                 continue;
             }
+            double beforeCash = account == null ? 0.0 : account.getCash();
+            double beforeBank = account == null ? 0.0 : account.getBank();
+            if (Double.isInfinite(beforeCash + addCash.doubleValue())
+                    || Double.isInfinite(beforeBank + addBank.doubleValue())) {
+                // The account could not store the result: move nothing and keep the rows unmarked.
+                unsettledPlayers.add(player.getKey());
+                plugin.getLogger().warn(String.format(plugin.i18n("economy.log.wallet_merge.too_large"),
+                        addCash.toPlainString(), addBank.toPlainString(), name));
+                continue;
+            }
             String marker = MARKER_PREFIX
                     + (account == null ? NONE : account.getCash() + "/" + account.getBank())
                     + ":" + encode(addCash) + "/" + encode(addBank);
@@ -229,6 +239,12 @@ public final class PrimaryWalletMerge {
             }
             double targetCash = m.hasBefore ? m.cashBefore + m.cashToAdd.doubleValue() : m.cashToAdd.doubleValue();
             double targetBank = m.hasBefore ? m.bankBefore + m.bankToAdd.doubleValue() : m.bankToAdd.doubleValue();
+            if (Double.isInfinite(targetCash) || Double.isInfinite(targetBank)
+                    || Double.isNaN(targetCash) || Double.isNaN(targetBank)) {
+                // Marking never records such a merge; a marker that leads here was not written by it.
+                leaveUnsettled(uuid, account, markedRows.get(0));
+                continue;
+            }
             if (account != null && holds(account, targetCash, targetBank)) {
                 // Credited by an earlier, interrupted start: only the removal is left.
                 markedDone.addAll(markedRows);

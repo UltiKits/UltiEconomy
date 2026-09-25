@@ -545,7 +545,8 @@ public class EconomyServiceImpl implements EconomyService {
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId) {
         if (isPrimary(currencyId)) {
-            return withdrawFromBank(playerUuid, amount);
+            // config.yml's bank.enabled governs the primary currency, as /withdraw <amount> applies it.
+            return config.isBankEnabled() && withdrawFromBank(playerUuid, amount);
         }
         if (amount <= 0) {
             return false;
