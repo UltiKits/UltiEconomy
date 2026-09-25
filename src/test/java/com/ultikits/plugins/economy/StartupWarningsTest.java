@@ -209,6 +209,66 @@ class StartupWarningsTest {
         }
     }
 
+    /**
+     * UltiKits/UltiEconomy#25 follow-up (maintainer, 2026-09-24: "config.yml governs, warn when they
+     * differ"): the primary currency has one wallet, governed by {@code config/config.yml}; a
+     * different value for it in {@code config/currencies.yml} is named at load.
+     */
+    @Nested
+    @DisplayName("primary-currency settings in currencies.yml (UltiEconomy#25)")
+    class PrimaryCurrencySettings {
+
+        private static final String AGREEING = "currencies:\n  coins:\n    initial-cash: 1000.0\n"
+                + "    bank-enabled: true\n    min-deposit: 100.0\n    max-bank-balance: -1\n    primary: true\n";
+
+        private List<String> conflicts(String currenciesYaml, String language) {
+            return warningsMentioning("config/currencies.yml",
+                    bootWith(new EconomyConfig(), new YamlConfiguration(), language, currenciesYaml));
+        }
+
+        @Test
+        @DisplayName("each of the four settings that differs is named with its file, key and both values, and config.yml's value is the one that applies")
+        void everyDifferenceIsNamed() {
+            List<String> warnings = conflicts("currencies:\n  coins:\n    initial-cash: 250.0\n"
+                    + "    bank-enabled: false\n    min-deposit: 50.0\n    max-bank-balance: 5000.0\n    primary: true\n", "en");
+
+            String text = CatalogueText.text("en", "economy.warn.primary_currency_setting");
+            assertThat(warnings).containsExactly(
+                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.initial-cash", "250.0",
+                            CONFIG_FILE, "initial-cash", "1000.0", "currencies.coins.initial-cash", "config/currencies.yml"),
+                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.bank-enabled", "false",
+                            CONFIG_FILE, "bank.enabled", "true", "currencies.coins.bank-enabled", "config/currencies.yml"),
+                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.min-deposit", "50.0",
+                            CONFIG_FILE, "bank.min-deposit", "100.0", "currencies.coins.min-deposit", "config/currencies.yml"),
+                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.max-bank-balance", "5000.0",
+                            CONFIG_FILE, "bank.max-balance", "-1.0", "currencies.coins.max-bank-balance", "config/currencies.yml"));
+            assertThat(warnings.get(2)).contains("bank.min-deposit = 100.0 applies");
+        }
+
+        @Test
+        @DisplayName("Control: values that agree with config.yml log nothing")
+        void agreeingValuesAreSilent() {
+            assertThat(conflicts(AGREEING, "en")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Control: a setting currencies.yml does not contain is not reported")
+        void absentKeysAreSilent() {
+            assertThat(conflicts("currencies:\n  coins:\n    display-name: 'Coins'\n    primary: true\n", "en")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("under language: zh the warning is Chinese and keeps both files, both keys and both values")
+        void warningInChinese() {
+            List<String> warnings = conflicts("currencies:\n  coins:\n    min-deposit: 50.0\n    primary: true\n", "zh");
+
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0)).matches("(?s).*\\p{IsHan}.*")
+                    .contains("currencies.coins.min-deposit = 50.0").contains("bank.min-deposit = 100.0")
+                    .contains(CONFIG_FILE);
+        }
+    }
+
     // ==================== helpers ====================
 
     static List<String> warningsMentioning(String needle, List<String> warnings) {
@@ -242,6 +302,13 @@ class StartupWarningsTest {
 
     /** As {@link #bootWith(EconomyConfig, YamlConfiguration)}, with the module speaking {@code language}. */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk, String language) {
+        // The primary-currency block agrees with config.yml's defaults, so loading logs nothing about it.
+        return bootWith(config, onDisk, language, "currencies:\n  coins:\n    initial-cash: 1000.0\n    bank-enabled: true\n"
+                + "    min-deposit: 100.0\n    max-bank-balance: -1\n    primary: true\n");
+    }
+
+    /** As {@link #bootWith(EconomyConfig, YamlConfiguration, String)}, with {@code currenciesYaml} as {@code config/currencies.yml}. */
+    static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk, String language, String currenciesYaml) {
         EconomyConfig effective = org.mockito.Mockito.spy(config);
         when(effective.getConfig()).thenReturn(onDisk);
         when(effective.getConfigFilePath()).thenReturn(CONFIG_FILE);
@@ -254,11 +321,9 @@ class StartupWarningsTest {
         when(plugin.getConfig(EconomyConfig.class)).thenReturn(effective);
         SimpleContainer context = mock(SimpleContainer.class);
         when(plugin.getContext()).thenReturn(context);
-        // The primary-currency block agrees with config.yml's defaults, and storage is empty, so
-        // loading logs nothing about either (UltiKits/UltiEconomy#25).
+        // Storage is empty, so the wallet merge logs nothing (UltiKits/UltiEconomy#25).
         when(plugin.getCurrencyManager()).thenReturn(new CurrencyManager(YamlConfiguration.loadConfiguration(
-                new StringReader("currencies:\n  coins:\n    initial-cash: 1000.0\n    bank-enabled: true\n"
-                        + "    min-deposit: 100.0\n    max-bank-balance: -1\n    primary: true\n"))));
+                new StringReader(currenciesYaml))));
         when(plugin.getDataOperator(PlayerAccountEntity.class)).thenReturn(
                 InMemoryDataOperator.relational("economy_accounts", PlayerAccountEntity.class, null));
         when(plugin.getDataOperator(CurrencyBalanceEntity.class)).thenReturn(
