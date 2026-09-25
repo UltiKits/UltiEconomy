@@ -56,10 +56,12 @@ public final class PrimaryWalletMerge {
     /**
      * {@code currency_id} prefix of a second-wallet row whose merge has started and not finished:
      * {@code <prefix><cash before>/<bank before>:<cash to add>/<bank to add>}, "before" being
-     * {@code none} when the player had no account. No currency id can collide with it in practice:
-     * it starts with a character no shipped or documented currency id uses.
+     * {@code none} when the player had no account. Only this class writes it: every other
+     * {@code currency_id} is a key of {@code currencies.yml}'s {@code currencies} section, and Bukkit
+     * reads a {@code .} in a key as a path separator, so no key -- and no currency, now or in any
+     * earlier version -- can start with a prefix that contains one.
      */
-    static final String MARKER_PREFIX = "~merging-into-account:";
+    static final String MARKER_PREFIX = "~merging-into-account.marker:";
 
     private static final String NONE = "none";
 
