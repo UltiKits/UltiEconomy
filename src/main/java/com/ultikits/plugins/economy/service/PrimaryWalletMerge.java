@@ -316,6 +316,14 @@ public final class PrimaryWalletMerge {
                 markedDone.addAll(markedRows);
                 continue;
             }
+            if (!addsUpTo(m, markedRows, new ArrayList<CurrencyBalanceEntity>())) {
+                // Not credited yet, so every row the marking recorded is still there, holding what it
+                // held (marking changes only currency_id): together they hold exactly the marker's
+                // amounts. Rows that do not were not marked by this merge -- a currency id that only
+                // has the marker's shape -- and move nothing.
+                leaveUnsettled(uuid, account, markedRows.get(0));
+                continue;
+            }
             if (!m.hasBefore && account == null) {
                 account = PlayerAccountEntity.builder()
                         .uuid(uuid)
