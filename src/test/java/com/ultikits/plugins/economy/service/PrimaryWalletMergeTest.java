@@ -328,6 +328,60 @@ class PrimaryWalletMergeTest {
             }
         }
 
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {"relational", "cached", "cached-eager"})
+        @DisplayName("a second crash while the next start is finishing the first one's merge still ends exactly right")
+        void crashTwiceThenRestart(String backend) {
+            EconomyTestWorld reference = world(backend);
+            assertThat(merge(reference).run()).isTrue();
+            Map<String, String> expectedAccounts = accountsOf(reference);
+
+            EconomyTestWorld counting = world(backend);
+            counting.crash.armAt(0);
+            merge(counting).run();
+            int steps = counting.crash.count();
+
+            int recoveriesChecked = 0;
+            for (int first = 1; first <= steps; first++) {
+                // How many durable steps the start after this first crash takes.
+                EconomyTestWorld probe = world(backend);
+                probe.crash.armAt(first);
+                merge(probe).run();
+                probe.accounts.restartFromDisk();
+                probe.balances.restartFromDisk();
+                probe.crash.armAt(0);
+                merge(probe).run();
+                int recoverySteps = probe.crash.count();
+
+                for (int second = 1; second <= recoverySteps; second++) {
+                    EconomyTestWorld crashed = world(backend);
+                    crashed.crash.armAt(first);
+                    merge(crashed).run();
+                    crashed.accounts.restartFromDisk();
+                    crashed.balances.restartFromDisk();
+                    crashed.crash.armAt(second);
+                    merge(crashed).run();
+                    crashed.crash.disarm();
+                    crashed.accounts.restartFromDisk();
+                    crashed.balances.restartFromDisk();
+
+                    assertThat(merge(crashed).run()).isTrue();
+                    crashed.accounts.flush();
+                    crashed.balances.flush();
+                    crashed.balances.gc();
+                    crashed.accounts.restartFromDisk();
+                    crashed.balances.restartFromDisk();
+                    assertThat(accountsOf(crashed))
+                            .as("accounts after crashes at step %d, then at step %d of the next start, on %s",
+                                    first, second, backend)
+                            .isEqualTo(expectedAccounts);
+                    assertThat(crashed.balanceRows("coins")).isEmpty();
+                    recoveriesChecked++;
+                }
+            }
+            assertThat(recoveriesChecked).as("double-crash cases checked on " + backend).isGreaterThan(0);
+        }
+
         @Test
         @DisplayName("JSON-like storage: the merge flushes its markers before any account write can reach disk")
         void cachedStorageIsFlushedByTheMerge() {
