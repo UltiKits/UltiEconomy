@@ -408,6 +408,21 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
+        @DisplayName("JSON-like storage: removing an empty second wallet reaches disk, so a restart does not bring it back (Codex round 1)")
+        void emptyWalletRemovalIsDurableOnCachedStorage() {
+            EconomyTestWorld world = EconomyTestWorld.cached();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, "coins", 0.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+            world.balances.restartFromDisk();
+
+            assertThat(world.balanceRows("coins")).isEmpty();
+            assertThat(merge(world).run()).isTrue();
+            assertThat(logged(world, "info")).hasSize(1);
+        }
+
+        @Test
         @DisplayName("JSON-like storage: the merge flushes its markers before any account write can reach disk")
         void cachedStorageIsFlushedByTheMerge() {
             EconomyTestWorld world = world("cached");
