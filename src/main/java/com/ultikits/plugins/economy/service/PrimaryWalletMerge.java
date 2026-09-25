@@ -160,6 +160,7 @@ public final class PrimaryWalletMerge {
         Map<String, PlayerAccountEntity> byUuid = accountsByUuid();
         boolean marked = false;
         List<CurrencyBalanceEntity> empty = new ArrayList<>();
+        List<String> emptyWithoutAccount = new ArrayList<>();
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : byPlayer.entrySet()) {
             heartbeat.run();
             if (unsettledPlayers.contains(player.getKey())) {
@@ -193,7 +194,13 @@ public final class PrimaryWalletMerge {
                 addBank = addBank.add(positivePart(row.getBank()));
             }
             if (addCash.signum() == 0 && addBank.signum() == 0) {
-                // Nothing to move: removing the rows cannot lose money, so no marker is needed.
+                // Nothing to move: removing the rows cannot lose money, so no marker is needed. A player
+                // with no account keeps one holding what the wallet held -- nothing -- as a player whose
+                // wallet held money gets one holding that; without it, a first join would grant
+                // initial-cash the stored state never held.
+                if (account == null) {
+                    emptyWithoutAccount.add(player.getKey());
+                }
                 empty.addAll(player.getValue());
                 emptyRemoved += player.getValue().size();
                 continue;
@@ -219,6 +226,21 @@ public final class PrimaryWalletMerge {
         if (marked) {
             // Every marker is on disk before any account is credited.
             flush(balances);
+        }
+        if (!emptyWithoutAccount.isEmpty()) {
+            for (String uuid : emptyWithoutAccount) {
+                PlayerAccountEntity created = PlayerAccountEntity.builder()
+                        .uuid(uuid)
+                        .playerName(nameFor(uuid, null))
+                        .cash(0.0)
+                        .bank(0.0)
+                        .build();
+                beforeAccountWrite.run();
+                accounts.insert(created);
+            }
+            // Every such account is on disk before its empty wallet is removed; a start interrupted in
+            // between finds the account and only removes the rows.
+            flush(accounts);
         }
         // Durable like every other removal, so a restart cannot bring the rows back.
         remove(empty);
