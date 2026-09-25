@@ -596,6 +596,56 @@ class PrimaryWalletMergeTest {
     }
 
     @Nested
+    @DisplayName("a row that only looks like a merge marker")
+    class NotAMarker {
+
+        @Test
+        @DisplayName("creates no account from the amounts in its currency id, and is left, with its balance, for an operator (Codex round 10)")
+        void orphanMarkerCreatesNothing() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            // A currency id of this shape that this merge never wrote -- say, a currency removed from
+            // currencies.yml -- whose row holds 50, not the 1/1 its id encodes.
+            world.seedBalance(PEAR, PrimaryWalletMerge.MARKER_PREFIX + "none:1/1", 50.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.accounts.getAll()).isEmpty();
+            assertThat(balancesOf(world).values()).containsExactly(
+                    PEAR + " " + PrimaryWalletMerge.MARKER_PREFIX + "none:1/1 50.0/0.0");
+            assertThat(logged(world, "warn")).containsExactly(en("economy.log.wallet_merge.unsettled",
+                    "offline-e", "1", "1", PrimaryWalletMerge.MARKER_PREFIX + "none:1/1"));
+        }
+
+        @Test
+        @DisplayName("credits no account whose balances its currency id happens to match, and keeps the row")
+        void orphanMarkerCreditsNothing() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, PrimaryWalletMerge.MARKER_PREFIX + "500.0/100.0:7/0", 50.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(accountsOf(world)).containsOnly(
+                    org.assertj.core.api.Assertions.entry(STEVE.toString(), "Steve 500.0/100.0"));
+            assertThat(world.balances.getAll()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("control: a marker this merge wrote, whose row holds what it records, is settled")
+        void genuineMarkerIsSettled() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, PrimaryWalletMerge.MARKER_PREFIX + "500.0/100.0:7/0", 7.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(accountsOf(world)).containsOnly(
+                    org.assertj.core.api.Assertions.entry(STEVE.toString(), "Steve 507.0/100.0"));
+            assertThat(world.balances.getAll()).isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("a storage failure")
     class Failure {
 
