@@ -3,6 +3,8 @@ package com.ultikits.plugins.economy.testsupport;
 import com.ultikits.ultitools.abstracts.data.BaseDataEntity;
 import com.ultikits.ultitools.annotations.Column;
 import com.ultikits.ultitools.entities.WhereCondition;
+import com.ultikits.ultitools.exceptions.DataAccessException;
+import com.ultikits.ultitools.exceptions.ErrorCode;
 import com.ultikits.ultitools.interfaces.Cached;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
@@ -196,6 +198,16 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
     public void insert(T obj) {
         if (obj.getId() == null) {
             obj.setId(UUID.randomUUID().toString());
+        }
+        if (cache.containsKey(obj.getId())) {
+            // Measured against the framework (UltiTools-API 6.3.0-SNAPSHOT): on SQLite and MySQL the
+            // table's PRIMARY KEY (id) refuses the INSERT, and AbstractRelationalDataOperator.insert
+            // (line 516) rethrows the SQLException as this exception; the JSON operator's insert is
+            // cache.putIfAbsent (SimpleJsonDataOperator line 392), which keeps the existing record.
+            if (!cachedBackend) {
+                throw new DataAccessException(ErrorCode.DATA_OPERATION_FAILED, "Failed to insert entity");
+            }
+            return;
         }
         write("insert " + name + " " + obj.getId());
         cache.put(obj.getId(), copy(obj));
