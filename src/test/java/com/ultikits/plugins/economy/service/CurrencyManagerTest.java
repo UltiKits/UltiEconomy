@@ -149,4 +149,22 @@ class CurrencyManagerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Multiple primary currencies");
     }
+
+    @Test
+    @DisplayName("refuses a currency id in the prefix the primary-wallet merge reserves (UltiKits/UltiEconomy#25, Codex round 2)")
+    void reservedMergePrefixIsRefused() {
+        String yaml =
+                "currencies:\n" +
+                "  coins:\n" +
+                "    primary: true\n" +
+                "  '~merging-into-account:none:1/1':\n" +
+                "    display-name: 'Trap'\n";
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yaml));
+        assertThatThrownBy(() -> new CurrencyManager(config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("~merging-into-account:");
+        // Control: the same file without that entry loads.
+        assertThat(new CurrencyManager(YamlConfiguration.loadConfiguration(
+                new StringReader("currencies:\n  coins:\n    primary: true\n"))).getPrimaryCurrencyId()).isEqualTo("coins");
+    }
 }
