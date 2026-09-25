@@ -28,7 +28,7 @@ import java.util.UUID;
  *   <li>{@link #cached(String, Class, CrashSwitch)} -- like the JSON backend
  *       ({@code SimpleJsonDataOperator}): writes change only an in-memory cache; {@link #flush()}
  *       writes every cached record to "disk" one record at a time and never removes one;
- *       {@link #gc()} removes the disk records no longer cached. What reaches disk is only what a
+ *       {@link #gc()} removes the disk records no longer cached, also one at a time. What reaches disk is only what a
  *       flush wrote. Setting {@link #setEagerFlush(boolean)} flushes after every write, which
  *       models the framework's background flush firing at the worst moment.</li>
  * </ul>
@@ -269,7 +269,13 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
         if (!cachedBackend) {
             return;
         }
-        disk.keySet().retainAll(new ArrayList<>(cache.keySet()));
+        // Like the real gc(), one file at a time, so a crash can fall between two deletions.
+        for (String key : new ArrayList<>(disk.keySet())) {
+            if (!cache.containsKey(key)) {
+                crashSwitch.step("gc " + name + " " + key);
+                disk.remove(key);
+            }
+        }
     }
 
     // ----- internals -----
