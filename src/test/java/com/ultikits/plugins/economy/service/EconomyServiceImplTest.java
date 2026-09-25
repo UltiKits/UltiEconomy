@@ -1184,13 +1184,15 @@ class EconomyServiceImplTest {
         void depositToBankCurrencyRejectsAboveMaxBalance() {
             String cappedYaml =
                     "currencies:\n" +
+                    "  coins:\n" +
+                    "    primary: true\n" +
                     "  capped:\n" +
                     "    display-name: 'Capped'\n" +
                     "    symbol: 'C'\n" +
                     "    bank-enabled: true\n" +
                     "    min-deposit: 0.0\n" +
                     "    max-bank-balance: 1000.0\n" +
-                    "    primary: true\n";
+                    "    primary: false\n";
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(cappedYaml));
             CurrencyManager cappedManager = new CurrencyManager(yaml);
             EconomyServiceImpl cappedService =
