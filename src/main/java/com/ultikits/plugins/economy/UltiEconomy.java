@@ -75,6 +75,7 @@ public class UltiEconomy extends UltiToolsPlugin {
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).
         StartupWarnings.log(config, getLogger(), this);
+        StartupWarnings.logPrimaryCurrencyConflicts(config, getCurrencyManager(), getLogger(), this);
         vaultProvider = new VaultEconomyProvider(economyService, config, this);
 
         Plugin vaultPlugin = Bukkit.getPluginManager().getPlugin("Vault");

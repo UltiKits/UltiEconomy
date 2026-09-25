@@ -134,6 +134,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。无论使用 SQLite、MySQL 还是 JSON 存储，
   在合并过程中的任何时刻停止服务器都是安全的。
 
+- When `config/currencies.yml` gives the primary currency an `initial-cash`, `bank-enabled`,
+  `min-deposit` or `max-bank-balance` different from `config/config.yml`'s `initial-cash`,
+  `bank.enabled`, `bank.min-deposit` or `bank.max-balance`, a WARNING at startup names both files,
+  both keys and both values, and says that the `config.yml` value applies (UltiKits/UltiEconomy#25).
+- 当 `config/currencies.yml` 中主货币的 `initial-cash`、`bank-enabled`、`min-deposit` 或 `max-bank-balance` 与
+  `config/config.yml` 的 `initial-cash`、`bank.enabled`、`bank.min-deposit` 或 `bank.max-balance` 不一致时，启动时会记录一条
+  WARNING，写明两个文件、两个键与两个值，并说明以 `config.yml` 的值为准（UltiKits/UltiEconomy#25）。
+
 ### Removed
 
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen

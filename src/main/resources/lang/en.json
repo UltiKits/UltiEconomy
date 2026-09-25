@@ -74,5 +74,6 @@
   "economy.log.wallet_merge.negative_cash": "Primary-currency wallet merge: %s's second wallet held negative cash of %s; it was not taken from their account.",
   "economy.log.wallet_merge.negative_bank": "Primary-currency wallet merge: %s's second wallet held a negative bank balance of %s; it was not taken from their account.",
   "economy.log.wallet_merge.unsettled": "Primary-currency wallet merge: %s's account or second-wallet rows changed after an earlier start began merging %s cash and %s bank into the account, so this start cannot tell whether that amount was already added. Nothing was changed for this player; their rows stay in currency_balances (currency_id %s) until an operator settles them.",
-  "economy.log.wallet_merge.failed": "Primary-currency wallet merge failed, so UltiEconomy did not start and no balance can change until it does: %s. Nothing is lost: fix the storage problem and restart the server; the merge resumes where it stopped and adds nothing twice."
+  "economy.log.wallet_merge.failed": "Primary-currency wallet merge failed, so UltiEconomy did not start and no balance can change until it does: %s. Nothing is lost: fix the storage problem and restart the server; the merge resumes where it stopped and adds nothing twice.",
+  "economy.warn.primary_currency_setting": "%s: %s sets %s = %s for the primary currency, but the primary currency takes this setting from %s, where %s = %s applies. Make the two agree, or remove %s from %s, to silence this warning."
 }
