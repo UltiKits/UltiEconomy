@@ -631,6 +631,21 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
+        @DisplayName("is not removed as \"already added\" because the account happens to hold the balance its id names")
+        void orphanMarkerNotRemovedAsCredited() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 507.0, 100.0);
+            // Its id says 7 was added to 500/100 -- which is what the account holds -- but the row holds 50.
+            world.seedBalance(STEVE, PrimaryWalletMerge.MARKER_PREFIX + "500.0/100.0:7/0", 50.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(accountsOf(world)).containsOnly(
+                    org.assertj.core.api.Assertions.entry(STEVE.toString(), "Steve 507.0/100.0"));
+            assertThat(world.balances.getAll()).hasSize(1);
+        }
+
+        @Test
         @DisplayName("control: a marker this merge wrote, whose row holds what it records, is settled")
         void genuineMarkerIsSettled() {
             EconomyTestWorld world = EconomyTestWorld.relational();
