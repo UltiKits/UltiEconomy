@@ -51,20 +51,27 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
         }
     }
 
-    /** Counts durable write steps across operators and throws at the armed one (1-based; 0 = never). */
+    /**
+     * Counts durable write steps across operators and throws at the armed one (1-based; 0 = never).
+     * Once it has thrown, every later write step throws too until it is re-armed or disarmed: the
+     * server is dead, and a {@code finally} block in it writes nothing.
+     */
     public static final class CrashSwitch {
         private int count;
         private int crashAt;
+        private boolean crashed;
         private final List<String> steps = new ArrayList<>();
 
         public void armAt(int step) {
             this.crashAt = step;
             this.count = 0;
+            this.crashed = false;
             this.steps.clear();
         }
 
         public void disarm() {
             this.crashAt = 0;
+            this.crashed = false;
         }
 
         public int count() {
@@ -76,8 +83,12 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
         }
 
         void step(String what) {
+            if (crashed) {
+                throw new SimulatedCrash(what + " (after the crash)");
+            }
             count++;
             if (crashAt > 0 && count == crashAt) {
+                crashed = true;
                 throw new SimulatedCrash(what + " (step " + count + ")");
             }
             steps.add(what);

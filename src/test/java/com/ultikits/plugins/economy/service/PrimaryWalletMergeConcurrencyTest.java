@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.entity.WalletMergeClaimEntity;
 import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.testsupport.InMemoryDataOperator;
 import com.ultikits.plugins.economy.testsupport.Lockstep;
@@ -30,6 +31,10 @@ import static org.mockito.Mockito.mock;
  * version start at the same moment, each runs the one-time wallet merge at load. Whatever order their
  * storage calls interleave in, every second wallet must be added to its account exactly once, and no
  * server may start (let players and Vault at the wallets) while another server's merge is unfinished.
+ *
+ * <p>Measured before {@link MergeClaim} existed, on the merge alone: 121 of 300 interleavings of two
+ * servers and 145 of 300 of three went wrong -- an account created twice, an account credited twice,
+ * rows left unmerged, a server starting before the merge was finished.
  *
  * <p>Each seed is one interleaving of the servers' storage calls ({@link Lockstep}); the test runs
  * several hundred of them over one shared, relational store (SQLite's or MySQL's shape: every write is
@@ -70,10 +75,23 @@ class PrimaryWalletMergeConcurrencyTest {
                 InMemoryDataOperator.relational("economy_accounts", PlayerAccountEntity.class, null);
         final InMemoryDataOperator<CurrencyBalanceEntity> balances =
                 InMemoryDataOperator.relational("currency_balances", CurrencyBalanceEntity.class, null);
+        final InMemoryDataOperator<WalletMergeClaimEntity> claims =
+                InMemoryDataOperator.relational("economy_wallet_merge_claim", WalletMergeClaimEntity.class, null);
 
-        SharedDatabase() {
+        /**
+         * @param leftByStoppedServer whether a server that stopped in the middle of its merge left its
+         *                            claim, and Steve's rows marked but not yet added, behind
+         */
+        SharedDatabase(boolean leftByStoppedServer) {
             accounts.seed(account(STEVE, "Steve", 500.0, 100.0));
-            balances.seed(balance(STEVE, "coins", 1000.0, 50.0));
+            if (leftByStoppedServer) {
+                WalletMergeClaimEntity claim = new WalletMergeClaimEntity("stopped-server", "7", "2026-09-25T08:00:00Z");
+                claim.setId(MergeClaim.CLAIM_ID);
+                claims.seed(claim);
+                balances.seed(balance(STEVE, PrimaryWalletMerge.MARKER_PREFIX + "500.0/100.0:1000.0/50.0", 1000.0, 50.0));
+            } else {
+                balances.seed(balance(STEVE, "coins", 1000.0, 50.0));
+            }
             // Alex has only a second wallet: the merge creates the account.
             balances.seed(balance(ALEX, "coins", 7.5, 0.0));
             // Noor has two second-wallet rows.
@@ -121,24 +139,48 @@ class PrimaryWalletMergeConcurrencyTest {
         return plugin;
     }
 
-    /** What one server does at load, as {@code UltiEconomy.registerSelf} does it. */
+    /** What one server does at load, as {@code UltiEconomy.registerSelf} does it: merge under the claim. */
     private static boolean start(String server, SharedDatabase db, Lockstep lockstep) {
         UltiToolsPlugin plugin = plugin();
         PrimaryWalletMerge merge = new PrimaryWalletMerge(plugin,
                 new SteppedOperator<>("economy_accounts", db.accounts, lockstep.stepper(server)),
                 new SteppedOperator<>("currency_balances", db.balances, lockstep.stepper(server)),
                 "coins", uuid -> "offline-" + uuid.substring(uuid.length() - 1));
-        return merge.run();
+        MergeClaim.Timing virtual = new MergeClaim.Timing() {
+            @Override
+            public long millis() {
+                return lockstep.now();
+            }
+
+            @Override
+            public void sleep(long millis) {
+                lockstep.sleep(server, millis);
+            }
+        };
+        return new MergeClaim(plugin,
+                () -> new SteppedOperator<>("economy_wallet_merge_claim", db.claims, lockstep.stepper(server)),
+                virtual).runExclusively(merge);
     }
 
     @ParameterizedTest(name = "{0} servers")
     @ValueSource(ints = {2, 3})
     @DisplayName("every interleaving of the servers' storage calls adds each second wallet exactly once, and no server starts before the merge is done")
     void everyInterleavingMergesOnce(int servers) {
+        everyInterleaving(servers, false);
+    }
+
+    @ParameterizedTest(name = "{0} servers")
+    @ValueSource(ints = {2, 3})
+    @DisplayName("after a server stopped in the middle of its merge, the servers starting next finish it once, whatever the interleaving")
+    void everyInterleavingFinishesAStoppedServersMergeOnce(int servers) {
+        everyInterleaving(servers, true);
+    }
+
+    private void everyInterleaving(int servers, boolean leftByStoppedServer) {
         List<String> failures = new ArrayList<>();
         Map<String, Integer> kinds = new TreeMap<>();
         for (long seed = 1; seed <= SEEDS; seed++) {
-            SharedDatabase db = new SharedDatabase();
+            SharedDatabase db = new SharedDatabase(leftByStoppedServer);
             Lockstep lockstep = new Lockstep(seed);
             Map<String, List<String>> startedWithPending = new TreeMap<>();
             Map<String, Callable<?>> starts = new LinkedHashMap<>();
@@ -186,6 +228,10 @@ class PrimaryWalletMergeConcurrencyTest {
             if (!db.pendingRows().isEmpty()) {
                 wrong.add("rows left " + db.pendingRows());
                 count(kinds, "second-wallet rows left unmerged");
+            }
+            if (!db.claims.getAll().isEmpty()) {
+                wrong.add("claim left " + db.claims.getAll());
+                count(kinds, "a claim left behind");
             }
             if (db.balances.getAll().size() - db.pendingRows().size() != 1) {
                 wrong.add("currency_balances holds " + db.balances.getAll().size() + " rows");

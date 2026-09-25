@@ -76,5 +76,10 @@
   "economy.log.wallet_merge.unsettled": "主货币钱包合并：之前某次启动开始向 %s 的账户并入 %s 现金、%s 存款后，该账户或其第二钱包记录发生了变化，本次启动无法判断这笔金额是否已经并入。此玩家未做任何更改；其记录保留在 currency_balances 中（currency_id 为 %s），待运维处理。",
   "economy.log.wallet_merge.failed": "主货币钱包合并失败，因此 UltiEconomy 未启动，在其启动前任何余额都不会变化：%s。不会丢失任何数据：请修复存储问题后重启服务器；合并会从中断处继续，不会重复并入。",
   "economy.warn.primary_currency_setting": "%s：%s 为主货币设置了 %s = %s，但主货币的这项设置以 %s 为准，生效的是 %s = %s。请让两处一致，或删除 %s（位于 %s），以消除此警告。",
-  "economy.log.wallet_merge.too_large": "主货币钱包合并：将 %s 现金与 %s 存款从 %s 的第二钱包并入后无法被准确存储——总和会过大、有效数字多于余额能保存的位数，或不是一个数——因此未做任何转移；第二钱包保留在 currency_balances 中，待运维处理。"
+  "economy.log.wallet_merge.too_large": "主货币钱包合并：将 %s 现金与 %s 存款从 %s 的第二钱包并入后无法被准确存储——总和会过大、有效数字多于余额能保存的位数，或不是一个数——因此未做任何转移；第二钱包保留在 currency_balances 中，待运维处理。",
+  "economy.log.wallet_merge.claim_waiting": "主货币钱包合并：共用此数据库的另一台服务器正在执行合并（其认领时间为 %s）。本服务器等待其完成后再启动 UltiEconomy。",
+  "economy.log.wallet_merge.claim_finished_elsewhere": "主货币钱包合并：共用此数据库的另一台服务器已完成合并，本服务器不再合并任何内容，UltiEconomy 随即启动。",
+  "economy.log.wallet_merge.claim_stale": "主货币钱包合并：认领时间为 %s 的认领已有 %s 秒没有变化，因此视为认领它的服务器已停止。本服务器接手合并；它会完成未做完的部分，不会重复并入。",
+  "economy.log.wallet_merge.claim_lost": "本服务器执行钱包合并期间，另一台服务器接手了合并（本服务器停止响应的时间过长），因此本服务器已停止合并；请在另一台服务器启动完成后再启动本服务器",
+  "economy.log.wallet_merge.claim_release_failed": "主货币钱包合并：本服务器无法删除自己的钱包合并认领（%s）。下一台在此数据库上启动的服务器会等待 %s 秒后接手该认领。"
 }

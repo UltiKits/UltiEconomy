@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy.service;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.entity.WalletMergeClaimEntity;
 import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.testsupport.InMemoryDataOperator;
 import com.ultikits.plugins.economy.testsupport.InMemoryDataOperator.CrashSwitch;
@@ -54,6 +55,7 @@ public final class EconomyTestWorld {
     public final CrashSwitch crash = new CrashSwitch();
     public final InMemoryDataOperator<PlayerAccountEntity> accounts;
     public final InMemoryDataOperator<CurrencyBalanceEntity> balances;
+    public final InMemoryDataOperator<WalletMergeClaimEntity> claims;
     public final EconomyConfig config = new EconomyConfig();
     public final CurrencyManager currencies;
     public final UltiToolsPlugin plugin = mock(UltiToolsPlugin.class);
@@ -67,6 +69,9 @@ public final class EconomyTestWorld {
         this.balances = cachedBackend
                 ? InMemoryDataOperator.cached("currency_balances", CurrencyBalanceEntity.class, crash)
                 : InMemoryDataOperator.relational("currency_balances", CurrencyBalanceEntity.class, crash);
+        this.claims = cachedBackend
+                ? InMemoryDataOperator.cached("economy_wallet_merge_claim", WalletMergeClaimEntity.class, crash)
+                : InMemoryDataOperator.relational("economy_wallet_merge_claim", WalletMergeClaimEntity.class, crash);
         this.currencies = new CurrencyManager(
                 YamlConfiguration.loadConfiguration(new StringReader(currenciesYaml)));
         lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("en"));
@@ -96,6 +101,20 @@ public final class EconomyTestWorld {
     public CurrencyBalanceEntity seedBalance(UUID uuid, String currencyId, double cash, double bank) {
         return balances.seed(CurrencyBalanceEntity.builder()
                 .uuid(uuid.toString()).currencyId(currencyId).cash(cash).bank(bank).build());
+    }
+
+    /** Seeds the claim a server holding (or having held) the merge left in the claim table. */
+    public WalletMergeClaimEntity seedClaim(String owner, String heartbeat, String claimedAt) {
+        WalletMergeClaimEntity claim = new WalletMergeClaimEntity(owner, heartbeat, claimedAt);
+        claim.setId(MergeClaim.CLAIM_ID);
+        return claims.seed(claim);
+    }
+
+    /** What a server restarted now would read, in all three tables. */
+    public void restartFromDisk() {
+        accounts.restartFromDisk();
+        balances.restartFromDisk();
+        claims.restartFromDisk();
     }
 
     /** The stored account row for {@code uuid}, or null. */

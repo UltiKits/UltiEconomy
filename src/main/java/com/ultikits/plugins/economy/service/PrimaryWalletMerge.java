@@ -47,6 +47,9 @@ import java.util.function.Function;
  * whatever point a crash interrupts, the next start ends with the same balances -- never more, never
  * less. (A crash while the JSON backend is rewriting one record's file can still leave that file
  * unreadable; that is the framework's file write, not something a module can make atomic.)
+ *
+ * <p>This class assumes it is the only writer while it runs. Servers that share one database run it
+ * through {@link MergeClaim}, which lets one server at a time run it.
  */
 public final class PrimaryWalletMerge {
 
@@ -71,6 +74,7 @@ public final class PrimaryWalletMerge {
     private BigDecimal bankAdded = BigDecimal.ZERO;
     private int emptyRemoved;
     private final Set<String> unsettledPlayers = new HashSet<>();
+    private Runnable heartbeat = () -> { };
 
     /**
      * @param plugin    the module, for its logger and language catalogue
@@ -90,6 +94,31 @@ public final class PrimaryWalletMerge {
         this.balances = balances;
         this.primaryId = primaryId;
         this.nameOf = nameOf;
+    }
+
+    /**
+     * Makes the merge call {@code heartbeat} between its steps -- before each player and each row
+     * removal -- so that {@link MergeClaim} can show the servers waiting for it that this one is still
+     * merging, and stop it when another server has taken the claim over (it throws, which ends the
+     * merge like a storage failure).
+     */
+    PrimaryWalletMerge withHeartbeat(Runnable heartbeat) {
+        this.heartbeat = heartbeat;
+        return this;
+    }
+
+    /**
+     * Whether anything is left to merge: a second-wallet row of the primary currency, or a row an
+     * earlier start marked. False on a fresh install and on a database whose merge is finished.
+     */
+    public boolean pending() {
+        for (CurrencyBalanceEntity row : balances.getAll()) {
+            String id = row.getCurrencyId();
+            if (primaryId.equals(id) || (id != null && id.startsWith(MARKER_PREFIX))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -119,6 +148,7 @@ public final class PrimaryWalletMerge {
 
     /** Step 1 for every player: record what the merge will do on each of their second-wallet rows. */
     private void markSecondWallets() throws IllegalAccessException {
+        heartbeat.run();
         Map<String, List<CurrencyBalanceEntity>> byPlayer = group(balances.getAll(
                 WhereCondition.builder().column("currency_id").value(primaryId).build()));
         if (byPlayer.isEmpty()) {
@@ -128,6 +158,7 @@ public final class PrimaryWalletMerge {
         boolean marked = false;
         List<CurrencyBalanceEntity> empty = new ArrayList<>();
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : byPlayer.entrySet()) {
+            heartbeat.run();
             if (unsettledPlayers.contains(player.getKey())) {
                 // An operator has to settle this player's earlier merge first.
                 continue;
@@ -202,6 +233,7 @@ public final class PrimaryWalletMerge {
      * removes anything. Rows that do not add up are left for an operator.
      */
     private void settleMarked() throws IllegalAccessException {
+        heartbeat.run();
         Map<String, List<CurrencyBalanceEntity>> markedByPlayer = new LinkedHashMap<>();
         Map<String, List<CurrencyBalanceEntity>> unmarkedByPlayer = new LinkedHashMap<>();
         for (CurrencyBalanceEntity row : balances.getAll()) {
@@ -221,6 +253,7 @@ public final class PrimaryWalletMerge {
         boolean credited = false;
         boolean completedMarking = false;
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : markedByPlayer.entrySet()) {
+            heartbeat.run();
             String uuid = player.getKey();
             List<CurrencyBalanceEntity> markedRows = player.getValue();
             List<CurrencyBalanceEntity> unmarkedRows = unmarkedByPlayer.containsKey(uuid)
@@ -300,6 +333,7 @@ public final class PrimaryWalletMerge {
             return;
         }
         for (CurrencyBalanceEntity row : rows) {
+            heartbeat.run();
             balances.delById(row.getId());
         }
         flush(balances);

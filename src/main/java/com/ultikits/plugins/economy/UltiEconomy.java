@@ -4,11 +4,13 @@ import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.config.StartupWarnings;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
+import com.ultikits.plugins.economy.entity.WalletMergeClaimEntity;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.placeholder.EconomyPlaceholderExpansion;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.LeaderboardService;
+import com.ultikits.plugins.economy.service.MergeClaim;
 import com.ultikits.plugins.economy.service.PrimaryWalletMerge;
 import com.ultikits.plugins.economy.vault.VaultEconomyProvider;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -61,12 +63,15 @@ public class UltiEconomy extends UltiToolsPlugin {
         // UltiKits/UltiEconomy#25: the primary currency has one wallet, the account. Merge the second
         // wallet UltiEconomy 2.0.0 kept for it (once; a later start finds nothing) before registering
         // anything through which a player or another plugin could read or move a balance. A merge
-        // that cannot finish refuses the module; the next start resumes it.
-        boolean merged = new PrimaryWalletMerge(this,
+        // that cannot finish refuses the module; the next start resumes it. Servers sharing one
+        // database take turns through the claim, and a server whose turn has not come waits here.
+        PrimaryWalletMerge merge = new PrimaryWalletMerge(this,
                 getDataOperator(PlayerAccountEntity.class),
                 getDataOperator(CurrencyBalanceEntity.class),
                 getCurrencyManager().getPrimaryCurrencyId(),
-                UltiEconomy::offlinePlayerName).run();
+                UltiEconomy::offlinePlayerName);
+        boolean merged = new MergeClaim(this, () -> getDataOperator(WalletMergeClaimEntity.class))
+                .runExclusively(merge);
         if (!merged) {
             return false;
         }
