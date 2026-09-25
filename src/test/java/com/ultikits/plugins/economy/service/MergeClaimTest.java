@@ -226,9 +226,10 @@ class MergeClaimTest {
             assertThat(world.claims.durable()).isEmpty();
         }
 
-        @Test
+        @ParameterizedTest(name = "clock starting at {0}")
+        @ValueSource(longs = {0L, 5_000_000_000L})
         @DisplayName("takes over a claim whose heartbeat has not changed for half a minute, and finishes the merge the stopped holder left half done, once")
-        void takesOverAStaleClaim() {
+        void takesOverAStaleClaim(long clockStart) {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
             world.seedAccount(NOOR, "Noor", 10.0, 0.0);
@@ -237,6 +238,8 @@ class MergeClaimTest {
             world.seedBalance(NOOR, "coins", 4.0, 6.0);
             world.seedClaim("stopped-server", "7", "2026-09-25T08:00:00Z");
             ManualTiming timing = new ManualTiming();
+            // The real clock (System.nanoTime) is far from 0; a claim seen for the first time is not stale.
+            timing.now = clockStart;
 
             assertThat(claim(world, timing).runExclusively(merge(world))).isTrue();
 
@@ -248,6 +251,69 @@ class MergeClaimTest {
                     org.assertj.core.api.Assertions.entry(NOOR.toString(), "14.0/6.0"));
             assertThat(pendingRows(world)).isEmpty();
             assertThat(world.claims.durable()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("refuses the module, without waiting or deleting anything, for a claim row with no holder or no heartbeat")
+        void malformedClaim() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, "coins", 1000.0, 50.0);
+            world.seedClaim(null, null, null);
+            ManualTiming timing = new ManualTiming();
+            timing.now = 5_000_000_000L;
+
+            assertThat(claim(world, timing).runExclusively(merge(world))).isFalse();
+
+            assertThat(logged(world, "error")).containsExactly(en("economy.log.wallet_merge.failed",
+                    CatalogueText.text("en", "economy.log.wallet_merge.claim_malformed")));
+            assertThat(timing.slept).isZero();
+            assertThat(world.claims.durable()).hasSize(1);
+            assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
+        }
+
+        @Test
+        @DisplayName("control: the same claim row with a holder and a heartbeat is waited for, not refused")
+        void controlWellFormedClaimIsWaitedFor() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, "coins", 1000.0, 50.0);
+            world.seedClaim("stopped-server", "7", null);
+            ManualTiming timing = new ManualTiming();
+            timing.now = 5_000_000_000L;
+
+            assertThat(claim(world, timing).runExclusively(merge(world))).isTrue();
+
+            assertThat(timing.slept).isEqualTo(MergeClaim.STALE_MILLIS);
+            assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "1500.0/150.0");
+        }
+
+        @Test
+        @DisplayName("an interrupted wait refuses the module and keeps the thread's interrupt")
+        void interruptedWait() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, "coins", 1000.0, 50.0);
+            world.seedClaim("other-server", "1", "2026-09-25T08:00:00Z");
+            MergeClaim.Timing interrupted = new MergeClaim.Timing() {
+                @Override
+                public long millis() {
+                    return 0L;
+                }
+
+                @Override
+                public void sleep(long millis) throws InterruptedException {
+                    throw new InterruptedException("shutting down");
+                }
+            };
+
+            boolean started = claim(world, interrupted).runExclusively(merge(world));
+            boolean interruptKept = Thread.interrupted();
+
+            assertThat(started).isFalse();
+            assertThat(interruptKept).isTrue();
+            assertThat(logged(world, "error")).containsExactly(en("economy.log.wallet_merge.failed", "shutting down"));
+            assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
         }
 
         @Test
@@ -384,6 +450,37 @@ class MergeClaimTest {
                     CatalogueText.text("en", "economy.log.wallet_merge.claim_lost")));
             assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getClaimOwner()).isEqualTo("taker");
             assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
+        }
+    }
+
+    @Nested
+    @DisplayName("a holder whose claim is taken over between two heartbeats")
+    class TakenBetweenBeats {
+
+        @Test
+        @DisplayName("finds out before it writes to an account, and writes nothing to it")
+        void checksBeforeTheAccountWrite() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            world.seedBalance(STEVE, "coins", 1000.0, 50.0);
+            // The clock never moves, so no heartbeat is due during the whole merge.
+            ManualTiming timing = new ManualTiming();
+            AtomicInteger rowWrites = new AtomicInteger();
+            DataOperator<CurrencyBalanceEntity> balances = new SteppedOperator<>("currency_balances", world.balances, call -> {
+                if (call.startsWith("update") && rowWrites.incrementAndGet() == 1) {
+                    // Right after this server marked Steve's row, another server takes the claim over.
+                    world.claims.update("claim_owner", "taker", MergeClaim.CLAIM_ID);
+                }
+            });
+            PrimaryWalletMerge merge = new PrimaryWalletMerge(world.plugin, world.accounts, balances,
+                    world.currencies.getPrimaryCurrencyId(), uuid -> "x");
+
+            assertThat(claim(world, timing).runExclusively(merge)).isFalse();
+
+            assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
+            assertThat(logged(world, "error")).containsExactly(en("economy.log.wallet_merge.failed",
+                    CatalogueText.text("en", "economy.log.wallet_merge.claim_lost")));
+            assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getClaimOwner()).isEqualTo("taker");
         }
     }
 

@@ -18,11 +18,18 @@ public final class SteppedOperator<T extends BaseDataEntity<String>> implements 
     private final String table;
     private final DataOperator<T> shared;
     private final Consumer<String> beforeEachCall;
+    private Consumer<T> onInsert = t -> { };
 
     public SteppedOperator(String table, DataOperator<T> shared, Consumer<String> beforeEachCall) {
         this.table = table;
         this.shared = shared;
         this.beforeEachCall = beforeEachCall;
+    }
+
+    /** Also shows {@code hook} every entity this server tries to insert, before the insert. */
+    public SteppedOperator<T> onInsert(Consumer<T> hook) {
+        this.onInsert = hook;
+        return this;
     }
 
     private void announce(String call) {
@@ -74,6 +81,7 @@ public final class SteppedOperator<T extends BaseDataEntity<String>> implements 
     @Override
     public void insert(T obj) {
         announce("insert");
+        onInsert.accept(obj);
         shared.insert(obj);
     }
 

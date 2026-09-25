@@ -14,12 +14,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -139,12 +141,28 @@ class PrimaryWalletMergeConcurrencyTest {
         return plugin;
     }
 
-    /** What one server does at load, as {@code UltiEconomy.registerSelf} does it: merge under the claim. */
-    private static boolean start(String server, SharedDatabase db, Lockstep lockstep) {
+    /**
+     * What one server does at load, as {@code UltiEconomy.registerSelf} does it: merge under the claim.
+     * Also checks, at the moment each of the server's writes to the wallets happens, that the claim is
+     * this server's -- mutual exclusion itself, not only its outcome -- and records any write that is not
+     * in {@code notHolding}.
+     */
+    private static boolean start(String server, SharedDatabase db, Lockstep lockstep, List<String> notHolding) {
         UltiToolsPlugin plugin = plugin();
+        String[] token = new String[1];
+        Consumer<String> walletCalls = call -> {
+            lockstep.stepper(server).accept(call);
+            if (call.startsWith("insert") || call.startsWith("update") || call.startsWith("del")) {
+                WalletMergeClaimEntity held = db.claims.getById(MergeClaim.CLAIM_ID);
+                String holder = held == null ? null : held.getClaimOwner();
+                if (holder == null || !holder.equals(token[0])) {
+                    notHolding.add(server + " made \"" + call + "\" while the claim was " + holder);
+                }
+            }
+        };
         PrimaryWalletMerge merge = new PrimaryWalletMerge(plugin,
-                new SteppedOperator<>("economy_accounts", db.accounts, lockstep.stepper(server)),
-                new SteppedOperator<>("currency_balances", db.balances, lockstep.stepper(server)),
+                new SteppedOperator<>("economy_accounts", db.accounts, walletCalls),
+                new SteppedOperator<>("currency_balances", db.balances, walletCalls),
                 "coins", uuid -> "offline-" + uuid.substring(uuid.length() - 1));
         MergeClaim.Timing virtual = new MergeClaim.Timing() {
             @Override
@@ -158,7 +176,8 @@ class PrimaryWalletMergeConcurrencyTest {
             }
         };
         return new MergeClaim(plugin,
-                () -> new SteppedOperator<>("economy_wallet_merge_claim", db.claims, lockstep.stepper(server)),
+                () -> new SteppedOperator<>("economy_wallet_merge_claim", db.claims, lockstep.stepper(server))
+                        .onInsert(claim -> token[0] = claim.getClaimOwner()),
                 virtual).runExclusively(merge);
     }
 
@@ -194,11 +213,12 @@ class PrimaryWalletMergeConcurrencyTest {
             SharedDatabase db = new SharedDatabase(leftByStoppedServer);
             Lockstep lockstep = new Lockstep(seed, callCostMs);
             Map<String, List<String>> startedWithPending = new TreeMap<>();
+            List<String> notHolding = Collections.synchronizedList(new ArrayList<String>());
             Map<String, Callable<?>> starts = new LinkedHashMap<>();
             for (int i = 0; i < servers; i++) {
                 String server = String.valueOf((char) ('A' + i));
                 starts.put(server, () -> {
-                    boolean started = start(server, db, lockstep);
+                    boolean started = start(server, db, lockstep, notHolding);
                     if (started) {
                         // What a player or Vault would see the moment this server goes on loading.
                         startedWithPending.put(server, db.pendingRows());
@@ -221,6 +241,10 @@ class PrimaryWalletMergeConcurrencyTest {
                     wrong.add("server " + s.getKey() + " started while these rows were unmerged: " + s.getValue());
                     count(kinds, "a server started before the merge was finished");
                 }
+            }
+            if (!notHolding.isEmpty()) {
+                wrong.add("wallet writes by a server not holding the claim: " + notHolding);
+                count(kinds, "a wallet write by a server not holding the claim");
             }
             Map<String, List<String>> accounts = db.accountsByUuid();
             if (!accounts.equals(EXPECTED_ACCOUNTS)) {
