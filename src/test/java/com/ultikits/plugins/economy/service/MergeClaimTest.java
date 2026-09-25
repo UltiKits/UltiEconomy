@@ -461,11 +461,15 @@ class MergeClaimTest {
     @DisplayName("a holder whose claim is taken over between two heartbeats")
     class TakenBetweenBeats {
 
-        @Test
-        @DisplayName("finds out before it writes to an account, and writes nothing to it")
-        void checksBeforeTheAccountWrite() {
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {"an existing account", "no account yet"})
+        @DisplayName("finds out before it writes to an account -- crediting one or creating one -- and writes nothing to it")
+        void checksBeforeTheAccountWrite(String accountState) {
             EconomyTestWorld world = EconomyTestWorld.relational();
-            world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            boolean hasAccount = "an existing account".equals(accountState);
+            if (hasAccount) {
+                world.seedAccount(STEVE, "Steve", 500.0, 100.0);
+            }
             world.seedBalance(STEVE, "coins", 1000.0, 50.0);
             // The clock never moves, so no heartbeat is due during the whole merge.
             ManualTiming timing = new ManualTiming();
@@ -481,7 +485,12 @@ class MergeClaimTest {
 
             assertThat(claim(world, timing).runExclusively(merge)).isFalse();
 
-            assertThat(accountsOf(world)).containsEntry(STEVE.toString(), "500.0/100.0");
+            if (hasAccount) {
+                assertThat(accountsOf(world)).containsOnly(
+                        org.assertj.core.api.Assertions.entry(STEVE.toString(), "500.0/100.0"));
+            } else {
+                assertThat(world.accounts.getAll()).isEmpty();
+            }
             assertThat(logged(world, "error")).containsExactly(en("economy.log.wallet_merge.failed",
                     CatalogueText.text("en", "economy.log.wallet_merge.claim_lost")));
             assertThat(world.claims.getById(MergeClaim.CLAIM_ID).getClaimOwner()).isEqualTo("taker");
