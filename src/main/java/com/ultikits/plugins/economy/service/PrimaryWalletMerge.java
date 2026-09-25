@@ -166,7 +166,7 @@ public final class PrimaryWalletMerge {
             }
             double beforeCash = account == null ? 0.0 : account.getCash();
             double beforeBank = account == null ? 0.0 : account.getBank();
-            if (!storable(beforeCash, addCash) || !storable(beforeBank, addBank)) {
+            if (exactTarget(beforeCash, addCash) == null || exactTarget(beforeBank, addBank) == null) {
                 // The account could not hold the result exactly: move nothing, keep the rows unmarked.
                 unsettledPlayers.add(player.getKey());
                 plugin.getLogger().warn(String.format(plugin.i18n("economy.log.wallet_merge.too_large"),
@@ -244,14 +244,15 @@ public final class PrimaryWalletMerge {
                 }
                 completedMarking = true;
             }
-            double targetCash = m.hasBefore ? m.cashBefore + m.cashToAdd.doubleValue() : m.cashToAdd.doubleValue();
-            double targetBank = m.hasBefore ? m.bankBefore + m.bankToAdd.doubleValue() : m.bankToAdd.doubleValue();
-            if (!storable(m.hasBefore ? m.cashBefore : 0.0, m.cashToAdd)
-                    || !storable(m.hasBefore ? m.bankBefore : 0.0, m.bankToAdd)) {
+            Double exactCash = exactTarget(m.hasBefore ? m.cashBefore : 0.0, m.cashToAdd);
+            Double exactBank = exactTarget(m.hasBefore ? m.bankBefore : 0.0, m.bankToAdd);
+            if (exactCash == null || exactBank == null) {
                 // Marking never records such a merge; a marker that leads here was not written by it.
                 leaveUnsettled(uuid, account, markedRows.get(0));
                 continue;
             }
+            double targetCash = exactCash;
+            double targetBank = exactBank;
             if (account != null && holds(account, targetCash, targetBank)) {
                 // Credited by an earlier, interrupted start: only the removal is left.
                 markedDone.addAll(markedRows);
@@ -318,17 +319,24 @@ public final class PrimaryWalletMerge {
     }
 
     /**
-     * Whether adding {@code add} to a stored {@code before} gives a balance the account can hold and
-     * that differs from {@code before} whenever something is added. The credit writes absolute values
-     * and "the account already holds the target" means "credited", so a sum that overflows to
-     * infinity, or an amount too small to change a balance that large, must never be marked.
+     * The balance a merge stores: {@code before} plus {@code add}, added as the decimals they print
+     * as (so 0.1 + 0.2 is 0.3), or null when no balance can hold that sum exactly -- it overflows, it
+     * has more significant digits than a balance keeps, or {@code before} is not a number. One rule
+     * instead of one check per way a sum can go wrong: the credit writes this absolute value, and
+     * "the account already holds it" must mean "credited", which only an exact sum guarantees (a sum
+     * that rounded back to {@code before} would read as done and lose the rows). Deterministic, so a
+     * later start computes the same value from the same marker.
      */
-    private static boolean storable(double before, BigDecimal add) {
+    static Double exactTarget(double before, BigDecimal add) {
         if (!Double.isFinite(before)) {
-            return false;
+            return null;
         }
-        double target = before + add.doubleValue();
-        return Double.isFinite(target) && (add.signum() == 0 || target != before);
+        BigDecimal sum = BigDecimal.valueOf(before).add(add);
+        double target = sum.doubleValue();
+        if (!Double.isFinite(target) || BigDecimal.valueOf(target).compareTo(sum) != 0) {
+            return null;
+        }
+        return target;
     }
 
     /** The first row holding an amount that is not a finite number, or null. */
