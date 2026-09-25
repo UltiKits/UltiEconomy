@@ -149,7 +149,7 @@ class PrimaryWalletMergeConcurrencyTest {
         MergeClaim.Timing virtual = new MergeClaim.Timing() {
             @Override
             public long millis() {
-                return lockstep.now();
+                return lockstep.now(server);
             }
 
             @Override
@@ -176,12 +176,23 @@ class PrimaryWalletMergeConcurrencyTest {
         everyInterleaving(servers, true);
     }
 
+    @ParameterizedTest(name = "{0} servers")
+    @ValueSource(ints = {2, 3})
+    @DisplayName("on a slow database -- every storage call taking 2 s, so one merge takes minutes -- the waiting servers never take the claim from the server merging")
+    void everyInterleavingOnASlowDatabase(int servers) {
+        everyInterleaving(servers, false, 2_000L);
+    }
+
     private void everyInterleaving(int servers, boolean leftByStoppedServer) {
+        everyInterleaving(servers, leftByStoppedServer, Lockstep.CALL_COST_MS);
+    }
+
+    private void everyInterleaving(int servers, boolean leftByStoppedServer, long callCostMs) {
         List<String> failures = new ArrayList<>();
         Map<String, Integer> kinds = new TreeMap<>();
         for (long seed = 1; seed <= SEEDS; seed++) {
             SharedDatabase db = new SharedDatabase(leftByStoppedServer);
-            Lockstep lockstep = new Lockstep(seed);
+            Lockstep lockstep = new Lockstep(seed, callCostMs);
             Map<String, List<String>> startedWithPending = new TreeMap<>();
             Map<String, Callable<?>> starts = new LinkedHashMap<>();
             for (int i = 0; i < servers; i++) {
