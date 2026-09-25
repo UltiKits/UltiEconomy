@@ -4,6 +4,16 @@
 **Goal**: Add multi-currency, money notes, and tax system to create a realistic economy for RPG servers.
 **Approach**: Layered Build — multi-currency first (core refactor), then money notes, then tax system. Each layer ships independently.
 
+> **Note added 2026-09-25 (UltiKits/UltiEconomy#25): the shipped design differs from this document on the primary
+> currency.** The primary currency was never moved into `currency_balances`, and the one-time migration from
+> `economy_accounts` described here was never written. As shipped (2.0.0) and as decided by the maintainer on
+> 2026-09-24 (confirmed 2026-09-25), the primary currency's one wallet is the account row in `economy_accounts`,
+> the one Vault, `/money`, `/pay` and `/bank` use; the currency-aware service methods route the primary currency's
+> id to it, and `config.yml` governs its starting cash and bank settings. 2.0.0 also created a `currency_balances`
+> row for the primary currency on every join; the pull request that closes UltiKits/UltiEconomy#25 stops that and
+> merges those rows into the accounts once. Every section below that puts the primary currency in
+> `currency_balances`, or has the no-currency methods delegate to it, describes the plan, not the code.
+
 ## Feature 1: Multi-Currency System
 
 ### Data Model
@@ -87,6 +97,8 @@ Existing placeholders stay for primary currency. New pattern for extra currencie
 ### Migration
 
 On first boot with multi-currency, migrate existing `economy_accounts` rows into `currency_balances` with `currency_id = <primary currency id>`. Old table preserved as backup.
+
+> Not implemented; the direction was reversed. See the note at the top of this document (UltiKits/UltiEconomy#25).
 
 ---
 
