@@ -224,6 +224,41 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
+        @DisplayName("an amount too small to change a balance that large is not merged or lost: the row stays, an operator is told (Codex round 4)")
+        void amountBelowPrecisionIsLeftAlone() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 1.0e16, 0.0);
+            world.seedBalance(STEVE, "coins", 1.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1.0e16);
+            assertThat(world.balanceRows("coins")).hasSize(1);
+            assertThat(logged(world, "warn")).containsExactly(
+                    en("economy.log.wallet_merge.too_large", "1.0", "0", "Steve"));
+            assertThat(logged(world, "info")).containsExactly(
+                    en("economy.log.wallet_merge.total", 0, "0", "0", 0, 1));
+        }
+
+        @Test
+        @DisplayName("a second wallet holding a non-finite amount does not stop the module: it is left for an operator (same class)")
+        void nonFiniteSecondWalletIsLeftAlone() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 10.0, 0.0);
+            world.seedBalance(STEVE, "coins", Double.POSITIVE_INFINITY, 0.0);
+            world.seedAccount(ALEX, "Alex", 10.0, 0.0);
+            world.seedBalance(ALEX, "coins", 5.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(10.0);
+            assertThat(world.account(ALEX).getCash()).isEqualTo(15.0);
+            assertThat(world.balanceRows("coins")).hasSize(1);
+            assertThat(logged(world, "warn")).containsExactly(
+                    en("economy.log.wallet_merge.too_large", "Infinity", "0.0", "Steve"));
+        }
+
+        @Test
         @DisplayName("two second-wallet rows for one player are added once each, in one account write")
         void duplicateRows() {
             EconomyTestWorld world = EconomyTestWorld.relational();
