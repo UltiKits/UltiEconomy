@@ -528,13 +528,13 @@ class InterestServiceTest {
     }
 
     /**
-     * How a payment writes (gate-1 review of UltiKits/UltiEconomy#15, findings WR-01, WR-03 and
-     * WR-04). A payment runs on the main thread, so it must credit the rows it already read instead
-     * of looking each one up again; it must respect the bank caps a deposit respects; and it must
-     * tell a player about interest only when the credit was actually written.
+     * How a payment writes (found reviewing UltiKits/UltiEconomy#15). A payment runs on the main
+     * thread, so it must credit the rows it already read instead of looking each one up again; it
+     * must respect the bank caps a deposit respects; and it must tell a player about interest
+     * only when the credit was actually written.
      */
     @Nested
-    @DisplayName("Payment writes (UltiEconomy#15 gate-1)")
+    @DisplayName("Payment writes (UltiEconomy#15)")
     class PaymentWriteTests {
 
         @Test
@@ -677,7 +677,7 @@ class InterestServiceTest {
         }
 
         /**
-         * Maintainer ruling 2026-09-23 ("interest is paid on one wallet only"; UltiKits/UltiEconomy#25):
+         * Interest is paid on one wallet only (UltiKits/UltiEconomy#25):
          * the primary currency is held twice -- the account row every bare command and Vault read
          * (`/bank`, `/money`, `/eco check <player>`, `/deposit <amount>`), and a per-currency row for
          * the primary id created on join. Interest is paid once, on the account row.

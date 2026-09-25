@@ -40,11 +40,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Threat T-17-15-01 of plan 17-15: interest paid twice per interval because a reload added a second
- * interest task. Gate-1 review WR-05 found no test anywhere asserting that a reload adds none; the
- * property held only because {@code UltiToolsPlugin#reloadSelf()} happens not to touch the task
- * manager. UltiKits/UltiTools-Reborn#531 is about to make reload reschedule bound timers, which is
- * exactly where a missing cancel would add a second one.
+ * The risk: interest paid twice per interval because a reload added a second interest task. A
+ * review found no test anywhere asserting that a reload adds none; the property held only because
+ * {@code UltiToolsPlugin#reloadSelf()} happens not to touch the task manager.
+ * UltiKits/UltiTools-Reborn#531 is about to make reload reschedule bound timers, which is exactly
+ * where a missing cancel would add a second one.
  *
  * <p>This registers the module's two scheduled services through the framework's real
  * {@link TaskManager} -- the way {@code PluginManager} does once per module load -- then runs the
@@ -67,7 +67,7 @@ import static org.mockito.Mockito.when;
  * method. The changed-interval case additionally sees the interest task replaced by one with the
  * new period, so the reschedule path it guards really ran.
  */
-@DisplayName("Reload keeps exactly one scheduled task per method (T-17-15-01, UltiEconomy#15)")
+@DisplayName("Reload keeps exactly one scheduled task per method (UltiEconomy#15)")
 class ReloadKeepsOneTaskTest {
 
     @TempDir
