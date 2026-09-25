@@ -596,15 +596,16 @@ class PrimaryWalletMergeTest {
     }
 
     @Nested
-    @DisplayName("a row that only looks like a merge marker")
+    @DisplayName("a marker row that does not hold what its currency id records (tampered with or corrupted)")
     class NotAMarker {
 
         @Test
         @DisplayName("creates no account from the amounts in its currency id, and is left, with its balance, for an operator (Codex round 10)")
         void orphanMarkerCreatesNothing() {
             EconomyTestWorld world = EconomyTestWorld.relational();
-            // A currency id of this shape that this merge never wrote -- say, a currency removed from
-            // currencies.yml -- whose row holds 50, not the 1/1 its id encodes.
+            // A row with a marker's currency id that holds 50, not the 1/1 the id records: this merge
+            // never writes that (no currency can have the prefix; see CurrencyManagerTest), so it was
+            // changed by hand or corrupted.
             world.seedBalance(PEAR, PrimaryWalletMerge.MARKER_PREFIX + "none:1/1", 50.0, 0.0);
 
             assertThat(merge(world).run()).isTrue();

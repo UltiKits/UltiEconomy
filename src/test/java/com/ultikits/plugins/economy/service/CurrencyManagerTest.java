@@ -151,20 +151,25 @@ class CurrencyManagerTest {
     }
 
     @Test
-    @DisplayName("refuses a currency id in the prefix the primary-wallet merge reserves (UltiKits/UltiEconomy#25, Codex round 2)")
-    void reservedMergePrefixIsRefused() {
+    @DisplayName("no currencies.yml key can give a currency the merge marker's prefix: a '.' in a key nests it (UltiKits/UltiEconomy#25, Codex rounds 2, 10, 11)")
+    void noCurrencyIdCanHaveTheMarkerPrefix() {
+        // The prefix carries a '.', and Bukkit reads a '.' in a key as a path separator, so a key written
+        // with the whole prefix becomes a section named by the part before the '.'.
+        assertThat(PrimaryWalletMerge.MARKER_PREFIX).contains(".");
         String yaml =
                 "currencies:\n" +
                 "  coins:\n" +
                 "    primary: true\n" +
-                "  '~merging-into-account:none:1/1':\n" +
+                "  '" + PrimaryWalletMerge.MARKER_PREFIX + "none:1/1':\n" +
                 "    display-name: 'Trap'\n";
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(new StringReader(yaml));
-        assertThatThrownBy(() -> new CurrencyManager(config))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("~merging-into-account:");
-        // Control: the same file without that entry loads.
-        assertThat(new CurrencyManager(YamlConfiguration.loadConfiguration(
-                new StringReader("currencies:\n  coins:\n    primary: true\n"))).getPrimaryCurrencyId()).isEqualTo("coins");
+        CurrencyManager manager = new CurrencyManager(YamlConfiguration.loadConfiguration(new StringReader(yaml)));
+        assertThat(manager.getAllCurrencies())
+                .extracting(c -> c.getId())
+                .noneMatch(id -> id.startsWith(PrimaryWalletMerge.MARKER_PREFIX))
+                .contains("coins");
+        // Control: a key without a '.' comes back exactly as written, so it is the '.' that does it.
+        CurrencyManager control = new CurrencyManager(YamlConfiguration.loadConfiguration(new StringReader(
+                "currencies:\n  coins:\n    primary: true\n  '~merging-into-account:none:1/1':\n    display-name: 'x'\n")));
+        assertThat(control.getAllCurrencies()).extracting(c -> c.getId()).contains("~merging-into-account:none:1/1");
     }
 }
