@@ -169,6 +169,22 @@ class PrimaryWalletRoutingTest {
         }
 
         @Test
+        @DisplayName("a withdrawal by currency name obeys config.yml's bank.enabled, as the plain /withdraw does (Codex round 3)")
+        void withdrawByNameObeysBankEnabled() {
+            world.seedAccount(STEVE, "Steve", 0.0, 500.0);
+            world.config.setBankEnabled(false);
+
+            assertThat(service.withdrawFromBank(STEVE, 100.0, "coins")).isFalse();
+            assertThat(world.account(STEVE).getBank()).isEqualTo(500.0);
+
+            // Control: with the bank enabled the same call moves the money.
+            world.config.setBankEnabled(true);
+            assertThat(service.withdrawFromBank(STEVE, 100.0, "coins")).isTrue();
+            assertThat(world.account(STEVE).getBank()).isEqualTo(400.0);
+            assertThat(world.account(STEVE).getCash()).isEqualTo(100.0);
+        }
+
+        @Test
         @DisplayName("creating a primary-currency balance by name creates only the account, with config.yml's starting cash")
         void getOrCreateBalanceByNameCreatesOnlyTheAccount() {
             CurrencyBalanceEntity view = service.getOrCreateBalance(STEVE, "Steve", "coins");

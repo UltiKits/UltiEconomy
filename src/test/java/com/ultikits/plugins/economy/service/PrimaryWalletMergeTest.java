@@ -201,6 +201,29 @@ class PrimaryWalletMergeTest {
         }
 
         @Test
+        @DisplayName("a sum too large to store is not merged: nothing moves, the row stays, an operator is told (Codex round 3)")
+        void sumTooLargeIsLeftAlone() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 1.0e308, 0.0);
+            world.seedBalance(STEVE, "coins", 1.0e308, 5.0);
+            world.seedAccount(ALEX, "Alex", 10.0, 0.0);
+            world.seedBalance(ALEX, "coins", 5.0, 0.0);
+
+            assertThat(merge(world).run()).isTrue();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1.0e308);
+            assertThat(world.account(STEVE).getBank()).isEqualTo(0.0);
+            assertThat(world.balanceRows("coins")).hasSize(1);
+            assertThat(world.balanceRows("coins").get(0).getCash()).isEqualTo(1.0e308);
+            assertThat(logged(world, "warn")).containsExactly(en("economy.log.wallet_merge.too_large",
+                    new java.math.BigDecimal("1.0E+308").toPlainString(), "5.0", "Steve"));
+            // Everyone else is merged as usual.
+            assertThat(world.account(ALEX).getCash()).isEqualTo(15.0);
+            assertThat(logged(world, "info")).last().isEqualTo(
+                    en("economy.log.wallet_merge.total", 1, "5.0", "0", 0, 1));
+        }
+
+        @Test
         @DisplayName("two second-wallet rows for one player are added once each, in one account write")
         void duplicateRows() {
             EconomyTestWorld world = EconomyTestWorld.relational();
