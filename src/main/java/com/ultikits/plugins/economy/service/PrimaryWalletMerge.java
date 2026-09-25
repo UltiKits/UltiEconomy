@@ -126,6 +126,7 @@ public final class PrimaryWalletMerge {
         }
         Map<String, PlayerAccountEntity> byUuid = accountsByUuid();
         boolean marked = false;
+        List<CurrencyBalanceEntity> empty = new ArrayList<>();
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : byPlayer.entrySet()) {
             if (unsettledPlayers.contains(player.getKey())) {
                 // An operator has to settle this player's earlier merge first.
@@ -151,10 +152,8 @@ public final class PrimaryWalletMerge {
             }
             if (addCash.signum() == 0 && addBank.signum() == 0) {
                 // Nothing to move: removing the rows cannot lose money, so no marker is needed.
-                for (CurrencyBalanceEntity row : player.getValue()) {
-                    balances.delById(row.getId());
-                    emptyRemoved++;
-                }
+                empty.addAll(player.getValue());
+                emptyRemoved += player.getValue().size();
                 continue;
             }
             String marker = MARKER_PREFIX
@@ -170,6 +169,8 @@ public final class PrimaryWalletMerge {
             // Every marker is on disk before any account is credited.
             flush(balances);
         }
+        // Durable like every other removal, so a restart cannot bring the rows back.
+        remove(empty);
     }
 
     /**
