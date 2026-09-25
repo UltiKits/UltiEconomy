@@ -252,6 +252,14 @@ class StartupWarningsTest {
         }
 
         @Test
+        @DisplayName("two ways of writing \"no cap\" (0 and -1) are not a conflict (gate-1 IN-07)")
+        void twoUnlimitedCapsAgree() {
+            assertThat(conflicts("currencies:\n  coins:\n    max-bank-balance: 0\n    primary: true\n", "en")).isEmpty();
+            // Control: a real cap against "no cap" is still named.
+            assertThat(conflicts("currencies:\n  coins:\n    max-bank-balance: 10.0\n    primary: true\n", "en")).hasSize(1);
+        }
+
+        @Test
         @DisplayName("Control: a setting currencies.yml does not contain is not reported")
         void absentKeysAreSilent() {
             assertThat(conflicts("currencies:\n  coins:\n    display-name: 'Coins'\n    primary: true\n", "en")).isEmpty();

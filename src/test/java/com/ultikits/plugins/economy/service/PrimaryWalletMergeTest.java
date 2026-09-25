@@ -260,13 +260,17 @@ class PrimaryWalletMergeTest {
     @DisplayName("a crash between any two writes")
     class Crash {
 
-        /** Four players covering every case: both wallets, duplicates, an empty wallet, only a second wallet. */
+        /**
+         * Four players covering every case: both wallets, three duplicate rows (so a resumed merge has
+         * more than one unmarked row left; gate-1 WR-01), an empty wallet, only a second wallet.
+         */
         private void seed(EconomyTestWorld world) {
             world.seedAccount(STEVE, "Steve", 500.0, 100.0);
             world.seedBalance(STEVE, "coins", 1000.0, 50.0);
             world.seedAccount(ALEX, "Alex", 10.0, 0.0);
             world.seedBalance(ALEX, "coins", 1000.0, 0.0);
             world.seedBalance(ALEX, "coins", 5.0, 7.0);
+            world.seedBalance(ALEX, "coins", 3.0, 0.0);
             world.seedAccount(NOOR, "Noor", 1.0, 2.0);
             world.seedBalance(NOOR, "coins", 0.0, 0.0);
             world.seedBalance(ZED, "coins", 300.0, 20.0);
@@ -295,7 +299,7 @@ class PrimaryWalletMergeTest {
             Map<String, String> expectedAccounts = accountsOf(reference);
             assertThat(expectedAccounts).containsOnly(
                     org.assertj.core.api.Assertions.entry(STEVE.toString(), "Steve 1500.0/150.0"),
-                    org.assertj.core.api.Assertions.entry(ALEX.toString(), "Alex 1015.0/7.0"),
+                    org.assertj.core.api.Assertions.entry(ALEX.toString(), "Alex 1018.0/7.0"),
                     org.assertj.core.api.Assertions.entry(NOOR.toString(), "Noor 1.0/2.0"),
                     org.assertj.core.api.Assertions.entry(ZED.toString(), "offline-d 300.0/20.0"));
 
@@ -380,6 +384,27 @@ class PrimaryWalletMergeTest {
                 }
             }
             assertThat(recoveriesChecked).as("double-crash cases checked on " + backend).isGreaterThan(0);
+        }
+
+        @Test
+        @DisplayName("a marker stays short enough for a VARCHAR(255) column, however large the amounts (gate-1 IN-04)")
+        void markerFitsTheColumn() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.seedAccount(STEVE, "Steve", 1.0e200, 1.0e200);
+            world.seedBalance(STEVE, "coins", 1.0e200, 1.0e200);
+            world.seedBalance(STEVE, "coins", 1.0e200, 1.0e200);
+            // Crash after the markers are written: step 1 and 2 mark, step 3 would credit.
+            world.crash.armAt(3);
+
+            assertThat(merge(world).run()).isFalse();
+
+            for (CurrencyBalanceEntity row : world.balances.durable()) {
+                assertThat(row.getCurrencyId()).startsWith(PrimaryWalletMerge.MARKER_PREFIX);
+                assertThat(row.getCurrencyId().length()).as(row.getCurrencyId()).isLessThanOrEqualTo(255);
+            }
+            world.crash.disarm();
+            assertThat(merge(world).run()).isTrue();
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1.0e200 + 2.0e200);
         }
 
         @Test
