@@ -23,6 +23,12 @@ public class CurrencyManager {
         for (String id : section.getKeys(false)) {
             ConfigurationSection cs = section.getConfigurationSection(id);
             if (cs == null) continue;
+            if (id.startsWith(PrimaryWalletMerge.MARKER_PREFIX)) {
+                // Reserved: a currency_balances row with this currency id is a merge in progress
+                // (UltiKits/UltiEconomy#25), so no currency may use it.
+                throw new IllegalStateException("Currency id '" + id + "' starts with '"
+                        + PrimaryWalletMerge.MARKER_PREFIX + "', which is reserved for the primary-wallet merge");
+            }
 
             CurrencyDefinition def = CurrencyDefinition.builder()
                     .id(id)
