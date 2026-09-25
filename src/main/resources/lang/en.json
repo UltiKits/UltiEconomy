@@ -81,5 +81,6 @@
   "economy.log.wallet_merge.claim_wait_over": "Primary-currency wallet merge: the other server's claim is gone, so this server has taken it and merges whatever is left (after a finished merge, nothing).",
   "economy.log.wallet_merge.claim_stale": "Primary-currency wallet merge: the claim taken at %s has not changed for %s seconds, so the server that took it is taken to have stopped. This server takes the merge over; it finishes what was left half done and adds nothing twice.",
   "economy.log.wallet_merge.claim_lost": "another server took the wallet merge over while this one was running it (this server had stopped responding for too long), so this server stopped merging; start it again once the other server has started",
-  "economy.log.wallet_merge.claim_release_failed": "Primary-currency wallet merge: this server could not remove its wallet-merge claim (%s). The next server that starts on this database waits %s seconds and then takes the claim over."
+  "economy.log.wallet_merge.claim_release_failed": "Primary-currency wallet merge: this server could not remove its wallet-merge claim (%s). The next server that starts on this database waits %s seconds and then takes the claim over.",
+  "economy.log.wallet_merge.claim_malformed": "the wallet-merge claim in table economy_wallet_merge_claim has no holder or no heartbeat, which UltiEconomy never writes, so it cannot be taken over safely; with no server merging, delete that row (DELETE FROM economy_wallet_merge_claim) and start again"
 }

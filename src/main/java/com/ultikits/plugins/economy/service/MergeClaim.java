@@ -7,9 +7,6 @@ import com.ultikits.ultitools.interfaces.Cached;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -31,9 +28,10 @@ import java.util.function.Supplier;
  * server that does not hold it waits, reading only the claim row, and goes on only once it holds the
  * claim itself -- after the holder removed it, or after taking it over (below) -- and has run the merge,
  * which then finds nothing left or finishes what is left; so it never starts before the merge is
- * finished. Waiting,
- * not refusing to start, because the wait is short (the length of the other server's merge, once, at
- * the upgrade) and needs nobody to restart anything; every ten seconds it logs that it is waiting.
+ * finished. Waiting, not refusing to start, because the wait is short (the length of the other
+ * server's merge, once, at the upgrade) and needs nobody to restart anything; every ten seconds it logs
+ * that it is waiting. Modules load while the server starts, before its watchdog is armed (Paper arms it
+ * after "Done"), so the wait cannot trip the watchdog then.
  *
  * <p><b>A server that stopped while holding the claim.</b> While it merges, the holder changes the
  * claim's heartbeat every few seconds. A waiting server that sees the same holder and heartbeat for
@@ -41,14 +39,20 @@ import java.util.function.Supplier;
  * stopped: it deletes that exact claim -- the delete names the holder and the heartbeat it saw, so it
  * cannot delete a claim another waiting server has just taken -- and inserts its own. The merge's
  * per-player markers then let it finish whatever the stopped server left half done, adding nothing
- * twice. A holder that finds, at a heartbeat, that the claim is no longer its own stops merging.
+ * twice. A claim row with no holder or no heartbeat was not written by this class, and cannot be taken
+ * over by a delete that names exactly it, so it refuses the module with a message telling the operator
+ * to delete the row. The holder checks that the claim is still its own at every heartbeat and, without
+ * waiting for one, before every write to an account; a holder that finds it taken over stops merging.
  *
  * <p><b>Not covered.</b> JSON storage cannot be shared by two servers at all: each server keeps its own
  * copy of the records in memory and never rereads the files, and one server's clean-up deletes the
  * files the other wrote. A server still running a version without this claim is not stopped by it.
- * And a holder that pauses for longer than {@link #STALE_MILLIS} in the middle of one storage call --
- * not between two, where it checks -- and then goes on can still overlap with the server that took
- * over, because the framework's update cannot be made conditional on the claim.
+ * And a holder that pauses for longer than {@link #STALE_MILLIS} right after a check -- between the
+ * check before an account write and that write, or between two heartbeats while it marks or removes
+ * rows -- and then goes on can still overlap with the server that took over, because the framework
+ * cannot make a write conditional on the claim. The writes it could still make then are one account
+ * write (which could add a player's second wallet twice or undo a later change to that account) or
+ * row markings and removals, which repeat what the new holder writes.
  */
 public final class MergeClaim {
 
@@ -63,9 +67,9 @@ public final class MergeClaim {
 
     /**
      * How long an unchanged claim is waited for before its holder is taken to have stopped: six
-     * heartbeats, far longer than the holder ever goes between two, and short enough that a server
-     * waiting while it loads stays well inside the server watchdog's default 60 seconds should the
-     * module be loaded after the server has started (during startup the watchdog is not yet armed).
+     * heartbeats, far longer than a holder goes between two (a few storage calls). Taking over a
+     * stopped holder's claim therefore costs about 30 seconds of startup; waiting for a live holder
+     * lasts as long as its merge.
      */
     static final long STALE_MILLIS = 30_000L;
 
@@ -142,7 +146,7 @@ public final class MergeClaim {
         }
         try {
             // After another server's merge, this finds nothing left and writes nothing.
-            return merge.withHeartbeat(this::beat).run();
+            return merge.withClaim(this::beat, this::verify).run();
         } finally {
             release();
         }
@@ -154,6 +158,7 @@ public final class MergeClaim {
      */
     private void acquire() throws InterruptedException {
         claims = store.get();
+        boolean seen = false;
         String seenOwner = null;
         String seenBeat = null;
         long seenSince = 0L;
@@ -186,8 +191,12 @@ public final class MergeClaim {
                 lastBeat = timing.millis();
                 return;
             }
+            if (held.getClaimOwner() == null || held.getHeartbeat() == null) {
+                throw new IllegalStateException(plugin.i18n("economy.log.wallet_merge.claim_malformed"));
+            }
             long now = timing.millis();
-            if (!Objects.equals(held.getClaimOwner(), seenOwner) || !Objects.equals(held.getHeartbeat(), seenBeat)) {
+            if (!seen || !held.getClaimOwner().equals(seenOwner) || !held.getHeartbeat().equals(seenBeat)) {
+                seen = true;
                 seenOwner = held.getClaimOwner();
                 seenBeat = held.getHeartbeat();
                 seenSince = now;
@@ -198,8 +207,7 @@ public final class MergeClaim {
                 claims.del(exactly(seenOwner, seenBeat));
                 flushAndGc();
                 tookOver = true;
-                seenOwner = null;
-                seenBeat = null;
+                seen = false;
                 continue;
             }
             if (!waited || now - lastWaitLog >= WAIT_LOG_MILLIS) {
@@ -223,12 +231,20 @@ public final class MergeClaim {
             return;
         }
         lastBeat = now;
+        verify();
+        beats++;
+        claims.update("heartbeat", String.valueOf(beats), CLAIM_ID);
+    }
+
+    /**
+     * Called by the merge right before each write to an account, and by every heartbeat: throws, which
+     * stops the merge, when the claim is no longer this server's.
+     */
+    void verify() {
         WalletMergeClaimEntity held = claims.getById(CLAIM_ID);
         if (held == null || !owner.equals(held.getClaimOwner())) {
             throw new IllegalStateException(plugin.i18n("economy.log.wallet_merge.claim_lost"));
         }
-        beats++;
-        claims.update("heartbeat", String.valueOf(beats), CLAIM_ID);
     }
 
     /** Deletes this server's claim -- only its own, never one another server has taken over. */
@@ -261,17 +277,10 @@ public final class MergeClaim {
                 plugin.i18n("economy.log.wallet_merge.failed"), String.valueOf(e.getMessage())));
     }
 
-    /** Conditions matching the claim row with this holder and heartbeat (a missing value is not matched on). */
+    /** Conditions matching only the claim row with this holder and this heartbeat. */
     private static WhereCondition[] exactly(String claimOwner, String heartbeat) {
-        List<WhereCondition> conditions = new ArrayList<>();
-        conditions.add(where("id", CLAIM_ID));
-        if (claimOwner != null) {
-            conditions.add(where("claim_owner", claimOwner));
-        }
-        if (heartbeat != null) {
-            conditions.add(where("heartbeat", heartbeat));
-        }
-        return conditions.toArray(new WhereCondition[0]);
+        return new WhereCondition[]{
+                where("id", CLAIM_ID), where("claim_owner", claimOwner), where("heartbeat", heartbeat)};
     }
 
     private static WhereCondition where(String column, String value) {

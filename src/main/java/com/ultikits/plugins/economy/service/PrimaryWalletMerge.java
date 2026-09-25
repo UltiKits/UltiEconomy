@@ -75,6 +75,7 @@ public final class PrimaryWalletMerge {
     private int emptyRemoved;
     private final Set<String> unsettledPlayers = new HashSet<>();
     private Runnable heartbeat = () -> { };
+    private Runnable beforeAccountWrite = () -> { };
 
     /**
      * @param plugin    the module, for its logger and language catalogue
@@ -99,11 +100,13 @@ public final class PrimaryWalletMerge {
     /**
      * Makes the merge call {@code heartbeat} between its steps -- before each player and each row
      * removal -- so that {@link MergeClaim} can show the servers waiting for it that this one is still
-     * merging, and stop it when another server has taken the claim over (it throws, which ends the
-     * merge like a storage failure).
+     * merging, and {@code beforeAccountWrite} right before each write to an account, the one write a
+     * second writer could not repeat harmlessly. Either stops the merge by throwing (another server has
+     * taken the claim over), which ends it like a storage failure.
      */
-    PrimaryWalletMerge withHeartbeat(Runnable heartbeat) {
+    PrimaryWalletMerge withClaim(Runnable heartbeat, Runnable beforeAccountWrite) {
         this.heartbeat = heartbeat;
+        this.beforeAccountWrite = beforeAccountWrite;
         return this;
     }
 
@@ -298,10 +301,12 @@ public final class PrimaryWalletMerge {
                         .cash(targetCash)
                         .bank(targetBank)
                         .build();
+                beforeAccountWrite.run();
                 accounts.insert(account);
             } else if (m.hasBefore && account != null && holds(account, m.cashBefore, m.bankBefore)) {
                 account.setCash(targetCash);
                 account.setBank(targetBank);
+                beforeAccountWrite.run();
                 accounts.update(account);
             } else {
                 leaveUnsettled(uuid, account, markedRows.get(0));

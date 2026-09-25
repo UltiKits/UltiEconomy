@@ -81,5 +81,6 @@
   "economy.log.wallet_merge.claim_wait_over": "主货币钱包合并：另一台服务器的认领已删除，本服务器已取得认领，并合并剩余的部分（若合并已完成，则没有任何内容）。",
   "economy.log.wallet_merge.claim_stale": "主货币钱包合并：认领时间为 %s 的认领已有 %s 秒没有变化，因此视为认领它的服务器已停止。本服务器接手合并；它会完成未做完的部分，不会重复并入。",
   "economy.log.wallet_merge.claim_lost": "本服务器执行钱包合并期间，另一台服务器接手了合并（本服务器停止响应的时间过长），因此本服务器已停止合并；请在另一台服务器启动完成后再启动本服务器",
-  "economy.log.wallet_merge.claim_release_failed": "主货币钱包合并：本服务器无法删除自己的钱包合并认领（%s）。下一台在此数据库上启动的服务器会等待 %s 秒后接手该认领。"
+  "economy.log.wallet_merge.claim_release_failed": "主货币钱包合并：本服务器无法删除自己的钱包合并认领（%s）。下一台在此数据库上启动的服务器会等待 %s 秒后接手该认领。",
+  "economy.log.wallet_merge.claim_malformed": "economy_wallet_merge_claim 表中的钱包合并认领没有持有者或没有心跳，这不是 UltiEconomy 写入的，无法安全接管；请在没有服务器正在合并时删除该行（DELETE FROM economy_wallet_merge_claim）后重新启动"
 }
