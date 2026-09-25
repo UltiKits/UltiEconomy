@@ -2,11 +2,14 @@ package com.ultikits.plugins.economy;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.config.StartupWarnings;
+import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
+import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.placeholder.EconomyPlaceholderExpansion;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.LeaderboardService;
+import com.ultikits.plugins.economy.service.PrimaryWalletMerge;
 import com.ultikits.plugins.economy.vault.VaultEconomyProvider;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.UltiToolsModule;
@@ -19,6 +22,7 @@ import org.bukkit.plugin.ServicePriority;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @UltiToolsModule
 public class UltiEconomy extends UltiToolsPlugin {
@@ -54,6 +58,18 @@ public class UltiEconomy extends UltiToolsPlugin {
 
     @Override
     public boolean registerSelf() {
+        // UltiKits/UltiEconomy#25: the primary currency has one wallet, the account. Merge the second
+        // wallet UltiEconomy 2.0.0 kept for it (once; a later start finds nothing) before registering
+        // anything through which a player or another plugin could read or move a balance. A merge
+        // that cannot finish refuses the module; the next start resumes it.
+        boolean merged = new PrimaryWalletMerge(this,
+                getDataOperator(PlayerAccountEntity.class),
+                getDataOperator(CurrencyBalanceEntity.class),
+                getCurrencyManager().getPrimaryCurrencyId(),
+                UltiEconomy::offlinePlayerName).run();
+        if (!merged) {
+            return false;
+        }
         EconomyService economyService = getContext().getBean(EconomyService.class);
         EconomyConfig config = getConfig(EconomyConfig.class);
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
@@ -80,6 +96,19 @@ public class UltiEconomy extends UltiToolsPlugin {
     protected void onUnregister() {
         if (vaultProvider != null) {
             Bukkit.getServicesManager().unregister(Economy.class, vaultProvider);
+        }
+    }
+
+    /**
+     * The name the server knows for {@code uuid}, for an account the wallet merge creates for a
+     * player who had only a second wallet; the UUID itself when the server knows no name.
+     */
+    static String offlinePlayerName(String uuid) {
+        try {
+            String name = Bukkit.getOfflinePlayer(UUID.fromString(uuid)).getName();
+            return name != null ? name : uuid;
+        } catch (RuntimeException e) {
+            return uuid;
         }
     }
 

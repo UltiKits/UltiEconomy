@@ -113,6 +113,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `config/currencies.yml` 中主货币条目的 `initial-cash`、`bank-enabled`、`min-deposit`、`max-bank-balance` 不再被读取
   （其 `display-name` 与 `symbol` 仍被读取）。其他货币仍各自拥有独立的钱包。
 
+- **Upgrade consequence — the second wallet is merged once** (UltiKits/UltiEconomy#25). On the first
+  start after upgrading, before anything can read or move a balance, each player's second
+  primary-currency wallet is added to their account wallet — its cash to their cash, its bank balance
+  to their bank balance — and then removed. The server log gets one line per merged player with the
+  amounts and the new balances, and one total line. A later start finds nothing to merge. Nobody's
+  balance goes down: an amount below zero in a second wallet (which no command of this module can
+  produce) is not taken from the account, and is logged. A merged bank balance may end above
+  `bank.max-balance`; deposits and interest then stop at the cap as before. **Known trade-off:** the
+  starting amount 2.0.0 credited a second time stays in circulation — on a 103-player test server,
+  103,588.95 was merged, 101,000 of it untouched duplicated starting amounts. If storage fails during
+  the merge, the module does not start (so no balance changes); fix storage and restart, and the merge
+  resumes without adding anything twice. It is safe to stop the server at any point during the merge,
+  on SQLite, MySQL and JSON storage alike.
+- **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
+  第二个主货币钱包会并入其账户钱包——现金并入现金，存款并入存款——随后删除。服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），
+  并记录一行总计。之后的启动不会再合并任何内容。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
+  并会记入日志。合并后的存款可能高于 `bank.max-balance`；此后存款与利息照旧在上限处停止。**已知取舍：** 2.0.0 重复发放的初始金额会继续流通——
+  在一台 103 名玩家的测试服务器上，共并入 103,588.95，其中 101,000 是从未动用的重复初始金额。若合并过程中存储出错，模块不会启动
+  （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。无论使用 SQLite、MySQL 还是 JSON 存储，
+  在合并过程中的任何时刻停止服务器都是安全的。
+
 ### Removed
 
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen
