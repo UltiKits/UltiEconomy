@@ -135,9 +135,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   running 2.0.0 before starting the first upgraded one, and never run 2.0.0 against that database
   again — a 2.0.0 server gives each joining player a new second wallet, which the next start would
   merge as more money, and it takes no part in the claim. JSON storage cannot be shared by two
-  servers at all (each keeps its own copy of the records). A currency id
-  starting with `~merging-into-account:` is reserved for the merge; `currencies.yml` defining one is
-  refused at load.
+  servers at all (each keeps its own copy of the records). While a player's merge is in progress,
+  their second-wallet rows carry a `currency_id` starting with `~merging-into-account.marker:`, which
+  no currency can have (a `.` in a `currencies.yml` key nests the key).
 - **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
   第二个主货币钱包会并入其账户钱包——现金并入现金，存款并入存款——随后删除。服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），
   并记录一行总计。之后的启动不会再合并任何内容。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
@@ -150,7 +150,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   若执行合并的服务器中途停止，下一台服务器会在 30 秒后接手认领并完成合并，不会重复并入。启动第一台升级后的服务器之前，
   请停止所有仍在运行 2.0.0 的服务器，此后也不要再让 2.0.0 连接该数据库——2.0.0 服务器会给每位进服玩家新建一个第二钱包，
   下次启动时会被当作更多的钱并入，而且它不参与认领。JSON 存储根本无法由两台服务器共用（每台服务器各自保留一份记录副本）。
-  以 `~merging-into-account:` 开头的货币 ID 保留给合并使用；`currencies.yml` 若定义这样的货币，加载时会被拒绝。
+  某位玩家的合并进行期间，其第二钱包记录的 `currency_id` 以 `~merging-into-account.marker:` 开头；任何货币都不可能使用这样的 ID
+  （`currencies.yml` 中键名里的 `.` 会使该键成为嵌套键）。
 
 - When `config/currencies.yml` gives the primary currency an `initial-cash`, `bank-enabled`,
   `min-deposit` or `max-bank-balance` different from `config/config.yml`'s `initial-cash`,
