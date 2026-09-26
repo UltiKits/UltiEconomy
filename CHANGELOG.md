@@ -9,6 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Language keys were renamed from Chinese sentences to ASCII keys (for example `economy.money.header`).
+  An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
+  the new keys; until then the renamed messages show the new built-in text. A server whose language
+  files were never edited needs no action.
+- 语言键已从中文句子改为 ASCII 键（例如 `economy.money.header`）。改过本模块 `lang/en.json` 或
+  `lang/zh.json` 的运维需要把改动重新套到新键上；在此之前，这些消息显示新的内置文本。从未改过语言文件的服务器无需任何操作。
+
 - **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
   and the leaderboard refresh read their intervals from `interest.interval` and
   `leaderboard.update-interval` through a framework feature added in UltiTools 6.3.0
@@ -87,7 +94,41 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   本模块每次启动都会记录一条 WARNING 说明这一点。若要继续对转账征税，请设置 `tax.enabled: true` 并执行
   `/ul reload UltiTools-Economy`；该开关在每次转账时读取。声明默认值现为 `true`，只影响尚未包含该键的文件。
 
+### Removed
+
+- Twenty-two language entries that no code displayed were removed from both language files: thirteen
+  near-duplicates of the command messages above that carried one `%s` too many (the reason those
+  messages never matched), and nine that no version of this module ever referenced (a leaderboard
+  line and title, a transaction-tax, a wealth-tax and a wealth-tax-exemption message, a current
+  currency line, a bank-not-supported message, a players-only message and an `/eco` usage line).
+  Nothing an operator or player sees changes.
+- 从两份语言文件中删除了二十二条从未被显示的条目：十三条是上述命令消息多带一个 `%s` 的近似副本（正是这些消息从未匹配的原因），
+  另外九条从未被本模块任何版本引用（排行榜行与标题、交易税、财富税与财富税豁免消息、当前货币行、货币不支持银行功能、仅限玩家执行的提示、
+  `/eco` 用法行）。运维和玩家看到的内容没有任何变化。
+
 ### Fixed
+
+- `language: en` now applies to the command messages that showed their Chinese source text in every
+  language because their keys were missing from both language files: the `/money` and `/bank`
+  balance lines, the `/pay`, `/deposit` and `/withdraw` success lines, the `/eco give`, `take`, `set`
+  and `check` lines, the primary-currency interest notification, and the `/bank`, `/deposit`,
+  `/withdraw`, `/pay` and `/money` help and command descriptions, and the `/eco` and `/note` command
+  descriptions (UltiKits/UltiEconomy#14).
+  `language: zh` now also applies to text that was fixed English: the six help headers
+  (`=== UltiEconomy Bank ===` and the rest), a money note's name and lore (`[Money Note] …`,
+  `Currency:`, `Value:`, `Created by:`), the two startup warnings about `interest.enabled` and
+  `tax.enabled`, three console errors (a failed account, balance or interest write), and the messages
+  the Vault bridge returns when a withdrawal or deposit fails, which shop plugins show to the player.
+  English wording is unchanged, except that `/pay` to yourself now answers `You cannot pay yourself`
+  instead of `Invalid amount`. A money note made before this change keeps the name it was made with; notes
+  are recognised by their stored data, not their name, so old and new notes both redeem.
+- `language: en` 现在对以下命令消息生效（它们的键在两份语言文件中都缺失，因此在任何语言下都显示中文源文本）：`/money` 与
+  `/bank` 的余额行，`/pay`、`/deposit`、`/withdraw` 的成功提示，`/eco give`、`take`、`set`、`check` 的提示，主货币利息到账通知，
+  以及 `/bank`、`/deposit`、`/withdraw`、`/pay`、`/money` 的帮助与命令描述和 `/eco`、`/note` 的命令描述（UltiKits/UltiEconomy#14）。`language: zh` 现在也对
+  原先写死为英文的文本生效：六个帮助标题（`=== UltiEconomy Bank ===` 等）、纸币的名称与说明、`interest.enabled` 与
+  `tax.enabled` 的两条启动警告、三条控制台错误（账户、余额或利息写入失败），以及 Vault 接口在扣款或存款失败时返回的消息
+  （商店插件会把它显示给玩家）。英文措辞不变，唯一例外是向自己 `/pay` 时现在提示“不能向自己转账”，而不是“无效的金额”。改动前制作的纸币保留原名称；
+  纸币按存储的数据识别而非名称，新旧纸币都能兑换。
 
 - The wealth leaderboard is now refreshed: once as soon as the module loads, then every
   `leaderboard.update-interval` seconds — the value in your file; 1.0.0 and 2.0.0 shipped `60` but

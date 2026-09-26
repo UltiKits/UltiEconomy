@@ -11,7 +11,7 @@ import org.bukkit.entity.Player;
 
 @CmdExecutor(
         permission = "ultieconomy.deposit",
-        description = "存款到银行",
+        description = "economy.help.deposit",
         alias = {"deposit", "ck"}
 )
 public class DepositCommand extends BaseCommandExecutor {
@@ -30,7 +30,7 @@ public class DepositCommand extends BaseCommandExecutor {
     @CmdTarget(CmdTarget.CmdTargetType.PLAYER)
     public void onDeposit(@CmdSender Player player, @CmdParam("amount") String amountStr) {
         if (!config.isBankEnabled()) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("银行功能未启用"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.bank_disabled"));
             return;
         }
 
@@ -38,33 +38,33 @@ public class DepositCommand extends BaseCommandExecutor {
         try {
             amount = Double.parseDouble(amountStr);
         } catch (NumberFormatException e) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
             return;
         }
 
         if (amount <= 0) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("金额必须大于零"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.amount_not_positive"));
             return;
         }
 
         if (amount < config.getMinDeposit()) {
             String minFormatted = economyService.formatAmount(config.getMinDeposit());
-            player.sendMessage(ChatColor.RED + String.format(plugin.i18n("最低存款金额: %s"), minFormatted));
+            player.sendMessage(ChatColor.RED + String.format(plugin.i18n("economy.deposit.below_minimum"), minFormatted));
             return;
         }
 
         boolean success = economyService.depositToBank(player.getUniqueId(), amount);
         if (success) {
             String formatted = economyService.formatAmount(amount);
-            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("成功存入 %s 到银行"), formatted));
+            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.deposit.success"), formatted));
         } else {
             // Could be insufficient cash or max bank balance exceeded
             double maxBalance = config.getMaxBankBalance();
             double currentBank = economyService.getBank(player.getUniqueId());
             if (maxBalance > 0 && currentBank + amount > maxBalance) {
-                player.sendMessage(ChatColor.RED + plugin.i18n("银行余额已达上限"));
+                player.sendMessage(ChatColor.RED + plugin.i18n("economy.deposit.bank_full"));
             } else {
-                player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+                player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
             }
         }
     }
@@ -80,28 +80,28 @@ public class DepositCommand extends BaseCommandExecutor {
         try {
             amount = Double.parseDouble(amountStr);
         } catch (NumberFormatException e) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
             return;
         }
 
         if (amount <= 0) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("金额必须大于零"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.amount_not_positive"));
             return;
         }
 
         boolean success = economyService.depositToBank(player.getUniqueId(), amount, currencyId);
         if (success) {
             String formatted = economyService.formatAmount(amount, currencyId);
-            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("成功存入 %s 到银行"), formatted));
+            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.deposit.success"), formatted));
         } else {
-            player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
         }
     }
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy Deposit ===");
-        sender.sendMessage(ChatColor.YELLOW + "/deposit <amount>" + ChatColor.GRAY + " - " + plugin.i18n("存款到银行"));
-        sender.sendMessage(ChatColor.YELLOW + "/deposit <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("指定货币存款"));
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.deposit") + " ===");
+        sender.sendMessage(ChatColor.YELLOW + "/deposit <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.deposit"));
+        sender.sendMessage(ChatColor.YELLOW + "/deposit <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.deposit_currency"));
     }
 }

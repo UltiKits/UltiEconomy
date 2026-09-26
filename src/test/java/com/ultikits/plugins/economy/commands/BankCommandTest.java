@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
@@ -36,7 +37,7 @@ class BankCommandTest {
     @BeforeEach
     void setUp() {
         config = new EconomyConfig();
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         command = BankCommand.createForTest(plugin, economyService, config, currencyManager);
     }
@@ -87,7 +88,7 @@ class BankCommandTest {
     void handleHelpShowsCommands() throws Exception {
         @SuppressWarnings("unchecked")
         CommandSender sender = mock(CommandSender.class);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         java.lang.reflect.Method helpMethod = BankCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
         helpMethod.setAccessible(true);
@@ -106,7 +107,7 @@ class BankCommandTest {
             UltiEconomy ultiEconomy = mock(UltiEconomy.class);
             CurrencyManager resolvedCurrencyManager = mock(CurrencyManager.class);
             when(ultiEconomy.getCurrencyManager()).thenReturn(resolvedCurrencyManager);
-            lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             when(resolvedCurrencyManager.resolve("gems"))
                     .thenReturn(CurrencyDefinition.builder().id("gems").build());
             when(economyService.getBank(PLAYER_UUID, "gems")).thenReturn(10.0);

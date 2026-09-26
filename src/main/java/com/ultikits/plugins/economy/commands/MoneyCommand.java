@@ -13,7 +13,7 @@ import org.bukkit.entity.Player;
 
 @CmdExecutor(
         permission = "ultieconomy.money",
-        description = "查看余额",
+        description = "economy.help.money",
         alias = {"money", "bal"}
 )
 public class MoneyCommand extends BaseCommandExecutor {
@@ -60,10 +60,10 @@ public class MoneyCommand extends BaseCommandExecutor {
         String formattedBank = economyService.formatAmount(bank);
         String formattedTotal = economyService.formatAmount(total);
 
-        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " ===");
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的余额: %s"), formattedCash));
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formattedBank));
-        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("总资产: %s"), formattedTotal));
+        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.money.header") + " ===");
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.cash"), formattedCash));
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.bank"), formattedBank));
+        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.money.total"), formattedTotal));
     }
 
     @CmdMapping(format = "<currency>")
@@ -71,7 +71,7 @@ public class MoneyCommand extends BaseCommandExecutor {
     public void onCurrencyBalance(@CmdSender Player player, @CmdParam("currency") String currencyId) {
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
         String resolvedId = currency.getId();
@@ -84,16 +84,16 @@ public class MoneyCommand extends BaseCommandExecutor {
         String formattedBank = economyService.formatAmount(bank, resolvedId);
         String formattedTotal = economyService.formatAmount(total, resolvedId);
 
-        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("经济系统") + " (" + resolvedId + ") ===");
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的余额: %s"), formattedCash));
-        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("你的银行存款: %s"), formattedBank));
-        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("总资产: %s"), formattedTotal));
+        player.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.money.header") + " (" + resolvedId + ") ===");
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.cash"), formattedCash));
+        player.sendMessage(ChatColor.YELLOW + String.format(plugin.i18n("economy.money.bank"), formattedBank));
+        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.money.total"), formattedTotal));
     }
 
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "=== UltiEconomy ===");
-        sender.sendMessage(ChatColor.YELLOW + "/money" + ChatColor.GRAY + " - " + plugin.i18n("查看余额"));
-        sender.sendMessage(ChatColor.YELLOW + "/money <currency>" + ChatColor.GRAY + " - " + plugin.i18n("查看指定货币余额"));
+        sender.sendMessage(ChatColor.YELLOW + "/money" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.money"));
+        sender.sendMessage(ChatColor.YELLOW + "/money <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.money_currency"));
     }
 }

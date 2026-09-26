@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -68,7 +69,7 @@ class InterestServiceTest {
         config = new EconomyConfig();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.emptyList());
         service = InterestService.createForTest(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
     }
@@ -527,13 +528,13 @@ class InterestServiceTest {
     }
 
     /**
-     * How a payment writes (gate-1 review of UltiKits/UltiEconomy#15, findings WR-01, WR-03 and
-     * WR-04). A payment runs on the main thread, so it must credit the rows it already read instead
-     * of looking each one up again; it must respect the bank caps a deposit respects; and it must
-     * tell a player about interest only when the credit was actually written.
+     * How a payment writes (found reviewing UltiKits/UltiEconomy#15). A payment runs on the main
+     * thread, so it must credit the rows it already read instead of looking each one up again; it
+     * must respect the bank caps a deposit respects; and it must tell a player about interest
+     * only when the credit was actually written.
      */
     @Nested
-    @DisplayName("Payment writes (UltiEconomy#15 gate-1)")
+    @DisplayName("Payment writes (UltiEconomy#15)")
     class PaymentWriteTests {
 
         @Test
@@ -647,6 +648,10 @@ class InterestServiceTest {
 
             verify(failingOwner, never()).sendMessage(anyString());
             verify(nextOwner).sendMessage(contains("$300.00"));
+            // The operator reads the failure in the server's language (zh here).
+            String text = CatalogueText.entries("zh").get("economy.log.interest_write_failed");
+            verify(logger).error(text == null ? "<lang/zh.json has no economy.log.interest_write_failed>"
+                    : String.format(text, "write failed"));
             assertThat(next.getBank()).isCloseTo(10300.0, within(1e-6));
         }
 
@@ -672,7 +677,7 @@ class InterestServiceTest {
         }
 
         /**
-         * Maintainer ruling 2026-09-23 ("interest is paid on one wallet only"; UltiKits/UltiEconomy#25):
+         * Interest is paid on one wallet only (UltiKits/UltiEconomy#25):
          * the primary currency is held twice -- the account row every bare command and Vault read
          * (`/bank`, `/money`, `/eco check <player>`, `/deposit <amount>`), and a per-currency row for
          * the primary id created on join. Interest is paid once, on the account row.

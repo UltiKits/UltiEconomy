@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
@@ -34,7 +35,7 @@ class MoneyCommandTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         command = MoneyCommand.createForTest(plugin, economyService, currencyManager);
     }
@@ -102,7 +103,7 @@ class MoneyCommandTest {
     void handleHelpShowsCommands() throws Exception {
         @SuppressWarnings("unchecked")
         CommandSender sender = mock(CommandSender.class);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         java.lang.reflect.Method helpMethod = MoneyCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
         helpMethod.setAccessible(true);
@@ -121,7 +122,7 @@ class MoneyCommandTest {
             UltiEconomy ultiEconomy = mock(UltiEconomy.class);
             CurrencyManager resolvedCurrencyManager = mock(CurrencyManager.class);
             when(ultiEconomy.getCurrencyManager()).thenReturn(resolvedCurrencyManager);
-            lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            lenient().when(ultiEconomy.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             when(resolvedCurrencyManager.resolve("gems"))
                     .thenReturn(CurrencyDefinition.builder().id("gems").build());
             when(economyService.getCash(PLAYER_UUID, "gems")).thenReturn(10.0);
@@ -196,7 +197,7 @@ class MoneyCommandTest {
         }
 
         @Test
-        @DisplayName("A padded but otherwise valid identifier resolves the same currency (WR-02)")
+        @DisplayName("A padded but otherwise valid identifier resolves the same currency")
         void aPaddedButOtherwiseValidIdentifierResolvesTheSameCurrency() {
             lenient().when(currencyManager.resolve(" gems "))
                     .thenReturn(CurrencyDefinition.builder().id("gems").build());

@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
@@ -39,7 +40,7 @@ class NoteCommandTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(player.getName()).thenReturn("TestPlayer");
         lenient().when(player.getInventory()).thenReturn(inventory);
@@ -238,7 +239,7 @@ class NoteCommandTest {
     void handleHelpShowsCommands() throws Exception {
         @SuppressWarnings("unchecked")
         CommandSender sender = mock(CommandSender.class);
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         java.lang.reflect.Method helpMethod = NoteCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
         helpMethod.setAccessible(true);

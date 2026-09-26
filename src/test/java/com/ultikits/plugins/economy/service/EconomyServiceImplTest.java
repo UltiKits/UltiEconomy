@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -61,6 +62,8 @@ class EconomyServiceImplTest {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
         service = EconomyServiceImpl.createForTest(plugin, dataOperator, config, currencyDataOperator, currencyManager);
+        // Console lines come from the module's catalogue; answer from the real zh one.
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
     }
 
     private void mockQueryReturns(UUID uuid, PlayerAccountEntity account) {
@@ -773,9 +776,11 @@ class EconomyServiceImplTest {
             PlayerAccountEntity account = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
             mockQueryReturns(PLAYER_UUID, account);
             doThrow(new IllegalAccessException("test")).when(dataOperator).update(any());
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
             assertThat(service.setCash(PLAYER_UUID, 2000)).isFalse();
-            verify(logger).error(anyString());
+            // The operator reads this line in the server's language (zh here).
+            verify(logger).error(String.format(zhText("economy.log.account_update_failed"), "test"));
         }
     }
 
@@ -1203,9 +1208,11 @@ class EconomyServiceImplTest {
                     .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
             mockCurrencyQueryReturns(PLAYER_UUID, "gems", balance);
             doThrow(new IllegalAccessException("test")).when(currencyDataOperator).update(any());
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
             assertThat(service.setCash(PLAYER_UUID, 500.0, "gems")).isFalse();
-            verify(logger).error(anyString());
+            // The operator reads this line in the server's language (zh here).
+            verify(logger).error(String.format(zhText("economy.log.balance_update_failed"), "test"));
         }
 
         @Test
@@ -1326,5 +1333,11 @@ class EconomyServiceImplTest {
                     .thenReturn(Collections.singletonList(sender))
                     .thenReturn(Collections.singletonList(receiver));
         }
+    }
+
+    /** The zh text for {@code key}, or a marker naming the missing key. */
+    private static String zhText(String key) {
+        String text = CatalogueText.entries("zh").get(key);
+        return text == null ? "<lang/zh.json has no " + key + ">" : text;
     }
 }

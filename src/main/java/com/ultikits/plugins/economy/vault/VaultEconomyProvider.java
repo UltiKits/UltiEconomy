@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy.vault;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
@@ -17,15 +18,21 @@ import java.util.List;
  * resolve player names to UUIDs without Bukkit dependency in this class.
  * Vault's "bank" methods (shared/guild banks) are NOT_IMPLEMENTED — UltiEconomy's
  * bank feature is per-player, exposed through our own commands, not through Vault.
+ * <p>
+ * A failed response's error message is looked up in the module's catalogue: shop and sign plugins
+ * show it to the player, so it follows the server's language. The deprecated name-based methods keep
+ * a fixed English message, since only a plugin developer ever reads it.
  */
 public class VaultEconomyProvider implements Economy {
 
     private final EconomyService economyService;
     private final EconomyConfig config;
+    private final UltiToolsPlugin plugin;
 
-    public VaultEconomyProvider(EconomyService economyService, EconomyConfig config) {
+    public VaultEconomyProvider(EconomyService economyService, EconomyConfig config, UltiToolsPlugin plugin) {
         this.economyService = economyService;
         this.config = config;
+        this.plugin = plugin;
     }
 
     @Override
@@ -163,14 +170,14 @@ public class VaultEconomyProvider implements Economy {
     @Override
     public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount) {
         if (amount < 0) {
-            return new EconomyResponse(amount, 0, ResponseType.FAILURE, "Cannot withdraw negative amount");
+            return new EconomyResponse(amount, 0, ResponseType.FAILURE, plugin.i18n("economy.vault.negative_withdraw"));
         }
         boolean success = economyService.takeCash(player.getUniqueId(), amount);
         double balance = economyService.getCash(player.getUniqueId());
         if (success) {
             return new EconomyResponse(amount, balance, ResponseType.SUCCESS, "");
         }
-        return new EconomyResponse(amount, balance, ResponseType.FAILURE, "Insufficient funds");
+        return new EconomyResponse(amount, balance, ResponseType.FAILURE, plugin.i18n("economy.vault.insufficient_funds"));
     }
 
     @Override
@@ -195,14 +202,14 @@ public class VaultEconomyProvider implements Economy {
     @Override
     public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
         if (amount < 0) {
-            return new EconomyResponse(amount, 0, ResponseType.FAILURE, "Cannot deposit negative amount");
+            return new EconomyResponse(amount, 0, ResponseType.FAILURE, plugin.i18n("economy.vault.negative_deposit"));
         }
         boolean success = economyService.addCash(player.getUniqueId(), amount);
         double balance = economyService.getCash(player.getUniqueId());
         if (success) {
             return new EconomyResponse(amount, balance, ResponseType.SUCCESS, "");
         }
-        return new EconomyResponse(amount, balance, ResponseType.FAILURE, "Deposit failed");
+        return new EconomyResponse(amount, balance, ResponseType.FAILURE, plugin.i18n("economy.vault.deposit_failed"));
     }
 
     @Override
@@ -226,7 +233,7 @@ public class VaultEconomyProvider implements Economy {
     // ========================
 
     private EconomyResponse notImplemented() {
-        return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, "UltiEconomy does not support Vault shared banks");
+        return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, plugin.i18n("economy.vault.no_shared_banks"));
     }
 
     @Override

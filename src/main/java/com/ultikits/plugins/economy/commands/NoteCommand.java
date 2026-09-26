@@ -15,7 +15,7 @@ import org.bukkit.inventory.ItemStack;
 
 @CmdExecutor(
         permission = "ultieconomy.note",
-        description = "创建/兑换纸币",
+        description = "economy.command.note.description",
         alias = {"note"}
 )
 public class NoteCommand extends BaseCommandExecutor {
@@ -63,14 +63,14 @@ public class NoteCommand extends BaseCommandExecutor {
 
         String currencyId = economyService.getPrimaryCurrencyId();
         if (!economyService.takeCash(player.getUniqueId(), amount)) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
             return;
         }
 
         ItemStack note = noteFactory.createNote(currencyId, amount, player.getUniqueId(), player.getName());
         player.getInventory().addItem(note);
         String formatted = economyService.formatAmount(amount);
-        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("纸币已创建: %s"), formatted));
+        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.note.created"), formatted));
     }
 
     @CmdMapping(format = "<amount> <currency>")
@@ -84,20 +84,20 @@ public class NoteCommand extends BaseCommandExecutor {
 
         CurrencyDefinition currency = currencyManager.resolve(currencyId);
         if (currency == null) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("货币不存在"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.currency_not_found"));
             return;
         }
         String resolvedId = currency.getId();
 
         if (!economyService.takeCash(player.getUniqueId(), amount, resolvedId)) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("余额不足"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
             return;
         }
 
         ItemStack note = noteFactory.createNote(resolvedId, amount, player.getUniqueId(), player.getName());
         player.getInventory().addItem(note);
         String formatted = economyService.formatAmount(amount, resolvedId);
-        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("纸币已创建: %s"), formatted));
+        player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.note.created"), formatted));
     }
 
     @CmdMapping(format = "redeem")
@@ -105,7 +105,7 @@ public class NoteCommand extends BaseCommandExecutor {
     public void onRedeem(@CmdSender Player player) {
         ItemStack held = player.getInventory().getItemInMainHand();
         if (!noteFactory.isMoneyNote(held)) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("手中没有纸币"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.note.not_holding"));
             return;
         }
 
@@ -126,28 +126,28 @@ public class NoteCommand extends BaseCommandExecutor {
                 player.getInventory().setItemInMainHand(null);
             }
             String formatted = economyService.formatAmount(value, currencyId);
-            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("纸币已兑换: %s"), formatted));
+            player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.note.redeemed"), formatted));
         }
     }
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== Money Notes ===");
-        sender.sendMessage(ChatColor.YELLOW + "/note <amount>" + ChatColor.GRAY + " - " + plugin.i18n("创建纸币"));
-        sender.sendMessage(ChatColor.YELLOW + "/note <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("创建指定货币纸币"));
-        sender.sendMessage(ChatColor.YELLOW + "/note redeem" + ChatColor.GRAY + " - " + plugin.i18n("兑换手中纸币"));
+        sender.sendMessage(ChatColor.GOLD + "=== " + plugin.i18n("economy.help.header.notes") + " ===");
+        sender.sendMessage(ChatColor.YELLOW + "/note <amount>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_create"));
+        sender.sendMessage(ChatColor.YELLOW + "/note <amount> <currency>" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_create_currency"));
+        sender.sendMessage(ChatColor.YELLOW + "/note redeem" + ChatColor.GRAY + " - " + plugin.i18n("economy.help.note_redeem"));
     }
 
     private double parseAmount(Player player, String amountStr) {
         try {
             double amount = Double.parseDouble(amountStr);
             if (amount <= 0) {
-                player.sendMessage(ChatColor.RED + plugin.i18n("金额必须大于零"));
+                player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.amount_not_positive"));
                 return -1;
             }
             return amount;
         } catch (NumberFormatException e) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("无效的金额"));
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.invalid_amount"));
             return -1;
         }
     }

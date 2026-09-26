@@ -73,7 +73,7 @@ public class NoteRedeemListener implements Listener {
             }
             String formatted = economyService.formatAmount(value, currencyId);
             player.sendMessage(ChatColor.GREEN + String.format(
-                    plugin.i18n("纸币已兑换: %s"), formatted));
+                    plugin.i18n("economy.note.redeemed"), formatted));
         }
 
         event.setCancelled(true);

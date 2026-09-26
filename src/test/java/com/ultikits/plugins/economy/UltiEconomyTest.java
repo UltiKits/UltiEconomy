@@ -119,7 +119,7 @@ class UltiEconomyTest {
         void onUnregisterUnregistersVaultProvider() throws Exception {
             UltiEconomy module = allocateModule();
             VaultEconomyProvider provider = new VaultEconomyProvider(
-                    mock(EconomyService.class), mock(EconomyConfig.class));
+                    mock(EconomyService.class), mock(EconomyConfig.class), mock(UltiToolsPlugin.class));
             setVaultProvider(module, provider);
             ServicesManager servicesManager = mock(ServicesManager.class);
 

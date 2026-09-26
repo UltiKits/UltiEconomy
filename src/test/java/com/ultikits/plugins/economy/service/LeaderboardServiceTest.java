@@ -403,9 +403,9 @@ class LeaderboardServiceTest {
         }
 
         /**
-         * The refresh runs on the main thread every 60 seconds. Gate-1 review (WR-01): with two
-         * configured currencies it read the accounts table three times and the balances table twice
-         * per run. One read of each is enough.
+         * The refresh runs on the main thread every 60 seconds. With two configured currencies it
+         * read the accounts table three times and the balances table twice per run. One read of
+         * each is enough.
          */
         @Test
         @DisplayName("a scheduled run reads each table once, however many currencies are configured")
