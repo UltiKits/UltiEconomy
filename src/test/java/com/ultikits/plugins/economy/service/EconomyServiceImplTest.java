@@ -49,6 +49,14 @@ class EconomyServiceImplTest {
             "    min-deposit: 100.0\n" +
             "    max-bank-balance: -1\n" +
             "    primary: true\n" +
+            "  gold:\n" +
+            "    display-name: 'Gold'\n" +
+            "    symbol: 'Au'\n" +
+            "    initial-cash: 0.0\n" +
+            "    bank-enabled: true\n" +
+            "    min-deposit: 100.0\n" +
+            "    max-bank-balance: -1\n" +
+            "    primary: false\n" +
             "  gems:\n" +
             "    display-name: 'Gems'\n" +
             "    symbol: 'G'\n" +
@@ -814,13 +822,13 @@ class EconomyServiceImplTest {
         void getBankWithCurrency() {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                     .uuid(PLAYER_UUID.toString())
-                    .currencyId("coins")
+                    .currencyId("gold")
                     .cash(100.0)
                     .bank(500.0)
                     .build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.getBank(PLAYER_UUID, "coins")).isEqualTo(500.0);
+            assertThat(service.getBank(PLAYER_UUID, "gold")).isEqualTo(500.0);
         }
 
         @Test
@@ -882,10 +890,10 @@ class EconomyServiceImplTest {
         @DisplayName("getTotalWealth with currencyId")
         void getTotalWealthCurrency() {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(300.0).bank(700.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(300.0).bank(700.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.getTotalWealth(PLAYER_UUID, "coins")).isEqualTo(1000.0);
+            assertThat(service.getTotalWealth(PLAYER_UUID, "gold")).isEqualTo(1000.0);
         }
 
         @Test
@@ -956,10 +964,10 @@ class EconomyServiceImplTest {
         @DisplayName("depositToBank with currencyId")
         void depositToBankCurrency() throws Exception {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(1000.0).bank(500.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(1000.0).bank(500.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.depositToBank(PLAYER_UUID, 300.0, "coins")).isTrue();
+            assertThat(service.depositToBank(PLAYER_UUID, 300.0, "gold")).isTrue();
             assertThat(balance.getCash()).isEqualTo(700.0);
             assertThat(balance.getBank()).isEqualTo(800.0);
         }
@@ -968,10 +976,10 @@ class EconomyServiceImplTest {
         @DisplayName("withdrawFromBank with currencyId")
         void withdrawFromBankCurrency() throws Exception {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(500.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(500.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "coins")).isTrue();
+            assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "gold")).isTrue();
             assertThat(balance.getCash()).isEqualTo(300.0);
             assertThat(balance.getBank()).isEqualTo(300.0);
         }
@@ -980,10 +988,10 @@ class EconomyServiceImplTest {
         @DisplayName("setBank with currencyId updates bank balance")
         void setBankWithCurrency() throws Exception {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(200.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(200.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.setBank(PLAYER_UUID, 800.0, "coins")).isTrue();
+            assertThat(service.setBank(PLAYER_UUID, 800.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(800.0);
             verify(currencyDataOperator).update(balance);
         }
@@ -992,10 +1000,10 @@ class EconomyServiceImplTest {
         @DisplayName("addBank with currencyId increases bank balance")
         void addBankWithCurrency() throws Exception {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(300.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(300.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.addBank(PLAYER_UUID, 200.0, "coins")).isTrue();
+            assertThat(service.addBank(PLAYER_UUID, 200.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(500.0);
             verify(currencyDataOperator).update(balance);
         }
@@ -1004,10 +1012,10 @@ class EconomyServiceImplTest {
         @DisplayName("takeBank with currencyId decreases bank balance")
         void takeBankWithCurrency() throws Exception {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(500.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(500.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.takeBank(PLAYER_UUID, 200.0, "coins")).isTrue();
+            assertThat(service.takeBank(PLAYER_UUID, 200.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(300.0);
             verify(currencyDataOperator).update(balance);
         }
@@ -1016,30 +1024,30 @@ class EconomyServiceImplTest {
         @DisplayName("takeBank with currencyId fails on insufficient funds")
         void takeBankInsufficientCurrency() {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(50.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(50.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.takeBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+            assertThat(service.takeBank(PLAYER_UUID, 200.0, "gold")).isFalse();
         }
 
         @Test
         @DisplayName("depositToBank with currencyId fails on insufficient cash")
         void depositToBankCurrencyInsufficient() {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(50.0).bank(0.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(50.0).bank(0.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.depositToBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+            assertThat(service.depositToBank(PLAYER_UUID, 200.0, "gold")).isFalse();
         }
 
         @Test
         @DisplayName("withdrawFromBank with currencyId fails on insufficient bank")
         void withdrawFromBankCurrencyInsufficient() {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
-                    .uuid(PLAYER_UUID.toString()).currencyId("coins").cash(100.0).bank(50.0).build();
-            mockCurrencyQueryReturns(PLAYER_UUID, "coins", balance);
+                    .uuid(PLAYER_UUID.toString()).currencyId("gold").cash(100.0).bank(50.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gold", balance);
 
-            assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "coins")).isFalse();
+            assertThat(service.withdrawFromBank(PLAYER_UUID, 200.0, "gold")).isFalse();
         }
 
         @Test
@@ -1164,8 +1172,8 @@ class EconomyServiceImplTest {
         @Test
         @DisplayName("depositToBank with currencyId refuses an amount below the currency's minimum deposit")
         void depositToBankCurrencyRejectsBelowMinDeposit() {
-            // "coins" requires min-deposit: 100.0 in CURRENCIES_YAML.
-            boolean result = service.depositToBank(PLAYER_UUID, 50.0, "coins");
+            // "gold" requires min-deposit: 100.0 in CURRENCIES_YAML.
+            boolean result = service.depositToBank(PLAYER_UUID, 50.0, "gold");
 
             assertThat(result).isFalse();
             verifyNoInteractions(currencyDataOperator);
@@ -1176,13 +1184,15 @@ class EconomyServiceImplTest {
         void depositToBankCurrencyRejectsAboveMaxBalance() {
             String cappedYaml =
                     "currencies:\n" +
+                    "  coins:\n" +
+                    "    primary: true\n" +
                     "  capped:\n" +
                     "    display-name: 'Capped'\n" +
                     "    symbol: 'C'\n" +
                     "    bank-enabled: true\n" +
                     "    min-deposit: 0.0\n" +
                     "    max-bank-balance: 1000.0\n" +
-                    "    primary: true\n";
+                    "    primary: false\n";
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(cappedYaml));
             CurrencyManager cappedManager = new CurrencyManager(yaml);
             EconomyServiceImpl cappedService =

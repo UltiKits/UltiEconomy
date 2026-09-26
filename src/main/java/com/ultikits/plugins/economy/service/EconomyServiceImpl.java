@@ -66,7 +66,11 @@ public class EconomyServiceImpl implements EconomyService {
         this.taxService = taxService;
     }
 
-    // --- Legacy single-currency methods (delegate to primary) ---
+    // --- Account-wallet methods ---
+    // The primary currency's one and only wallet: the account row (table economy_accounts) that
+    // Vault, /money, /pay, /bank and /eco use. The currency-aware methods below route the primary
+    // currency's id here, so the primary currency is never kept anywhere else
+    // (UltiKits/UltiEconomy#25).
 
     @Override
     public PlayerAccountEntity getAccount(UUID playerUuid) {
@@ -269,9 +273,38 @@ public class EconomyServiceImpl implements EconomyService {
     }
 
     // --- Currency-aware methods ---
+    // A non-primary currency keeps its own row in currency_balances. The primary currency's id is
+    // routed to the account-wallet methods above, whichever path names it (/money coins,
+    // /pay ... coins, /eco ... coins, /note ... coins, %ultieconomy_coins_*%), so the primary
+    // currency has exactly one wallet. Its limits come from config.yml (maintainer decision
+    // 2026-09-24, UltiKits/UltiEconomy#25).
+
+    /** Whether {@code currencyId} names the primary currency, whose one wallet is the account row. */
+    private boolean isPrimary(String currencyId) {
+        return currencyManager != null && currencyManager.getPrimaryCurrencyId().equals(currencyId);
+    }
+
+    /**
+     * The primary currency's balance as a detached snapshot of the account row, or null when the
+     * player has no account. Writing to the returned object changes nothing; use the service methods.
+     */
+    private static CurrencyBalanceEntity accountView(PlayerAccountEntity account, String currencyId) {
+        if (account == null) {
+            return null;
+        }
+        return CurrencyBalanceEntity.builder()
+                .uuid(account.getUuid())
+                .currencyId(currencyId)
+                .cash(account.getCash())
+                .bank(account.getBank())
+                .build();
+    }
 
     @Override
     public CurrencyBalanceEntity getBalance(UUID playerUuid, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return accountView(getAccount(playerUuid), currencyId);
+        }
         List<CurrencyBalanceEntity> results = currencyDataOperator.query()
                 .where("uuid").eq(playerUuid.toString())
                 .and("currency_id").eq(currencyId)
@@ -281,6 +314,10 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public CurrencyBalanceEntity getOrCreateBalance(UUID playerUuid, String playerName, String currencyId) {
+        if (isPrimary(currencyId)) {
+            // Never a second primary-currency row: the account, created with config.yml's initial-cash.
+            return accountView(getOrCreateAccount(playerUuid, playerName), currencyId);
+        }
         CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
         if (balance != null) {
             return balance;
@@ -304,29 +341,44 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean hasBalance(UUID playerUuid, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return hasAccount(playerUuid);
+        }
         return getBalance(playerUuid, currencyId) != null;
     }
 
     @Override
     public double getCash(UUID playerUuid, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return getCash(playerUuid);
+        }
         CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
         return balance != null ? balance.getCash() : 0.0;
     }
 
     @Override
     public double getBank(UUID playerUuid, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return getBank(playerUuid);
+        }
         CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
         return balance != null ? balance.getBank() : 0.0;
     }
 
     @Override
     public double getTotalWealth(UUID playerUuid, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return getTotalWealth(playerUuid);
+        }
         CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
         return balance != null ? balance.getTotalWealth() : 0.0;
     }
 
     @Override
     public boolean setCash(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return setCash(playerUuid, amount);
+        }
         if (amount < 0) {
             return false;
         }
@@ -340,6 +392,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setBank(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return setBank(playerUuid, amount);
+        }
         if (amount < 0) {
             return false;
         }
@@ -353,6 +408,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addCash(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return addCash(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }
@@ -366,6 +424,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addBank(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return addBank(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }
@@ -379,6 +440,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeCash(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return takeCash(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }
@@ -392,6 +456,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeBank(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return takeBank(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }
@@ -405,6 +472,9 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean transfer(UUID from, UUID to, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            return transfer(from, to, amount);
+        }
         if (amount <= 0 || from.equals(to)) {
             return false;
         }
@@ -440,6 +510,11 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean depositToBank(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            // config.yml governs the primary currency: bank.enabled here, bank.min-deposit and
+            // bank.max-balance in depositToBank(UUID, double).
+            return config.isBankEnabled() && depositToBank(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }
@@ -469,6 +544,10 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId) {
+        if (isPrimary(currencyId)) {
+            // config.yml's bank.enabled governs the primary currency, as /withdraw <amount> applies it.
+            return config.isBankEnabled() && withdrawFromBank(playerUuid, amount);
+        }
         if (amount <= 0) {
             return false;
         }

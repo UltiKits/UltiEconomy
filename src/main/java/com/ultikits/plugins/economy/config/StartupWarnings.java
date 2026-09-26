@@ -1,7 +1,9 @@
 package com.ultikits.plugins.economy.config;
 
+import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
+import org.bukkit.configuration.ConfigurationSection;
 
 /**
  * Warnings this module logs once per boot about settings whose effect changed in 6.3.0.
@@ -24,6 +26,9 @@ public final class StartupWarnings {
 
     /** The module name each warning names. */
     private static final String MODULE = "UltiEconomy";
+
+    /** The file that defines the currencies, relative to the module's config folder. */
+    private static final String CURRENCIES_FILE = "config/currencies.yml";
 
     /** This module's runtime name, which is what {@code /ul reload <name>} expects. */
     private static final String RUNTIME_NAME = "UltiTools-Economy";
@@ -51,12 +56,65 @@ public final class StartupWarnings {
             String capText = cap > 0
                     ? String.format(plugin.i18n("economy.warn.interest_cap"), cap)
                     : String.format(plugin.i18n("economy.warn.interest_no_cap"), cap);
-            logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled"),
+            logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled_one_wallet"),
                     MODULE, file, config.getInterestInterval(), config.getInterestRate(), capText, file,
                     RUNTIME_NAME));
         }
         if (!config.isTaxEnabled()) {
             logger.warn(String.format(plugin.i18n("economy.warn.tax_disabled"), MODULE, file, file, RUNTIME_NAME));
         }
+    }
+
+    /**
+     * Logs one warning for each money setting of the primary currency that {@code currencies.yml}
+     * sets to a value different from {@code config.yml} (UltiKits/UltiEconomy#25). The primary
+     * currency has one wallet, the account, and {@code config.yml} governs it (maintainer decision
+     * 2026-09-24), so the {@code currencies.yml} value has no effect; the warning names both files,
+     * both keys and both values. A setting {@code currencies.yml} does not contain is not reported.
+     *
+     * @param config     the module's configuration; may be null, in which case nothing is reported
+     * @param currencies the currency definitions; may be null, in which case nothing is reported
+     * @param logger     the module's logger; may be null, in which case nothing is reported
+     * @param plugin     the module, for its catalogue; may be null, in which case nothing is reported
+     */
+    public static void logPrimaryCurrencyConflicts(EconomyConfig config, CurrencyManager currencies,
+                                                   PluginLogger logger, UltiToolsPlugin plugin) {
+        if (config == null || currencies == null || logger == null || plugin == null
+                || currencies.getPrimarySection() == null) {
+            return;
+        }
+        ConfigurationSection primary = currencies.getPrimarySection();
+        String prefix = "currencies." + currencies.getPrimaryCurrencyId() + ".";
+        String file = config.getConfigFilePath();
+        if (primary.contains("initial-cash") && Double.compare(primary.getDouble("initial-cash"), config.getInitialCash()) != 0) {
+            warnConflict(logger, plugin, prefix + "initial-cash", String.valueOf(primary.getDouble("initial-cash")),
+                    file, "initial-cash", String.valueOf(config.getInitialCash()));
+        }
+        if (primary.contains("bank-enabled") && primary.getBoolean("bank-enabled") != config.isBankEnabled()) {
+            warnConflict(logger, plugin, prefix + "bank-enabled", String.valueOf(primary.getBoolean("bank-enabled")),
+                    file, "bank.enabled", String.valueOf(config.isBankEnabled()));
+        }
+        if (primary.contains("min-deposit") && Double.compare(primary.getDouble("min-deposit"), config.getMinDeposit()) != 0) {
+            warnConflict(logger, plugin, prefix + "min-deposit", String.valueOf(primary.getDouble("min-deposit")),
+                    file, "bank.min-deposit", String.valueOf(config.getMinDeposit()));
+        }
+        // Every reader treats a cap of 0 or below as "no cap", so 0 and -1 agree.
+        if (primary.contains("max-bank-balance")
+                && Double.compare(cap(primary.getDouble("max-bank-balance")), cap(config.getMaxBankBalance())) != 0) {
+            warnConflict(logger, plugin, prefix + "max-bank-balance", String.valueOf(primary.getDouble("max-bank-balance")),
+                    file, "bank.max-balance", String.valueOf(config.getMaxBankBalance()));
+        }
+    }
+
+    /** A bank cap as every reader applies it: a value of 0 or below means "no cap". */
+    private static double cap(double maxBalance) {
+        return maxBalance > 0 ? maxBalance : -1;
+    }
+
+    private static void warnConflict(PluginLogger logger, UltiToolsPlugin plugin, String currenciesKey,
+                                     String currenciesValue, String configFile, String configKey, String configValue) {
+        logger.warn(String.format(plugin.i18n("economy.warn.primary_currency_setting"),
+                MODULE, CURRENCIES_FILE, currenciesKey, currenciesValue, configFile, configKey, configValue,
+                currenciesKey, CURRENCIES_FILE));
     }
 }

@@ -10,6 +10,7 @@ public class CurrencyManager {
 
     private final Map<String, CurrencyDefinition> currencies = new LinkedHashMap<>();
     private final String primaryCurrencyId;
+    private final ConfigurationSection primarySection;
 
     public CurrencyManager(YamlConfiguration yaml) {
         ConfigurationSection section = yaml.getConfigurationSection("currencies");
@@ -18,6 +19,7 @@ public class CurrencyManager {
         }
 
         String foundPrimary = null;
+        ConfigurationSection foundSection = null;
         for (String id : section.getKeys(false)) {
             ConfigurationSection cs = section.getConfigurationSection(id);
             if (cs == null) continue;
@@ -39,6 +41,7 @@ public class CurrencyManager {
                     throw new IllegalStateException("Multiple primary currencies: " + foundPrimary + " and " + id);
                 }
                 foundPrimary = id;
+                foundSection = cs;
             }
         }
 
@@ -46,6 +49,17 @@ public class CurrencyManager {
             throw new IllegalStateException("No primary currency defined in currencies.yml");
         }
         this.primaryCurrencyId = foundPrimary;
+        this.primarySection = foundSection;
+    }
+
+    /**
+     * The primary currency's own block of {@code currencies.yml}, as the file wrote it -- so a caller
+     * can tell a key the operator set from one left out. Only its {@code display-name} and
+     * {@code symbol} are read for the primary currency; its money settings come from
+     * {@code config.yml} (UltiKits/UltiEconomy#25).
+     */
+    public ConfigurationSection getPrimarySection() {
+        return primarySection;
     }
 
     public CurrencyDefinition getCurrency(String id) {

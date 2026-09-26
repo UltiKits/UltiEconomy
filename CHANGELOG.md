@@ -94,6 +94,73 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   本模块每次启动都会记录一条 WARNING 说明这一点。若要继续对转账征税，请设置 `tax.enabled: true` 并执行
   `/ul reload UltiTools-Economy`；该开关在每次转账时读取。声明默认值现为 `true`，只影响尚未包含该键的文件。
 
+- **The primary currency now has one wallet** (UltiKits/UltiEconomy#25). Since 2.0.0 every player
+  also had a second primary-currency wallet, credited with its own starting amount when they first
+  joined. The commands and placeholders that name the currency — `/money coins`, `/bank coins`,
+  `/pay <player> <amount> coins`, `/deposit <amount> coins`, `/withdraw <amount> coins`,
+  `/eco give|take|set|check <player> … coins`, `/note <amount> coins`, `%ultieconomy_coins_*%` and the
+  `coins` leaderboard — used that second wallet, while Vault, `/money`, `/pay` and `/bank` used the
+  account wallet. All of them now use the account wallet, and a player joining for the first time is
+  given `initial-cash` once. The primary currency's starting cash, bank switch (for deposits and
+  withdrawals alike), minimum deposit and maximum bank balance are read from `config/config.yml`; the primary entry's `initial-cash`,
+  `bank-enabled`, `min-deposit` and `max-bank-balance` in `config/currencies.yml` are no longer read
+  (its `display-name` and `symbol` still are). Every other currency keeps its own wallet.
+- **主货币现在只有一个钱包**（UltiKits/UltiEconomy#25）。自 2.0.0 起，每位玩家还有第二个主货币钱包，首次进服时按其自身的
+  初始金额入账。带货币名的命令与占位符——`/money coins`、`/bank coins`、`/pay <玩家> <金额> coins`、`/deposit <金额> coins`、
+  `/withdraw <金额> coins`、`/eco give|take|set|check <玩家> … coins`、`/note <金额> coins`、`%ultieconomy_coins_*%` 以及
+  `coins` 排行榜——使用的是这第二个钱包，而 Vault、`/money`、`/pay`、`/bank` 使用账户钱包。现在它们全部使用账户钱包，
+  新玩家首次进服只获得一次 `initial-cash`。主货币的初始金额、银行开关（存款与取款都受其约束）、最低存款与银行上限读取 `config/config.yml`；
+  `config/currencies.yml` 中主货币条目的 `initial-cash`、`bank-enabled`、`min-deposit`、`max-bank-balance` 不再被读取
+  （其 `display-name` 与 `symbol` 仍被读取）。其他货币仍各自拥有独立的钱包。
+
+- **Upgrade consequence — the second wallet is merged once** (UltiKits/UltiEconomy#25). On the first
+  start after upgrading, before anything can read or move a balance, each player's second
+  primary-currency wallet is added to their account wallet — its cash to their cash, its bank balance
+  to their bank balance — and then removed. The server log gets one line per merged player with the
+  amounts and the new balances, and one total line. A later start finds nothing to merge. Nobody's
+  balance goes down: an amount below zero in a second wallet (which no command of this module can
+  produce) is not taken from the account, and is logged. A merged bank balance may end above
+  `bank.max-balance`; deposits and interest then stop at the cap as before. **Known trade-off:** the
+  starting amount 2.0.0 credited a second time stays in circulation — on a 103-player test server,
+  103,588.95 was merged, 101,000 of it untouched duplicated starting amounts. If storage fails during
+  the merge, the module does not start (so no balance changes); fix storage and restart, and the merge
+  resumes without adding anything twice. Stopping the server at any point during the merge is safe on
+  SQLite and MySQL; on JSON storage it is safe too, except that a stop while a player's file is being
+  rewritten can leave that one file unreadable, which the JSON storage risks at every save. **Servers that
+  share one database** can be started together: one of them runs the merge — it takes a claim, a row
+  in a new table `economy_wallet_merge_claim` that it removes when the merge is done — and the others
+  wait for it, logging every 10 seconds that they are waiting, then start without merging anything
+  again. If the server running the merge stops in the middle, the next one takes the claim over
+  after 30 seconds and finishes the merge without adding anything twice. Stop every server still
+  running 2.0.0 before starting the first upgraded one, and never run 2.0.0 against that database
+  again — a 2.0.0 server gives each joining player a new second wallet, which the next start would
+  merge as more money, and it takes no part in the claim. JSON storage cannot be shared by two
+  servers at all (each keeps its own copy of the records). While a player's merge is in progress,
+  their second-wallet rows carry a `currency_id` starting with `~merging-into-account.marker:`, which
+  no currency can have (a `.` in a `currencies.yml` key nests the key).
+- **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
+  第二个主货币钱包会并入其账户钱包——现金并入现金，存款并入存款——随后删除。服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），
+  并记录一行总计。之后的启动不会再合并任何内容。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
+  并会记入日志。合并后的存款可能高于 `bank.max-balance`；此后存款与利息照旧在上限处停止。**已知取舍：** 2.0.0 重复发放的初始金额会继续流通——
+  在一台 103 名玩家的测试服务器上，共并入 103,588.95，其中 101,000 是从未动用的重复初始金额。若合并过程中存储出错，模块不会启动
+  （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。使用 SQLite 与 MySQL 时，
+  在合并过程中的任何时刻停止服务器都是安全的；使用 JSON 存储时同样安全，只是在某个玩家的文件正被改写时停止，可能使该文件无法读取——
+  这是 JSON 存储每次保存都存在的风险。**多台服务器共用一个数据库时**可以同时启动：其中一台执行合并——它先取得认领，即新表
+  `economy_wallet_merge_claim` 中的一行，合并完成后由它删除——其余服务器等待它完成（每 10 秒记录一次正在等待），随后启动且不再重复合并。
+  若执行合并的服务器中途停止，下一台服务器会在 30 秒后接手认领并完成合并，不会重复并入。启动第一台升级后的服务器之前，
+  请停止所有仍在运行 2.0.0 的服务器，此后也不要再让 2.0.0 连接该数据库——2.0.0 服务器会给每位进服玩家新建一个第二钱包，
+  下次启动时会被当作更多的钱并入，而且它不参与认领。JSON 存储根本无法由两台服务器共用（每台服务器各自保留一份记录副本）。
+  某位玩家的合并进行期间，其第二钱包记录的 `currency_id` 以 `~merging-into-account.marker:` 开头；任何货币都不可能使用这样的 ID
+  （`currencies.yml` 中键名里的 `.` 会使该键成为嵌套键）。
+
+- When `config/currencies.yml` gives the primary currency an `initial-cash`, `bank-enabled`,
+  `min-deposit` or `max-bank-balance` different from `config/config.yml`'s `initial-cash`,
+  `bank.enabled`, `bank.min-deposit` or `bank.max-balance`, a WARNING at startup names both files,
+  both keys and both values, and says that the `config.yml` value applies (UltiKits/UltiEconomy#25).
+- 当 `config/currencies.yml` 中主货币的 `initial-cash`、`bank-enabled`、`min-deposit` 或 `max-bank-balance` 与
+  `config/config.yml` 的 `initial-cash`、`bank.enabled`、`bank.min-deposit` 或 `bank.max-balance` 不一致时，启动时会记录一条
+  WARNING，写明两个文件、两个键与两个值，并说明以 `config.yml` 的值为准（UltiKits/UltiEconomy#25）。
+
 ### Removed
 
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen

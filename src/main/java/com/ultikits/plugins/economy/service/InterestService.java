@@ -106,9 +106,11 @@ public class InterestService {
      * <p>Which balances earn interest: the primary currency's bank balance on the account row
      * ({@link PlayerAccountEntity}, what {@code /bank}, {@code /money}, {@code /eco check} and Vault
      * show), once per player; and the bank balance of every other currency whose
-     * {@code bank-enabled} is true. The per-currency row this module also keeps for the primary
-     * currency (UltiKits/UltiEconomy#25) earns nothing, so a player is paid once for the primary
-     * currency and the per-payment cap is {@code interest.max-interest}, not twice it.
+     * {@code bank-enabled} is true. The account row is the primary currency's only wallet
+     * (UltiKits/UltiEconomy#25): the module creates no per-currency row for it, and merges the ones
+     * 2.0.0 created into the accounts at load. Should one exist anyway, it earns nothing, so a player
+     * is paid once for the primary currency and the per-payment cap is
+     * {@code interest.max-interest}, not twice it.
      *
      * <p>How a payment writes (found reviewing UltiKits/UltiEconomy#15):
      * <ul>
@@ -149,9 +151,9 @@ public class InterestService {
 
         List<CurrencyBalanceEntity> currencyBalances = currencyDataOperator.getAll();
         for (CurrencyBalanceEntity balance : currencyBalances) {
-            // The primary currency is paid once, above, on the account row -- the bank balance
-            // /bank, /money, /eco check and Vault show. Its per-currency row (created on join,
-            // UltiKits/UltiEconomy#25) earns nothing.
+            // The primary currency is paid once, above, on the account row -- its only wallet, the
+            // bank balance /bank, /money, /eco check and Vault show. A per-currency row for it is no
+            // longer created (UltiKits/UltiEconomy#25); should one exist it earns nothing.
             if (currencyManager.getPrimaryCurrencyId().equals(balance.getCurrencyId())) {
                 continue;
             }

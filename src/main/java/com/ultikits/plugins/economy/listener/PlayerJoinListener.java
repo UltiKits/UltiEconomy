@@ -43,7 +43,13 @@ public class PlayerJoinListener implements Listener {
         economyService.getOrCreateAccount(player.getUniqueId(), player.getName());
 
         if (currencyManager != null) {
+            String primaryId = currencyManager.getPrimaryCurrencyId();
             for (CurrencyDefinition currency : currencyManager.getAllCurrencies()) {
+                // The primary currency's one wallet is the account created above; a second row
+                // for it would credit the starting amount twice (UltiKits/UltiEconomy#25).
+                if (primaryId.equals(currency.getId())) {
+                    continue;
+                }
                 economyService.getOrCreateBalance(
                         player.getUniqueId(), player.getName(), currency.getId());
             }
