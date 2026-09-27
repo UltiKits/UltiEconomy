@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `tax.transaction-tax.rate` outside 0 to 1 is no longer used: the default 0.05 applies, with a warning
+  naming the key, the value as written and the default, at start-up and after every reload. A negative
+  rate credited the recipient more than the payer paid, and a rate above 1 credited a negative amount.
+- `tax.transaction-tax.rate` 超出 0 到 1 的值不再使用：改用默认值 0.05，并在启动和每次重载后发出警告，写明键名、所写的值和
+  默认值。此前负税率会让收款人收到比付款人付出更多的钱，大于 1 的税率则让收款人收到负数金额。
 - The primary currency's name and symbol now come from `config.yml` (`currency-name`, `currency-symbol`)
   everywhere: Vault, `/eco treasury` and every other place that shows them. The primary entry of
   `currencies.yml` follows it; a different `display-name` or `symbol` written there is reported at

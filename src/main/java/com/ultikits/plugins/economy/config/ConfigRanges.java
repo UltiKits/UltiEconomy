@@ -14,6 +14,10 @@ import java.math.BigDecimal;
  * is used instead, with a warning that names the key, the value as written and the default. The
  * operator's file is not changed. The check runs when the module loads and again every time the
  * framework reloads the file.
+ * <p>
+ * The same rule covers {@code tax.transaction-tax.rate}, the fraction of a transfer kept as tax: from 0
+ * to 1. A negative rate credited the recipient more than the payer paid, creating money, and a rate
+ * above 1 credited the recipient a negative amount.
  */
 public final class ConfigRanges {
 
@@ -54,6 +58,12 @@ public final class ConfigRanges {
             config.setMaxInterest(declared.getMaxInterest());
             warn(config, logger, plugin, "interest.max-interest", cap, plugin.i18n("economy.warn.range_max_interest"),
                     declared.getMaxInterest());
+        }
+        double taxRate = config.getTransactionTaxRate();
+        if (!(taxRate >= 0 && taxRate <= 1)) {
+            config.setTransactionTaxRate(declared.getTransactionTaxRate());
+            warn(config, logger, plugin, "tax.transaction-tax.rate", taxRate,
+                    plugin.i18n("economy.warn.range_transaction_tax_rate"), declared.getTransactionTaxRate());
         }
     }
 
