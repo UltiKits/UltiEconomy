@@ -7,7 +7,10 @@ import java.util.UUID;
 
 public interface EconomyService {
 
-    // --- Legacy single-currency methods (delegate to primary currency) ---
+    // --- Account-wallet methods ---
+    // The primary currency's one wallet: the account row (economy_accounts) that Vault, /money,
+    // /pay and /bank use. The currency-aware methods below, given the primary currency's id,
+    // read and write this same wallet (UltiKits/UltiEconomy#25).
 
     PlayerAccountEntity getAccount(UUID playerUuid);
 
@@ -42,6 +45,8 @@ public interface EconomyService {
     String formatAmount(double amount);
 
     // --- Currency-aware methods ---
+    // A non-primary currency has its own row in currency_balances; the primary currency's id is
+    // routed to the account-wallet methods above.
 
     CurrencyBalanceEntity getBalance(UUID playerUuid, String currencyId);
 

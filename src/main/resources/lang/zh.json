@@ -67,6 +67,20 @@
   "economy.log.interest_write_failed": "利息发放：写入银行余额失败，本次未入账：%s",
   "economy.warn.interest_cap": "每次最多 interest.max-interest = %s",
   "economy.warn.interest_no_cap": "不设上限，因为 interest.max-interest = %s 不大于 0",
-  "economy.warn.interest_enabled": "%s：%s 中 interest.enabled 为 true，因此会发放利息：每隔 interest.interval = %d 秒（首次发放在加载后一个间隔），玩家的主货币银行存款（即 /bank、/money 和 Vault 显示的那一项；每位玩家只发放一次，不会在 /bank <主货币> 显示的那一行上重复发放）以及其他每种 bank-enabled: true 货币的银行存款，各自获得自身的 interest.rate = %s 作为利息，%s，且不会超过银行自身的余额上限。这会凭空产生货币。在此版本之前（UltiEconomy 2.0.0 及更早），此开关不起作用，从未发放过利息。若多台服务器共用此数据库，每台开启利息的服务器都会按全额利率发放，因此只应在其中一台上开启。要停止发放利息，请在 %s 中设置 interest.enabled: false 并执行 /ul reload %s；下一次发放将被跳过。",
-  "economy.warn.tax_disabled": "%s：%s 中 tax.enabled 为 false，因此完全不征税：无论 tax.transaction-tax.* 如何设置，转账都不缴纳交易税，也不征收财富税。在此版本之前（UltiEconomy 2.0.0 及更早），此开关不起作用，只要 tax.transaction-tax.enabled 为 true，转账就会被征税。要征税，请在 %s 中设置 tax.enabled: true 并执行 /ul reload %s；下一笔转账即会被征税。"
+  "economy.warn.interest_enabled_one_wallet": "%s：%s 中 interest.enabled 为 true，因此会发放利息：每隔 interest.interval = %d 秒（首次发放在加载后一个间隔），玩家的主货币银行存款（即 /bank、/money 和 Vault 显示的那一项，命令写出主货币名时也是这一项；每位玩家只发放一次）以及其他每种 bank-enabled: true 货币的银行存款，各自获得自身的 interest.rate = %s 作为利息，%s，且不会超过银行自身的余额上限。这会凭空产生货币。在此版本之前（UltiEconomy 2.0.0 及更早），此开关不起作用，从未发放过利息。若多台服务器共用此数据库，每台开启利息的服务器都会按全额利率发放，因此只应在其中一台上开启。要停止发放利息，请在 %s 中设置 interest.enabled: false 并执行 /ul reload %s；下一次发放将被跳过。",
+  "economy.warn.tax_disabled": "%s：%s 中 tax.enabled 为 false，因此完全不征税：无论 tax.transaction-tax.* 如何设置，转账都不缴纳交易税，也不征收财富税。在此版本之前（UltiEconomy 2.0.0 及更早），此开关不起作用，只要 tax.transaction-tax.enabled 为 true，转账就会被征税。要征税，请在 %s 中设置 tax.enabled: true 并执行 /ul reload %s；下一笔转账即会被征税。",
+  "economy.log.wallet_merge.player": "主货币钱包合并：已将 %s 现金与 %s 存款从 %s 的第二钱包并入其账户，账户现有 %s 现金、%s 存款。",
+  "economy.log.wallet_merge.total": "主货币钱包合并完成：合并 %s 位玩家，共并入 %s 现金、%s 存款；删除 %s 条空的第二钱包记录；%s 位玩家未合并（见上方警告）。",
+  "economy.log.wallet_merge.negative_cash": "主货币钱包合并：%s 的第二钱包现金为负数 %s；未从其账户扣除。",
+  "economy.log.wallet_merge.negative_bank": "主货币钱包合并：%s 的第二钱包存款为负数 %s；未从其账户扣除。",
+  "economy.log.wallet_merge.unsettled": "主货币钱包合并：之前某次启动开始向 %s 的账户并入 %s 现金、%s 存款后，该账户或其第二钱包记录发生了变化，本次启动无法判断这笔金额是否已经并入。此玩家未做任何更改；其记录保留在 currency_balances 中（currency_id 为 %s），待运维处理。",
+  "economy.log.wallet_merge.failed": "主货币钱包合并失败，因此 UltiEconomy 未启动，在其启动前任何余额都不会变化：%s。不会丢失任何数据：请修复存储问题后重启服务器；合并会从中断处继续，不会重复并入。",
+  "economy.warn.primary_currency_setting": "%s：%s 为主货币设置了 %s = %s，但主货币的这项设置以 %s 为准，生效的是 %s = %s。请让两处一致，或删除 %s（位于 %s），以消除此警告。",
+  "economy.log.wallet_merge.too_large": "主货币钱包合并：将 %s 现金与 %s 存款从 %s 的第二钱包并入后无法被准确存储——总和会过大、有效数字多于余额能保存的位数，或不是一个数——因此未做任何转移；第二钱包保留在 currency_balances 中，待运维处理。",
+  "economy.log.wallet_merge.claim_waiting": "主货币钱包合并：共用此数据库的另一台服务器正在执行合并（其认领时间为 %s）。本服务器等待其完成后再启动 UltiEconomy。",
+  "economy.log.wallet_merge.claim_wait_over": "主货币钱包合并：另一台服务器的认领已删除，本服务器已取得认领，并合并剩余的部分（若合并已完成，则没有任何内容）。",
+  "economy.log.wallet_merge.claim_stale": "主货币钱包合并：认领时间为 %s 的认领已有 %s 秒没有变化，因此视为认领它的服务器已停止。本服务器接手合并；它会完成未做完的部分，不会重复并入。",
+  "economy.log.wallet_merge.claim_lost": "本服务器执行钱包合并期间，另一台服务器接手了合并（本服务器停止响应的时间过长），因此本服务器已停止合并；请在另一台服务器启动完成后再启动本服务器",
+  "economy.log.wallet_merge.claim_release_failed": "主货币钱包合并：本服务器无法删除自己的钱包合并认领（%s）。下一台在此数据库上启动的服务器会等待 %s 秒后接手该认领。",
+  "economy.log.wallet_merge.claim_malformed": "economy_wallet_merge_claim 表中的钱包合并认领没有持有者或没有心跳，这不是 UltiEconomy 写入的，无法安全接管；请在没有服务器正在合并时删除该行（DELETE FROM economy_wallet_merge_claim）后重新启动"
 }

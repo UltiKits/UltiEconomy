@@ -4,6 +4,16 @@
 
 **Goal:** Add multi-currency, money notes, and tax system to UltiEconomy for realistic RPG server economies.
 
+> **Note added 2026-09-25 (UltiKits/UltiEconomy#25): the shipped design differs from this plan on the primary
+> currency.** The primary currency was never moved into `currency_balances`, and the one-time migration from
+> `economy_accounts` described here was never written. As shipped (2.0.0) and as decided by the maintainer on
+> 2026-09-24 (confirmed 2026-09-25), the primary currency's one wallet is the account row in `economy_accounts`,
+> the one Vault, `/money`, `/pay` and `/bank` use; the currency-aware service methods route the primary currency's
+> id to it, and `config.yml` governs its starting cash and bank settings. 2.0.0 also created a `currency_balances`
+> row for the primary currency on every join; the pull request that closes UltiKits/UltiEconomy#25 stops that and
+> merges those rows into the accounts once. Every section below that puts the primary currency in
+> `currency_balances`, or has the no-currency methods delegate to it, describes the plan, not the code.
+
 **Architecture:** Layered build — multi-currency is the foundation (new entity + refactored service), money notes build on top (physical items tied to currency), tax system completes the loop (money sinks per currency). Each layer is independently shippable with its own commit.
 
 **Tech Stack:** Java 8, UltiTools-API 6.2.1, Spigot API, Vault, PlaceholderAPI, Mockito 5, JUnit 5, AssertJ

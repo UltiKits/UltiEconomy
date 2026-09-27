@@ -1,6 +1,9 @@
 # Currency definitions / 货币定义
-# Each currency has its own wallet. One must be primary (maps to Vault).
-# 每种货币有独立的钱包。必须有一个设为 primary（映射到 Vault）。
+# One currency must be primary: it is the one Vault exposes, and its only wallet is the account
+# wallet that /money, /pay and /bank show. Its initial-cash, bank-enabled, min-deposit and
+# max-bank-balance are taken from config.yml, not from this file. Every other currency has its own wallet.
+# 必须有一个货币设为 primary：它是 Vault 使用的货币，唯一的钱包就是 /money、/pay、/bank 显示的账户钱包；
+# 它的 initial-cash、bank-enabled、min-deposit、max-bank-balance 以 config.yml 为准，不读本文件。其他每种货币有独立的钱包。
 
 currencies:
   coins:
