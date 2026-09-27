@@ -141,6 +141,31 @@ class UltiEconomyTest {
         }
 
         @Test
+        @DisplayName("onUnregister() unregisters the PlaceholderAPI expansion as well as the Vault provider, and forgets it (#23)")
+        void onUnregisterUnregistersThePlaceholderExpansion() throws Exception {
+            UltiEconomy module = allocateModule();
+            VaultEconomyProvider provider = new VaultEconomyProvider(
+                    mock(EconomyService.class), mock(EconomyConfig.class), mock(UltiToolsPlugin.class));
+            setVaultProvider(module, provider);
+            com.ultikits.plugins.placeholderapi.economy.EconomyPlaceholderExpansion expansion =
+                    mock(com.ultikits.plugins.placeholderapi.economy.EconomyPlaceholderExpansion.class);
+            Field expansionField = UltiEconomy.class.getDeclaredField("placeholderExpansion");
+            expansionField.setAccessible(true);
+            expansionField.set(module, expansion);
+            ServicesManager servicesManager = mock(ServicesManager.class);
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(Bukkit::getServicesManager).thenReturn(servicesManager);
+
+                module.onUnregister();
+            }
+
+            verify(servicesManager).unregister(Economy.class, provider);
+            verify(expansion).unregister();
+            assertThat(expansionField.get(module)).isNull();
+        }
+
+        @Test
         @DisplayName("onUnregister() with no Vault provider makes no services-manager call (UltiKits/UltiEconomy#22)")
         void onUnregisterWithNullProviderMakesNoCall() throws Exception {
             UltiEconomy module = allocateModule();
