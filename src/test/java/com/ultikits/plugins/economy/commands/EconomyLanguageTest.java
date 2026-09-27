@@ -114,10 +114,15 @@ class EconomyLanguageTest {
         when(alice.getName()).thenReturn("Alice");
         when(bob.getUniqueId()).thenReturn(bobId);
         when(bob.getName()).thenReturn("Bob");
-        when(economy.transfer(PLAYER, bobId, 500.0)).thenReturn(true);
+        // The real service over in-memory storage, untaxed: the lines name what was credited.
+        com.ultikits.plugins.economy.service.EconomyTestWorld world =
+                com.ultikits.plugins.economy.service.EconomyTestWorld.relational();
+        world.config.setTaxEnabled(false);
+        world.seedAccount(PLAYER, "Alice", 1000.0, 0.0);
+        world.seedAccount(bobId, "Bob", 0.0, 0.0);
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(bob);
-            new PayCommand(plugin, economy).onPay(alice, "Bob", "500");
+            new PayCommand(plugin, world.service).onPay(alice, "Bob", "500");
         }
         assertThat(said(alice)).containsExactly(ChatColor.GREEN + "Successfully transferred $500.00 to Bob");
         assertThat(said(bob)).containsExactly(ChatColor.GREEN + "Alice transferred $500.00 to you");
