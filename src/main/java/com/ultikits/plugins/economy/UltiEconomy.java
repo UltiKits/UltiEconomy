@@ -1,6 +1,7 @@
 package com.ultikits.plugins.economy;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.config.InterestSettings;
 import com.ultikits.plugins.economy.config.StartupWarnings;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -15,6 +16,7 @@ import com.ultikits.plugins.economy.service.PrimaryWalletMerge;
 import com.ultikits.plugins.economy.vault.VaultEconomyProvider;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.UltiToolsModule;
+import com.ultikits.ultitools.interfaces.ConfigChangeListener;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -32,6 +34,8 @@ public class UltiEconomy extends UltiToolsPlugin {
     private VaultEconomyProvider vaultProvider;
     // Created only when PlaceholderAPI is installed; unregistered again on unload (UltiKits/UltiEconomy#23)
     private EconomyPlaceholderExpansion placeholderExpansion;
+    // Re-checks the interest settings after each reload; removed on unload (UltiKits/UltiEconomy#29)
+    private ConfigChangeListener interestSettingsWatch;
     private volatile CurrencyManager currencyManager;
     private volatile MoneyNoteFactory noteFactory;
 
@@ -79,6 +83,9 @@ public class UltiEconomy extends UltiToolsPlugin {
         }
         EconomyService economyService = getContext().getBean(EconomyService.class);
         EconomyConfig config = getConfig(EconomyConfig.class);
+        // An interest rate or cap outside what the module can use falls back to its default, now and
+        // after every reload (UltiKits/UltiEconomy#29); checked before the start-up warnings print them.
+        interestSettingsWatch = InterestSettings.watch(config, getLogger(), this);
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).
         StartupWarnings.log(config, getLogger(), this);
@@ -111,6 +118,13 @@ public class UltiEconomy extends UltiToolsPlugin {
         if (placeholderExpansion != null) {
             placeholderExpansion.unregister();
             placeholderExpansion = null;
+        }
+        if (interestSettingsWatch != null) {
+            EconomyConfig config = getConfig(EconomyConfig.class);
+            if (config != null) {
+                config.removeChangeListener(interestSettingsWatch);
+            }
+            interestSettingsWatch = null;
         }
     }
 

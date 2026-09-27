@@ -175,6 +175,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `interest.rate` must now be from 0 to 1 and `interest.max-interest` must be -1 (no cap) or at least 0.
+  A value outside its range is not used: the default (`0.03`, `10000`) is, with a warning naming the
+  key, the value as written and the default, at start-up and after every reload. Previously any value
+  was used, so a typo such as `rate: 3` paid 300% per payment (UltiKits/UltiEconomy#29).
+- `interest.rate` 现在必须在 0 到 1 之间，`interest.max-interest` 必须为 -1（不设上限）或不小于 0。超出范围的值不会被
+  使用，而是改用默认值（`0.03`、`10000`），并在启动与每次重载后发出警告，写明配置项、原值和默认值。此前任何值都会被
+  直接使用，`rate: 3` 这样的笔误会让每次付息 300%（UltiKits/UltiEconomy#29）。
 - Unloading this module (`/upm uninstall UltiTools-Economy`) now also unregisters its PlaceholderAPI
   expansion; `%ultieconomy_...%` placeholders used to keep answering from the unloaded module until a
   restart (UltiKits/UltiEconomy#23).
