@@ -92,8 +92,9 @@ public class UltiEconomy extends UltiToolsPlugin {
         EconomyService economyService = getContext().getBean(EconomyService.class);
         EconomyConfig config = getConfig(EconomyConfig.class);
         writeConfigTextInServerLanguage(config);
-        // An interest rate or cap outside what the module can use falls back to its default, now and
-        // after every reload (UltiKits/UltiEconomy#29); checked before the start-up warnings print them.
+        // An interest rate, interest cap or transaction tax rate outside what the module can use falls back
+        // to its default, now and after every reload (UltiKits/UltiEconomy#29); warned before the start-up
+        // warnings print them.
         configRangesWatch = ConfigRanges.watch(config, getLogger(), this);
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).

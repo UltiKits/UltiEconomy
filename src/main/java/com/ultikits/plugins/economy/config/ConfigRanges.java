@@ -28,7 +28,7 @@ public final class ConfigRanges {
     }
 
     /**
-     * Checks both values now and again after every reload of the file.
+     * Checks every ranged value now and again after every reload of the file.
      *
      * @param config the module's configuration, as the framework loaded it
      * @param logger the module's logger
