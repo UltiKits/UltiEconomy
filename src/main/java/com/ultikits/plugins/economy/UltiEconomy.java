@@ -30,6 +30,8 @@ import java.util.UUID;
 public class UltiEconomy extends UltiToolsPlugin {
 
     private VaultEconomyProvider vaultProvider;
+    // Created only when PlaceholderAPI is installed; unregistered again on unload (UltiKits/UltiEconomy#23)
+    private EconomyPlaceholderExpansion placeholderExpansion;
     private volatile CurrencyManager currencyManager;
     private volatile MoneyNoteFactory noteFactory;
 
@@ -91,8 +93,9 @@ public class UltiEconomy extends UltiToolsPlugin {
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             LeaderboardService leaderboardService = getContext().getBean(LeaderboardService.class);
-            new EconomyPlaceholderExpansion(economyService, leaderboardService,
-                    getCurrencyManager()).register();
+            placeholderExpansion = new EconomyPlaceholderExpansion(economyService, leaderboardService,
+                    getCurrencyManager());
+            placeholderExpansion.register();
         }
 
         return true;
@@ -102,6 +105,12 @@ public class UltiEconomy extends UltiToolsPlugin {
     protected void onUnregister() {
         if (vaultProvider != null) {
             Bukkit.getServicesManager().unregister(Economy.class, vaultProvider);
+        }
+        // The expansion would otherwise keep answering placeholders from this unloaded module until
+        // the server restarts (UltiKits/UltiEconomy#23).
+        if (placeholderExpansion != null) {
+            placeholderExpansion.unregister();
+            placeholderExpansion = null;
         }
     }
 

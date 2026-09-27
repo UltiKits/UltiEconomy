@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Unloading this module (`/upm uninstall UltiTools-Economy`) now also unregisters its PlaceholderAPI
+  expansion; `%ultieconomy_...%` placeholders used to keep answering from the unloaded module until a
+  restart (UltiKits/UltiEconomy#23).
+- 卸载本模块（`/upm uninstall UltiTools-Economy`）现在也会注销其 PlaceholderAPI 扩展；此前 `%ultieconomy_...%` 变量会在
+  重启前一直由已卸载的模块应答（UltiKits/UltiEconomy#23）。
 - A server without PlaceholderAPI no longer logs a class-load error for this module's placeholder
   expansion at every start: the expansion is loaded only after the module has checked that
   PlaceholderAPI is installed (UltiKits/UltiEconomy#20).
