@@ -45,7 +45,7 @@ public class UltiEconomy extends UltiToolsPlugin {
             synchronized (this) {
                 if (noteFactory == null) {
                     Plugin bukkitPlugin = Bukkit.getPluginManager().getPlugin("UltiTools");
-                    noteFactory = new MoneyNoteFactory(bukkitPlugin);
+                    noteFactory = new MoneyNoteFactory(bukkitPlugin, this);
                 }
             }
         }
@@ -58,8 +58,8 @@ public class UltiEconomy extends UltiToolsPlugin {
         EconomyConfig config = getConfig(EconomyConfig.class);
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).
-        StartupWarnings.log(config, getLogger());
-        vaultProvider = new VaultEconomyProvider(economyService, config);
+        StartupWarnings.log(config, getLogger(), this);
+        vaultProvider = new VaultEconomyProvider(economyService, config, this);
 
         Plugin vaultPlugin = Bukkit.getPluginManager().getPlugin("Vault");
         if (vaultPlugin != null) {

@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.factory;
 
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -15,9 +16,12 @@ import java.util.UUID;
 public class MoneyNoteFactory {
 
     private final Plugin plugin;
+    /** The module, whose language catalogue gives the note its name and lore. */
+    private final UltiToolsPlugin module;
 
-    public MoneyNoteFactory(Plugin plugin) {
+    public MoneyNoteFactory(Plugin plugin, UltiToolsPlugin module) {
         this.plugin = plugin;
+        this.module = module;
     }
 
     public ItemStack createNote(String currencyId, double amount, UUID creatorUuid, String creatorName) {
@@ -32,11 +36,14 @@ public class MoneyNoteFactory {
 
     void applyNoteData(ItemMeta meta, String currencyId, double amount, UUID creatorUuid, String creatorName) {
         String formattedAmount = String.format("%.2f", amount);
-        meta.setDisplayName(ChatColor.GOLD + "[Money Note] " + formattedAmount + " " + currencyId);
+        // A note is identified by its persistent data below, never by this text, so a note keeps
+        // working when the server's language changes after it was made.
+        meta.setDisplayName(ChatColor.GOLD + String.format(module.i18n("economy.note.item_name"),
+                formattedAmount, currencyId));
         meta.setLore(Arrays.asList(
-                ChatColor.GRAY + "Currency: " + currencyId,
-                ChatColor.GRAY + "Value: " + formattedAmount,
-                ChatColor.GRAY + "Created by: " + creatorName
+                ChatColor.GRAY + String.format(module.i18n("economy.note.item_currency"), currencyId),
+                ChatColor.GRAY + String.format(module.i18n("economy.note.item_value"), formattedAmount),
+                ChatColor.GRAY + String.format(module.i18n("economy.note.item_creator"), creatorName)
         ));
 
         PersistentDataContainer pdc = meta.getPersistentDataContainer();

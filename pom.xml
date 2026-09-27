@@ -158,10 +158,9 @@
                         </goals>
                         <configuration>
                             <!-- This module has no gui package, so this exclude is currently inert.
-                                 Written anyway for comparability across all sixteen module poms; see
-                                 09-CONVENTIONS.md section 5 and 09-GATE-SEMANTICS.md finding F-1 for
-                                 why this belongs here (CheckMojo's own excludes) and not inside
-                                 rule/excludes, which is a no-op for a BUNDLE-element rule. -->
+                                 Written anyway for comparability across the module poms. It belongs
+                                 here (CheckMojo's own excludes) and not inside rule/excludes, which
+                                 is a no-op for a BUNDLE-element rule. -->
                             <excludes>
                                 <exclude>**/gui/**</exclude>
                             </excludes>

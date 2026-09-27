@@ -67,8 +67,8 @@ public class LeaderboardService {
      * release nothing called either refresh method and every such placeholder read an empty cache.
      *
      * <p>Runs on the main thread, like the rest of this module's data access, and reads each table
-     * once per run however many currencies are configured (gate-1 WR-01). It only reads and then
-     * swaps the two volatile snapshots, so readers never see a half-built list.
+     * once per run however many currencies are configured. It only reads and then swaps the two
+     * volatile snapshots, so readers never see a half-built list.
      */
     @Scheduled(config = EconomyConfig.class, periodKey = "leaderboard.update-interval")
     public void refreshAll() {

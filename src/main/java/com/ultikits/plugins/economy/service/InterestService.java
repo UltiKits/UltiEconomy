@@ -86,8 +86,8 @@ public class InterestService {
      * thread is outside this module's control.)
      *
      * <p>Every server that runs this task pays the full rate on every balance in its database. If
-     * several servers share one database, interest must be on for exactly one of them (gate-1
-     * WR-02; the load-time warning says so).
+     * several servers share one database, interest must be on for exactly one of them (the load-time
+     * warning says so).
      */
     @Scheduled(config = EconomyConfig.class, periodKey = "interest.interval", delayKey = "interest.interval")
     public void payInterestIfEnabled() {
@@ -108,10 +108,9 @@ public class InterestService {
      * show), once per player; and the bank balance of every other currency whose
      * {@code bank-enabled} is true. The per-currency row this module also keeps for the primary
      * currency (UltiKits/UltiEconomy#25) earns nothing, so a player is paid once for the primary
-     * currency and the per-payment cap is {@code interest.max-interest}, not twice it (maintainer
-     * ruling 2026-09-23).
+     * currency and the per-payment cap is {@code interest.max-interest}, not twice it.
      *
-     * <p>How a payment writes (gate-1 review of UltiKits/UltiEconomy#15):
+     * <p>How a payment writes (found reviewing UltiKits/UltiEconomy#15):
      * <ul>
      *   <li>It credits the rows {@code getAll()} returned and writes each one once. It does not look a
      *       row up again: this runs on the main thread, and a per-row lookup by {@code uuid} (an
@@ -152,7 +151,7 @@ public class InterestService {
         for (CurrencyBalanceEntity balance : currencyBalances) {
             // The primary currency is paid once, above, on the account row -- the bank balance
             // /bank, /money, /eco check and Vault show. Its per-currency row (created on join,
-            // UltiKits/UltiEconomy#25) earns nothing (maintainer ruling 2026-09-23).
+            // UltiKits/UltiEconomy#25) earns nothing.
             if (currencyManager.getPrimaryCurrencyId().equals(balance.getCurrencyId())) {
                 continue;
             }
@@ -194,8 +193,7 @@ public class InterestService {
             operator.update(row);
             return true;
         } catch (IllegalAccessException | RuntimeException e) {
-            plugin.getLogger().error("Interest payment: failed to write a bank balance, it was not credited: "
-                    + e.getMessage());
+            plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"), e.getMessage()));
             return false;
         }
     }
@@ -222,7 +220,7 @@ public class InterestService {
             if (player != null && player.isOnline()) {
                 String formatted = economyService.formatAmount(interest);
                 player.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("银行利息到账: %s"), formatted));
+                        plugin.i18n("economy.interest.received"), formatted));
             }
         } catch (IllegalArgumentException ignored) {
             // Invalid UUID — skip notification
@@ -237,7 +235,7 @@ public class InterestService {
                 CurrencyDefinition def = currencyManager.getCurrency(currencyId);
                 String currencyName = def != null ? def.getDisplayName() : currencyId;
                 player.sendMessage(ChatColor.GREEN + String.format(
-                        plugin.i18n("%s 银行利息到账: %s"), currencyName, formatted));
+                        plugin.i18n("economy.interest.received_currency"), currencyName, formatted));
             }
         } catch (IllegalArgumentException ignored) {
             // Invalid UUID — skip notification

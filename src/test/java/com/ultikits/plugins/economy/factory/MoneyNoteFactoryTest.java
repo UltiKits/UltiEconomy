@@ -1,5 +1,8 @@
 package com.ultikits.plugins.economy.factory;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -28,9 +31,16 @@ class MoneyNoteFactoryTest {
     @Mock private Plugin plugin;
     @Mock private ItemStack itemStack;
     @Mock private ItemMeta itemMeta;
+    @Mock private UltiToolsPlugin module;
     @Mock private PersistentDataContainer pdc;
 
     private MoneyNoteFactory factory;
+
+    /** The zh text for {@code key}, or a marker naming the missing key so a failure shows what was set. */
+    private static String zh(String key) {
+        String text = CatalogueText.entries("zh").get(key);
+        return text == null ? "<lang/zh.json has no " + key + ">" : text;
+    }
     private Map<NamespacedKey, Object> pdcStore;
 
     private static final UUID CREATOR_UUID = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
@@ -44,7 +54,9 @@ class MoneyNoteFactoryTest {
         // default answer for this unstubbed method is null, which fails NamespacedKey's own
         // validate() with an NPE before any assertion runs.
         lenient().when(plugin.namespace()).thenReturn("ultitools");
-        factory = new MoneyNoteFactory(plugin);
+        // The note's name and lore come from the module's catalogue; answer from the real zh one.
+        lenient().when(module.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
+        factory = new MoneyNoteFactory(plugin, module);
 
         pdcStore = new HashMap<>();
         lenient().doAnswer(inv -> {
@@ -90,6 +102,26 @@ class MoneyNoteFactoryTest {
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(itemMeta).setDisplayName(captor.capture());
             assertThat(captor.getValue()).contains("500");
+        }
+
+        @Test
+        @DisplayName("the note's name is in the server's language")
+        void displayNameFollowsTheLanguage() {
+            factory.applyNoteData(itemMeta, "coins", 500.0, CREATOR_UUID, "TestPlayer");
+
+            verify(itemMeta).setDisplayName(org.bukkit.ChatColor.GOLD
+                    + String.format(zh("economy.note.item_name"), "500.00", "coins"));
+        }
+
+        @Test
+        @DisplayName("the note's lore is in the server's language")
+        void loreFollowsTheLanguage() {
+            factory.applyNoteData(itemMeta, "gems", 1000.0, CREATOR_UUID, "TestPlayer");
+
+            verify(itemMeta).setLore(java.util.Arrays.asList(
+                    org.bukkit.ChatColor.GRAY + String.format(zh("economy.note.item_currency"), "gems"),
+                    org.bukkit.ChatColor.GRAY + String.format(zh("economy.note.item_value"), "1000.00"),
+                    org.bukkit.ChatColor.GRAY + String.format(zh("economy.note.item_creator"), "TestPlayer")));
         }
 
         @SuppressWarnings("unchecked")

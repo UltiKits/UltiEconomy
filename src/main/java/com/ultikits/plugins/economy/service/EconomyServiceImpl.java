@@ -506,7 +506,7 @@ public class EconomyServiceImpl implements EconomyService {
             dataOperator.update(account);
             return true;
         } catch (IllegalAccessException e) {
-            plugin.getLogger().error("Failed to update account: " + e.getMessage());
+            plugin.getLogger().error(String.format(plugin.i18n("economy.log.account_update_failed"), e.getMessage()));
             return false;
         }
     }
@@ -516,7 +516,7 @@ public class EconomyServiceImpl implements EconomyService {
             currencyDataOperator.update(balance);
             return true;
         } catch (IllegalAccessException e) {
-            plugin.getLogger().error("Failed to update balance: " + e.getMessage());
+            plugin.getLogger().error(String.format(plugin.i18n("economy.log.balance_update_failed"), e.getMessage()));
             return false;
         }
     }

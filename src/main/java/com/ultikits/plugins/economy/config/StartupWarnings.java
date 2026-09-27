@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.config;
 
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 
 /**
@@ -37,44 +38,25 @@ public final class StartupWarnings {
      * @param config the module's configuration, after the framework has loaded it; may be null, in
      *               which case nothing is reported
      * @param logger the module's logger; may be null, in which case nothing is reported
+     * @param plugin the module, whose language catalogue gives the warnings their text; may be null,
+     *               in which case nothing is reported
      */
-    public static void log(EconomyConfig config, PluginLogger logger) {
-        if (config == null || logger == null) {
+    public static void log(EconomyConfig config, PluginLogger logger, UltiToolsPlugin plugin) {
+        if (config == null || logger == null || plugin == null) {
             return;
         }
         String file = config.getConfigFilePath();
         if (config.isInterestEnabled()) {
             double cap = config.getMaxInterest();
             String capText = cap > 0
-                    ? "capped at interest.max-interest = " + cap + " per payment"
-                    : "with no cap, because interest.max-interest = " + cap + " is not above 0";
-            logger.warn(String.format(
-                    "%s: interest.enabled is true in %s, so interest is paid: every interest.interval"
-                            + " = %d seconds (the first payment one interval after load), a player's"
-                            + " primary-currency bank balance"
-                            + " (the one /bank, /money and Vault show; paid once per player, not also on"
-                            + " the per-currency row that /bank <primary currency> shows) and their bank"
-                            + " balance in every other currency with bank-enabled: true each earn"
-                            + " interest.rate = %s of itself, %s, never above the bank's own maximum"
-                            + " balance. This creates money. Before this release (UltiEconomy 2.0.0 and"
-                            + " earlier) this switch had no effect and no interest was ever paid. If"
-                            + " several servers share this database, each one that has interest on pays"
-                            + " the full rate, so turn it on for exactly one of them. To stop paying"
-                            + " interest, set interest.enabled: false in %s and run /ul reload %s; the"
-                            + " next payment is skipped.",
+                    ? String.format(plugin.i18n("economy.warn.interest_cap"), cap)
+                    : String.format(plugin.i18n("economy.warn.interest_no_cap"), cap);
+            logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled"),
                     MODULE, file, config.getInterestInterval(), config.getInterestRate(), capText, file,
                     RUNTIME_NAME));
         }
         if (!config.isTaxEnabled()) {
-            logger.warn(String.format(
-                    "%s: tax.enabled is false in %s, so no tax is collected at all: transfers pay no"
-                            + " transaction tax, whatever tax.transaction-tax.* says, and no wealth tax"
-                            + " is taken. Before this release (UltiEconomy 2.0.0 and earlier) this switch"
-                            + " had no effect and transfers were"
-                            + " taxed whenever tax.transaction-tax.enabled was true. To collect taxes,"
-                            + " set tax.enabled: true in %s and run /ul reload %s; the next transfer"
-                            + " is taxed.",
-                    MODULE, file, file, RUNTIME_NAME));
+            logger.warn(String.format(plugin.i18n("economy.warn.tax_disabled"), MODULE, file, file, RUNTIME_NAME));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.listener;
 
+import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -35,7 +36,7 @@ class NoteRedeemListenerTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(player.getInventory()).thenReturn(inventory);
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
