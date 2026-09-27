@@ -6,7 +6,7 @@ import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.entity.WalletMergeClaimEntity;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
-import com.ultikits.plugins.economy.placeholder.EconomyPlaceholderExpansion;
+import com.ultikits.plugins.placeholderapi.economy.EconomyPlaceholderExpansion;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.plugins.economy.service.LeaderboardService;

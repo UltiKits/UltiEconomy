@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A server without PlaceholderAPI no longer logs a class-load error for this module's placeholder
+  expansion at every start: the expansion is loaded only after the module has checked that
+  PlaceholderAPI is installed (UltiKits/UltiEconomy#20).
+- 未安装 PlaceholderAPI 的服务器不再在每次启动时为本模块的变量扩展记录类加载错误：扩展只在确认已安装 PlaceholderAPI
+  之后才加载（UltiKits/UltiEconomy#20）。
 - `tax.transaction-tax.exempt-permission` now works: a player holding it (`ultieconomy.tax.exempt` by
   default) pays no transaction tax on `/pay`; it used to be declared but never checked
   (UltiKits/UltiEconomy#26).

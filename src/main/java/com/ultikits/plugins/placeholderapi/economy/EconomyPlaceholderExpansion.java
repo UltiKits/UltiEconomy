@@ -1,4 +1,4 @@
-package com.ultikits.plugins.economy.placeholder;
+package com.ultikits.plugins.placeholderapi.economy;
 
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
@@ -10,6 +10,16 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+/**
+ * UltiEconomy's PlaceholderAPI expansion ({@code %ultieconomy_...%}).
+ * <p>
+ * This class lives outside {@code com.ultikits.plugins.economy} on purpose. At load the framework's
+ * component scan loads every class under the module's scan package, and a class extending
+ * {@link PlaceholderExpansion} cannot be loaded on a server without PlaceholderAPI, which left a
+ * class-load error in the boot log of every such server. Here it is loaded only when
+ * {@code UltiEconomy#registerSelf} creates it, after checking that PlaceholderAPI is installed
+ * (UltiKits/UltiEconomy#20).
+ */
 public class EconomyPlaceholderExpansion extends PlaceholderExpansion {
 
     private final EconomyService economyService;
