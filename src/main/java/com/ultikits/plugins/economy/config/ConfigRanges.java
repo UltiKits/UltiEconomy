@@ -7,20 +7,20 @@ import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import java.math.BigDecimal;
 
 /**
- * Keeps {@code interest.rate} and {@code interest.max-interest} inside the values the module can use
- * (maintainer decision 2026-09-27, UltiKits/UltiEconomy#29): the rate is a fraction per payment from
- * 0 to 1, and the cap is -1 (no cap) or at least 0. A value outside its range is not used -- a typo
+ * Keeps configuration values inside the values the module can use. {@code interest.rate} and
+ * {@code interest.max-interest} (maintainer decision 2026-09-27, UltiKits/UltiEconomy#29): the rate is
+ * a fraction per payment from 0 to 1, and the cap is -1 (no cap) or at least 0. A value outside its range is not used -- a typo
  * such as {@code rate: 3} would pay 300% of every bank balance per payment -- so the declared default
  * is used instead, with a warning that names the key, the value as written and the default. The
  * operator's file is not changed. The check runs when the module loads and again every time the
  * framework reloads the file.
  */
-public final class InterestSettings {
+public final class ConfigRanges {
 
     private static final String MODULE = "UltiEconomy";
     private static final String RUNTIME_NAME = "UltiTools-Economy";
 
-    private InterestSettings() {
+    private ConfigRanges() {
     }
 
     /**

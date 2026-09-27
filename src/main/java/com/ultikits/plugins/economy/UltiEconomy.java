@@ -2,7 +2,7 @@ package com.ultikits.plugins.economy;
 
 import com.ultikits.plugins.economy.config.ConfigTextDefaults;
 import com.ultikits.plugins.economy.config.EconomyConfig;
-import com.ultikits.plugins.economy.config.InterestSettings;
+import com.ultikits.plugins.economy.config.ConfigRanges;
 import com.ultikits.plugins.economy.config.StartupWarnings;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -37,7 +37,7 @@ public class UltiEconomy extends UltiToolsPlugin {
     // Created only when PlaceholderAPI is installed; unregistered again on unload (UltiKits/UltiEconomy#23)
     private EconomyPlaceholderExpansion placeholderExpansion;
     // Re-checks the interest settings after each reload; removed on unload (UltiKits/UltiEconomy#29)
-    private ConfigChangeListener interestSettingsWatch;
+    private ConfigChangeListener configRangesWatch;
     private volatile CurrencyManager currencyManager;
     private volatile MoneyNoteFactory noteFactory;
 
@@ -94,7 +94,7 @@ public class UltiEconomy extends UltiToolsPlugin {
         writeConfigTextInServerLanguage(config);
         // An interest rate or cap outside what the module can use falls back to its default, now and
         // after every reload (UltiKits/UltiEconomy#29); checked before the start-up warnings print them.
-        interestSettingsWatch = InterestSettings.watch(config, getLogger(), this);
+        configRangesWatch = ConfigRanges.watch(config, getLogger(), this);
         // Switches whose effect changed in 6.3.0 take the value on the operator's disk, which
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).
         StartupWarnings.log(config, getLogger(), this);
@@ -128,12 +128,12 @@ public class UltiEconomy extends UltiToolsPlugin {
             placeholderExpansion.unregister();
             placeholderExpansion = null;
         }
-        if (interestSettingsWatch != null) {
+        if (configRangesWatch != null) {
             EconomyConfig config = getConfig(EconomyConfig.class);
             if (config != null) {
-                config.removeChangeListener(interestSettingsWatch);
+                config.removeChangeListener(configRangesWatch);
             }
-            interestSettingsWatch = null;
+            configRangesWatch = null;
         }
     }
 
