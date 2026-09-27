@@ -174,8 +174,11 @@ public class EconomyConfig extends AbstractConfigEntity {
         return value >= 0 && value <= 1;
     }
 
-    /** A cap: -1 for none, or 0 and above. */
+    /**
+     * A cap: -1 for none, or a finite 0 and above. An infinite value (YAML {@code .inf}, or a number too
+     * large for a double) is refused like any other value outside the range: "no cap" is written -1.
+     */
     static boolean isUsableCap(double value) {
-        return value == -1 || value >= 0;
+        return value == -1 || (value >= 0 && !Double.isInfinite(value));
     }
 }
