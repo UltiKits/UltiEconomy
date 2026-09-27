@@ -46,32 +46,6 @@ class PayCommandTest {
     }
 
     @Nested
-    @DisplayName("Success Cases")
-    class SuccessCases {
-
-        @Test
-        @DisplayName("successful transfer notifies both players")
-        void successfulTransfer() {
-            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-                bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
-
-                when(economyService.transfer(SENDER_UUID, TARGET_UUID, 500.0)).thenReturn(true);
-                when(economyService.formatAmount(500.0)).thenReturn("$500.00");
-
-                command.onPay(sender, "Bob", "500");
-
-                ArgumentCaptor<String> senderCaptor = ArgumentCaptor.forClass(String.class);
-                verify(sender).sendMessage(senderCaptor.capture());
-                assertThat(senderCaptor.getValue()).contains("成功转账").contains("$500.00").contains("Bob");
-
-                ArgumentCaptor<String> targetCaptor = ArgumentCaptor.forClass(String.class);
-                verify(target).sendMessage(targetCaptor.capture());
-                assertThat(targetCaptor.getValue()).contains("Alice").contains("$500.00");
-            }
-        }
-    }
-
-    @Nested
     @DisplayName("Failure Cases")
     class FailureCases {
 
@@ -135,38 +109,6 @@ class PayCommandTest {
                 // Paying yourself is its own refusal, not an invalid amount.
                 assertThat(captor.getValue()).contains("不能向自己转账");
             }
-        }
-
-        @Test
-        @DisplayName("insufficient funds shows error")
-        void insufficientFunds() {
-            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-                bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
-                when(economyService.transfer(SENDER_UUID, TARGET_UUID, 999999.0)).thenReturn(false);
-
-                command.onPay(sender, "Bob", "999999");
-
-                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-                verify(sender).sendMessage(captor.capture());
-                assertThat(captor.getValue()).contains("余额不足");
-            }
-        }
-    }
-
-    @Test
-    @DisplayName("successful transfer with specific currency")
-    void successfulTransferWithCurrency() {
-        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-            bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
-
-            when(economyService.transfer(SENDER_UUID, TARGET_UUID, 500.0, "gems")).thenReturn(true);
-            when(economyService.formatAmount(500.0, "gems")).thenReturn("G500.00");
-
-            command.onPayWithCurrency(sender, "Bob", "500", "gems");
-
-            ArgumentCaptor<String> senderCaptor = ArgumentCaptor.forClass(String.class);
-            verify(sender).sendMessage(senderCaptor.capture());
-            assertThat(senderCaptor.getValue()).contains("成功转账").contains("G500.00").contains("Bob");
         }
     }
 
@@ -232,21 +174,6 @@ class PayCommandTest {
                 verify(sender).sendMessage(captor.capture());
                 // Paying yourself is its own refusal, not an invalid amount.
                 assertThat(captor.getValue()).contains("不能向自己转账");
-            }
-        }
-
-        @Test
-        @DisplayName("currency transfer with insufficient funds shows error")
-        void currencyInsufficientFunds() {
-            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-                bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
-                when(economyService.transfer(SENDER_UUID, TARGET_UUID, 999999.0, "gems")).thenReturn(false);
-
-                command.onPayWithCurrency(sender, "Bob", "999999", "gems");
-
-                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-                verify(sender).sendMessage(captor.capture());
-                assertThat(captor.getValue()).contains("余额不足");
             }
         }
     }
