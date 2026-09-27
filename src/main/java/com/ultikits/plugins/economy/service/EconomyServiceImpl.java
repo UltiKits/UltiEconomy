@@ -199,16 +199,21 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean transfer(UUID from, UUID to, double amount) {
+        return transferWithReceipt(from, to, amount).isSuccess();
+    }
+
+    @Override
+    public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount) {
         if (amount <= 0 || from.equals(to)) {
-            return false;
+            return TransferReceipt.refused();
         }
         PlayerAccountEntity sender = getAccount(from);
         if (sender == null || sender.getCash() < amount) {
-            return false;
+            return TransferReceipt.refused();
         }
         PlayerAccountEntity receiver = getAccount(to);
         if (receiver == null) {
-            return false;
+            return TransferReceipt.refused();
         }
         double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
         double received = amount - tax;
@@ -216,12 +221,12 @@ public class EconomyServiceImpl implements EconomyService {
         receiver.setCash(receiver.getCash() + received);
         if (!updateAccount(sender)) {
             sender.setCash(sender.getCash() + amount);
-            return false;
+            return TransferReceipt.refused();
         }
         if (!updateAccount(receiver)) {
             sender.setCash(sender.getCash() + amount);
             updateAccount(sender);
-            return false;
+            return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
             try {
@@ -229,7 +234,7 @@ public class EconomyServiceImpl implements EconomyService {
             } catch (IllegalAccessException ignored) {
             }
         }
-        return true;
+        return TransferReceipt.completed(received, tax);
     }
 
     @Override
@@ -472,19 +477,24 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean transfer(UUID from, UUID to, double amount, String currencyId) {
+        return transferWithReceipt(from, to, amount, currencyId).isSuccess();
+    }
+
+    @Override
+    public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount, String currencyId) {
         if (isPrimary(currencyId)) {
-            return transfer(from, to, amount);
+            return transferWithReceipt(from, to, amount);
         }
         if (amount <= 0 || from.equals(to)) {
-            return false;
+            return TransferReceipt.refused();
         }
         CurrencyBalanceEntity sender = getBalance(from, currencyId);
         if (sender == null || sender.getCash() < amount) {
-            return false;
+            return TransferReceipt.refused();
         }
         CurrencyBalanceEntity receiver = getBalance(to, currencyId);
         if (receiver == null) {
-            return false;
+            return TransferReceipt.refused();
         }
         double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
         double received = amount - tax;
@@ -492,12 +502,12 @@ public class EconomyServiceImpl implements EconomyService {
         receiver.setCash(receiver.getCash() + received);
         if (!updateBalance(sender)) {
             sender.setCash(sender.getCash() + amount);
-            return false;
+            return TransferReceipt.refused();
         }
         if (!updateBalance(receiver)) {
             sender.setCash(sender.getCash() + amount);
             updateBalance(sender);
-            return false;
+            return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
             try {
@@ -505,7 +515,7 @@ public class EconomyServiceImpl implements EconomyService {
             } catch (IllegalAccessException ignored) {
             }
         }
-        return true;
+        return TransferReceipt.completed(received, tax);
     }
 
     @Override

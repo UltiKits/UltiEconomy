@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.EconomyService;
+import com.ultikits.plugins.economy.service.TransferReceipt;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.*;
@@ -56,9 +57,11 @@ public class PayCommand extends BaseCommandExecutor {
             return;
         }
 
-        boolean success = economyService.transfer(sender.getUniqueId(), target.getUniqueId(), amount);
-        if (success) {
-            String formatted = economyService.formatAmount(amount);
+        TransferReceipt receipt = economyService.transferWithReceipt(sender.getUniqueId(), target.getUniqueId(), amount);
+        if (receipt.isSuccess()) {
+            // Both lines name what the receiver was credited, after any transaction tax
+            // (UltiKits/UltiEconomy#18).
+            String formatted = economyService.formatAmount(receipt.getCredited());
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.pay.sent"), formatted, target.getName()));
             target.sendMessage(ChatColor.GREEN + String.format(
@@ -106,9 +109,10 @@ public class PayCommand extends BaseCommandExecutor {
             return;
         }
 
-        boolean success = economyService.transfer(sender.getUniqueId(), target.getUniqueId(), amount, resolvedId);
-        if (success) {
-            String formatted = economyService.formatAmount(amount, resolvedId);
+        TransferReceipt receipt = economyService.transferWithReceipt(
+                sender.getUniqueId(), target.getUniqueId(), amount, resolvedId);
+        if (receipt.isSuccess()) {
+            String formatted = economyService.formatAmount(receipt.getCredited(), resolvedId);
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.pay.sent"), formatted, target.getName()));
             target.sendMessage(ChatColor.GREEN + String.format(

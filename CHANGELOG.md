@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `/pay` now tells both players the amount the receiver was actually credited, after transaction tax
+  (for example `$95.00` for `/pay <player> 100` at the shipped 5% rate); it used to quote the amount
+  sent (UltiKits/UltiEconomy#18).
+- `/pay` 现在告诉双方收款人扣税后实际到账的金额（例如默认税率 5% 时 `/pay <玩家> 100` 显示 `$95.00`）；此前显示的是
+  发出的金额（UltiKits/UltiEconomy#18）。
 - `/deposit`, `/withdraw` and `/pay` with a currency name now refuse a currency that does not exist,
   saying so (`Currency not found`), before any balance is touched; they used to answer with the
   generic insufficient-balance line (UltiKits/UltiEconomy#13).
