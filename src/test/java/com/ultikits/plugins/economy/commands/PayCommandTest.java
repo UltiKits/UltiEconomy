@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PayCommandTest {
 
-    @Mock private UltiToolsPlugin plugin;
+    @Mock private com.ultikits.plugins.economy.UltiEconomy plugin;
     @Mock private EconomyService economyService;
     @Mock private Player sender;
     @Mock private Player target;
@@ -36,6 +36,7 @@ class PayCommandTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(plugin.getCurrencyManager()).thenReturn(com.ultikits.plugins.economy.testsupport.Currencies.coinsAndGems());
         lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(sender.getUniqueId()).thenReturn(SENDER_UUID);
         lenient().when(sender.getName()).thenReturn("Alice");
@@ -262,5 +263,26 @@ class PayCommandTest {
         helpMethod.invoke(command, helpSender);
 
         verify(helpSender, atLeast(2)).sendMessage(anyString());
+    }
+
+    @Nested
+    @DisplayName("an unknown currency is refused (#13)")
+    class UnknownCurrency {
+
+        @Test
+        @DisplayName("/pay <player> <amount> <unknown currency> says the currency does not exist and moves nothing")
+        void refusesAnUnknownCurrency() {
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(target);
+
+                command.onPayWithCurrency(sender, "Bob", "100", "rubies");
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(sender).sendMessage(captor.capture());
+                assertThat(captor.getValue()).contains(CatalogueText.text("zh", "economy.error.currency_not_found"));
+                verify(economyService, never()).transfer(any(), any(), anyDouble(), anyString());
+                verify(target, never()).sendMessage(anyString());
+            }
+        }
     }
 }
