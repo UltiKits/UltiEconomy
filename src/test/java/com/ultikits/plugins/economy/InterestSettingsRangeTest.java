@@ -142,6 +142,31 @@ class InterestSettingsRangeTest {
     }
 
     @Test
+    @DisplayName("An infinite max-interest (YAML .inf, or a number too large for a double) falls back to 10000 with a warning")
+    void anInfiniteCapFallsBack() {
+        UltiEconomy module = module();
+        config.setMaxInterest(Double.POSITIVE_INFINITY);
+
+        start(module);
+
+        assertThat(config.getMaxInterest()).isEqualTo(10000.0);
+        assertThat(warnings()).anySatisfy(w -> assertThat(w)
+                .contains("interest.max-interest").contains("Infinity").contains("10000"));
+    }
+
+    @Test
+    @DisplayName("A rate that is not a number falls back to 0.03 with a warning")
+    void aNotANumberRateFallsBack() {
+        UltiEconomy module = module();
+        config.setInterestRate(Double.NaN);
+
+        start(module);
+
+        assertThat(config.getInterestRate()).isEqualTo(0.03);
+        assertThat(warnings()).anySatisfy(w -> assertThat(w).contains("interest.rate").contains("NaN"));
+    }
+
+    @Test
     @DisplayName("After a reload the check runs again: a rate edited to 3 falls back to 0.03")
     void theCheckRunsAgainAfterAReload() throws Exception {
         UltiEconomy module = module();
