@@ -175,6 +175,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The primary currency's name and symbol now come from `config.yml` (`currency-name`, `currency-symbol`)
+  everywhere: Vault, `/eco treasury` and every other place that shows them. The primary entry of
+  `currencies.yml` follows it; a different `display-name` or `symbol` written there is reported at
+  start-up. While `currency-name` is still the shipped `Coins`, it is written in the server's language
+  (`金币` under `language: zh`). Previously the two files were read by different paths and a rename in
+  one showed up in only half of the output (UltiKits/UltiEconomy#32).
+- 主货币的名称和符号现在一律取自 `config.yml`（`currency-name`、`currency-symbol`）：Vault、`/eco treasury` 以及所有
+  显示它们的地方都是如此。`currencies.yml` 中主货币那一条跟随它，若在那里写了不同的 `display-name` 或 `symbol`，启动
+  时会发出警告。`currency-name` 仍为出厂的 `Coins` 时，会按服务器语言写入（`language: zh` 下为 `金币`）。此前两个文件由
+  不同代码路径读取，只改其中一个只会影响一半的输出（UltiKits/UltiEconomy#32）。
 - `interest.rate` must now be from 0 to 1 and `interest.max-interest` must be -1 (no cap) or at least 0.
   A value outside its range is not used: the default (`0.03`, `10000`) is, with a warning naming the
   key, the value as written and the default, at start-up and after every reload. Previously any value

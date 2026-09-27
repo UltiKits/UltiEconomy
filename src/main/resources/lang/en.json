@@ -70,6 +70,8 @@
   "economy.warn.value_out_of_range": "%s: %s in %s is %s, which is outside %s; the default %s is used instead. Set a value in that range and run /ul reload %s.",
   "economy.warn.range_interest_rate": "0 to 1",
   "economy.warn.range_max_interest": "-1 (no cap) or 0 and above",
+  "economy.config.currency_name": "Coins",
+  "economy.warn.config_save_failed": "Could not save %s after writing its built-in text in the server's language: %s",
   "economy.warn.tax_disabled": "%s: tax.enabled is false in %s, so no tax is collected at all: transfers pay no transaction tax, whatever tax.transaction-tax.* says, and no wealth tax is taken. Before this release (UltiEconomy 2.0.0 and earlier) this switch had no effect and transfers were taxed whenever tax.transaction-tax.enabled was true. To collect taxes, set tax.enabled: true in %s and run /ul reload %s; the next transfer is taxed.",
   "economy.log.wallet_merge.player": "Primary-currency wallet merge: added %s cash and %s bank from %s's second wallet to their account, which now holds %s cash and %s bank.",
   "economy.log.wallet_merge.total": "Primary-currency wallet merge finished: %s player(s) merged, %s cash and %s bank added in total; %s empty second-wallet row(s) removed; %s player(s) left unmerged (see the warnings above).",

@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy;
 
+import com.ultikits.plugins.economy.config.ConfigTextDefaults;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.config.InterestSettings;
 import com.ultikits.plugins.economy.config.StartupWarnings;
@@ -24,6 +25,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -45,7 +47,13 @@ public class UltiEconomy extends UltiToolsPlugin {
                 if (currencyManager == null) {
                     File currenciesFile = getConfigFile("config/currencies.yml");
                     YamlConfiguration yaml = YamlConfiguration.loadConfiguration(currenciesFile);
-                    currencyManager = new CurrencyManager(yaml);
+                    CurrencyManager created = new CurrencyManager(yaml);
+                    // config.yml owns the primary currency's name and symbol (UltiKits/UltiEconomy#32).
+                    EconomyConfig config = getConfig(EconomyConfig.class);
+                    if (config != null) {
+                        created.usePrimaryNaming(config::getCurrencyName, config::getCurrencySymbol);
+                    }
+                    currencyManager = created;
                 }
             }
         }
@@ -83,6 +91,7 @@ public class UltiEconomy extends UltiToolsPlugin {
         }
         EconomyService economyService = getContext().getBean(EconomyService.class);
         EconomyConfig config = getConfig(EconomyConfig.class);
+        writeConfigTextInServerLanguage(config);
         // An interest rate or cap outside what the module can use falls back to its default, now and
         // after every reload (UltiKits/UltiEconomy#29); checked before the start-up warnings print them.
         interestSettingsWatch = InterestSettings.watch(config, getLogger(), this);
@@ -125,6 +134,33 @@ public class UltiEconomy extends UltiToolsPlugin {
                 config.removeChangeListener(interestSettingsWatch);
             }
             interestSettingsWatch = null;
+        }
+    }
+
+    /**
+     * Writes the configuration's built-in text in the server's language after the framework has
+     * reloaded the file and the language (UltiKits/UltiEconomy#32).
+     */
+    @Override
+    protected void onReload() {
+        writeConfigTextInServerLanguage(getConfig(EconomyConfig.class));
+    }
+
+    /**
+     * Writes the primary currency's name into {@code config.yml} in the server's language while it is
+     * still built-in text, and saves the file when it changed; a name the operator chose is kept
+     * (maintainer decision 2026-09-25, UltiKits/UltiEconomy#32).
+     */
+    private void writeConfigTextInServerLanguage(EconomyConfig config) {
+        if (config == null || !config.materializeText(
+                ConfigTextDefaults.jarLanguage(EconomyConfig.class, getLanguageCode())::getLocalizedText)) {
+            return;
+        }
+        try {
+            config.save();
+        } catch (IOException e) {
+            getLogger().warn(String.format(i18n("economy.warn.config_save_failed"), config.getConfigFilePath(),
+                    e.getMessage()));
         }
     }
 

@@ -5,21 +5,65 @@ import com.ultikits.ultitools.annotations.ConfigEntity;
 import com.ultikits.ultitools.annotations.ConfigEntry;
 import lombok.Getter;
 import lombok.Setter;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 
 @Getter
 @Setter
 @ConfigEntity("config/config.yml")
 public class EconomyConfig extends AbstractConfigEntity {
 
+    /** The primary currency's name every earlier version shipped; the Java default of {@link #currencyName}. */
+    static final String SHIPPED_CURRENCY_NAME = "Coins";
+
+    /** The catalogue key of the primary currency's name in the server's language. */
+    static final String CURRENCY_NAME_KEY = "economy.config.currency_name";
+
     public EconomyConfig() {
         super("config/config.yml");
+    }
+
+    /**
+     * Writes the primary currency's name in the server's language (maintainer decision 2026-09-25,
+     * UltiKits/UltiEconomy#32): {@code currency-name} is replaced with {@code text}'s current text
+     * when it is still built-in text -- the name an earlier version shipped, or this jar's text for it
+     * in any language -- and differs from the current text. Any other value is the operator's and is
+     * kept. Idempotent. Must run after the module's language is loaded (enable and
+     * {@code onReload()}); the caller saves the file when this returns {@code true}.
+     *
+     * @param text the jar's catalogue for the server's language, as {@code getLocalizedText}
+     * @return whether {@code currency-name} changed
+     */
+    public boolean materializeText(Function<String, String> text) {
+        Map<String, Map<String, String>> jar = ConfigTextDefaults.jarCatalogues(EconomyConfig.class);
+        String newName = ConfigTextDefaults.materialize(EconomyConfig.class, "currencyName", currencyName,
+                ConfigTextDefaults.currentText(text, "", CURRENCY_NAME_KEY),
+                ConfigTextDefaults.tracked(jar, "", CURRENCY_NAME_KEY, SHIPPED_CURRENCY_NAME));
+        if (Objects.equals(newName, currencyName)) {
+            return false;
+        }
+        currencyName = newName;
+        return true;
+    }
+
+    /**
+     * Every text that counts as the primary currency's built-in name: the name an earlier version
+     * shipped, and this jar's text for it in every language.
+     *
+     * @return the built-in names
+     */
+    public static Set<String> builtInCurrencyNames() {
+        return ConfigTextDefaults.tracked(ConfigTextDefaults.jarCatalogues(EconomyConfig.class), "",
+                CURRENCY_NAME_KEY, SHIPPED_CURRENCY_NAME);
     }
 
     @ConfigEntry(path = "initial-cash", comment = "Initial cash for new players")
     private double initialCash = 1000.0;
 
     @ConfigEntry(path = "currency-name", comment = "Currency display name")
-    private String currencyName = "Coins";
+    private String currencyName = SHIPPED_CURRENCY_NAME;
 
     @ConfigEntry(path = "currency-symbol", comment = "Currency symbol prefix")
     private String currencySymbol = "$";
