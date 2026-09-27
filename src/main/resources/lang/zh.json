@@ -16,7 +16,6 @@
   "economy.help.note_create": "创建纸币",
   "economy.help.note_create_currency": "创建指定货币纸币",
   "economy.help.note_redeem": "兑换手中纸币",
-  "economy.error.tax_disabled": "税收系统未启用",
   "economy.treasury.withdrawn": "已从国库提取 %s",
   "economy.treasury.insufficient": "国库余额不足",
   "economy.vault.insufficient_funds": "余额不足",

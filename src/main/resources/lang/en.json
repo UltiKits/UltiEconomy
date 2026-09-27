@@ -16,7 +16,6 @@
   "economy.help.note_create": "Create money note",
   "economy.help.note_create_currency": "Create money note (specific currency)",
   "economy.help.note_redeem": "Redeem held money note",
-  "economy.error.tax_disabled": "Tax system is not enabled",
   "economy.treasury.withdrawn": "Withdrew %s from treasury",
   "economy.treasury.insufficient": "Insufficient treasury balance",
   "economy.vault.insufficient_funds": "Insufficient funds",
