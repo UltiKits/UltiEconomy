@@ -66,6 +66,7 @@ class PayCommandReceiptTest {
         lenient().when(bob.getUniqueId()).thenReturn(BOB);
         lenient().when(bob.getName()).thenReturn("Bob");
         bukkit = mockStatic(Bukkit.class);
+        bukkit.when(Bukkit::getServer).thenReturn(mock(org.bukkit.Server.class));
         bukkit.when(() -> Bukkit.getPlayer("Bob")).thenReturn(bob);
         bukkit.when(() -> Bukkit.getPlayer(ALICE)).thenReturn(alice);
         bukkit.when(() -> Bukkit.getPlayer(BOB)).thenReturn(bob);
