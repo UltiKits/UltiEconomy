@@ -43,27 +43,25 @@ public final class ConfigRanges {
     }
 
     /**
-     * Replaces each out-of-range value with its declared default, warning once for each.
+     * Warns once for each value outside its range. The value is not changed: {@link EconomyConfig}'s
+     * getters answer the declared default while the file's value is outside its range, so the module
+     * never uses it, and a save of the file writes back what the operator wrote.
      */
     static void enforce(EconomyConfig config, PluginLogger logger, UltiToolsPlugin plugin) {
-        EconomyConfig declared = new EconomyConfig();
-        double rate = config.getInterestRate();
-        if (!(rate >= 0 && rate <= 1)) {
-            config.setInterestRate(declared.getInterestRate());
+        double rate = config.writtenInterestRate();
+        if (!EconomyConfig.isUsableFraction(rate)) {
             warn(config, logger, plugin, "interest.rate", rate, plugin.i18n("economy.warn.range_interest_rate"),
-                    declared.getInterestRate());
+                    EconomyConfig.DEFAULT_INTEREST_RATE);
         }
-        double cap = config.getMaxInterest();
-        if (!(cap == -1 || cap >= 0)) {
-            config.setMaxInterest(declared.getMaxInterest());
+        double cap = config.writtenMaxInterest();
+        if (!EconomyConfig.isUsableCap(cap)) {
             warn(config, logger, plugin, "interest.max-interest", cap, plugin.i18n("economy.warn.range_max_interest"),
-                    declared.getMaxInterest());
+                    EconomyConfig.DEFAULT_MAX_INTEREST);
         }
-        double taxRate = config.getTransactionTaxRate();
-        if (!(taxRate >= 0 && taxRate <= 1)) {
-            config.setTransactionTaxRate(declared.getTransactionTaxRate());
+        double taxRate = config.writtenTransactionTaxRate();
+        if (!EconomyConfig.isUsableFraction(taxRate)) {
             warn(config, logger, plugin, "tax.transaction-tax.rate", taxRate,
-                    plugin.i18n("economy.warn.range_transaction_tax_rate"), declared.getTransactionTaxRate());
+                    plugin.i18n("economy.warn.range_transaction_tax_rate"), EconomyConfig.DEFAULT_TRANSACTION_TAX_RATE);
         }
     }
 
