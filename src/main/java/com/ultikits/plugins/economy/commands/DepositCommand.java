@@ -1,6 +1,7 @@
 package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -89,9 +90,15 @@ public class DepositCommand extends BaseCommandExecutor {
             return;
         }
 
-        boolean success = economyService.depositToBank(player.getUniqueId(), amount, currencyId);
+        CurrencyDefinition currency = CurrencyArguments.resolveOrRefuse(plugin, player, currencyId);
+        if (currency == null) {
+            return;
+        }
+        String resolvedId = currency.getId();
+
+        boolean success = economyService.depositToBank(player.getUniqueId(), amount, resolvedId);
         if (success) {
-            String formatted = economyService.formatAmount(amount, currencyId);
+            String formatted = economyService.formatAmount(amount, resolvedId);
             player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.deposit.success"), formatted));
         } else {
             player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));

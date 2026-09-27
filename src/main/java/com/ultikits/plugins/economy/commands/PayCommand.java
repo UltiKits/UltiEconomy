@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.commands;
 
+import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.EconomyService;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -88,6 +89,12 @@ public class PayCommand extends BaseCommandExecutor {
             return;
         }
 
+        CurrencyDefinition currency = CurrencyArguments.resolveOrRefuse(plugin, sender, currencyId);
+        if (currency == null) {
+            return;
+        }
+        String resolvedId = currency.getId();
+
         Player target = Bukkit.getPlayer(targetName);
         if (target == null) {
             sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.player_not_found"));
@@ -99,9 +106,9 @@ public class PayCommand extends BaseCommandExecutor {
             return;
         }
 
-        boolean success = economyService.transfer(sender.getUniqueId(), target.getUniqueId(), amount, currencyId);
+        boolean success = economyService.transfer(sender.getUniqueId(), target.getUniqueId(), amount, resolvedId);
         if (success) {
-            String formatted = economyService.formatAmount(amount, currencyId);
+            String formatted = economyService.formatAmount(amount, resolvedId);
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.pay.sent"), formatted, target.getName()));
             target.sendMessage(ChatColor.GREEN + String.format(

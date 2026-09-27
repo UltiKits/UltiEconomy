@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `/deposit`, `/withdraw` and `/pay` with a currency name now refuse a currency that does not exist,
+  saying so (`Currency does not exist`), before any balance is touched; they used to answer with the
+  generic insufficient-balance line (UltiKits/UltiEconomy#13).
+- 带货币名的 `/deposit`、`/withdraw`、`/pay` 现在会在动用任何余额之前拒绝不存在的货币，并如实提示“货币不存在”；
+  此前回复的是通用的余额不足提示（UltiKits/UltiEconomy#13）。
 - `language: en` now applies to the command messages that showed their Chinese source text in every
   language because their keys were missing from both language files: the `/money` and `/bank`
   balance lines, the `/pay`, `/deposit` and `/withdraw` success lines, the `/eco give`, `take`, `set`
