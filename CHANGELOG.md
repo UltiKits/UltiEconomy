@@ -175,6 +175,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `tax.transaction-tax.exempt-permission` now works: a player holding it (`ultieconomy.tax.exempt` by
+  default) pays no transaction tax on `/pay`; it used to be declared but never checked
+  (UltiKits/UltiEconomy#26).
+- `tax.transaction-tax.exempt-permission` 现在生效：持有该权限（默认 `ultieconomy.tax.exempt`）的玩家使用 `/pay` 时不再
+  缴纳交易税；此前该配置项只有声明、从未检查（UltiKits/UltiEconomy#26）。
 - `/pay` now tells both players the amount the receiver was actually credited, after transaction tax
   (for example `$95.00` for `/pay <player> 100` at the shipped 5% rate); it used to quote the amount
   sent (UltiKits/UltiEconomy#18).

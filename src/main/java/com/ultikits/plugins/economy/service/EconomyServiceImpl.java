@@ -10,6 +10,9 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.UUID;
@@ -197,6 +200,28 @@ public class EconomyServiceImpl implements EconomyService {
         return updateAccount(account);
     }
 
+    /**
+     * The transaction tax on a transfer of {@code amount} by {@code payer}: none for a payer holding
+     * {@code tax.transaction-tax.exempt-permission} (UltiKits/UltiEconomy#26). A transfer is started
+     * by an online player ({@code /pay}), whose permissions are read here; a payer who is not
+     * online cannot be checked and is taxed.
+     */
+    private double transactionTax(UUID payer, double amount) {
+        if (taxService == null) {
+            return 0.0;
+        }
+        String exemptPermission = config.getTransactionTaxExemptPermission();
+        if (exemptPermission != null && !exemptPermission.isEmpty()) {
+            // No server means no online player whose permission could be read (the service used
+            // on its own, outside a running server): the payer is taxed.
+            Player player = Bukkit.getServer() == null ? null : Bukkit.getPlayer(payer);
+            if (player != null && player.hasPermission(exemptPermission)) {
+                return 0.0;
+            }
+        }
+        return taxService.calculateTransactionTax(amount);
+    }
+
     @Override
     public boolean transfer(UUID from, UUID to, double amount) {
         return transferWithReceipt(from, to, amount).isSuccess();
@@ -215,7 +240,7 @@ public class EconomyServiceImpl implements EconomyService {
         if (receiver == null) {
             return TransferReceipt.refused();
         }
-        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double tax = transactionTax(from, amount);
         double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
         receiver.setCash(receiver.getCash() + received);
@@ -496,7 +521,7 @@ public class EconomyServiceImpl implements EconomyService {
         if (receiver == null) {
             return TransferReceipt.refused();
         }
-        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double tax = transactionTax(from, amount);
         double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
         receiver.setCash(receiver.getCash() + received);
