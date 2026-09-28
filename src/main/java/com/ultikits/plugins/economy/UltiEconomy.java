@@ -34,8 +34,18 @@ import java.util.UUID;
 public class UltiEconomy extends UltiToolsPlugin {
 
     private VaultEconomyProvider vaultProvider;
-    // Created only when PlaceholderAPI is installed; unregistered again on unload (UltiKits/UltiEconomy#23)
-    private EconomyPlaceholderExpansion placeholderExpansion;
+    // Created only when PlaceholderAPI is installed; unregistered again on unload (UltiKits/UltiEconomy#23).
+    // Held as Object, not EconomyPlaceholderExpansion (UltiKits/UltiEconomy#34): the framework's
+    // container reflects over this class's declared fields (AutowireFactory#autowireBean), and
+    // Class#getDeclaredFields() eagerly resolves every field's declared type. A field typed
+    // EconomyPlaceholderExpansion forces the JVM to load that class, which forces loading its
+    // PlaceholderAPI supertype -- on a server without PlaceholderAPI this throws
+    // NoClassDefFoundError and the whole module fails to load, regardless of whether PlaceholderAPI
+    // is ever actually used. The concrete type is still used, and only used, inside the
+    // PlaceholderAPI-present branches of registerSelf()/onUnregister() below, where the cast is
+    // resolved lazily at first execution -- never on a server without PlaceholderAPI, because
+    // those branches never run there.
+    private Object placeholderExpansion;
     // Re-checks the interest settings after each reload; removed on unload (UltiKits/UltiEconomy#29)
     private ConfigChangeListener configRangesWatch;
     private volatile CurrencyManager currencyManager;
@@ -110,9 +120,10 @@ public class UltiEconomy extends UltiToolsPlugin {
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             LeaderboardService leaderboardService = getContext().getBean(LeaderboardService.class);
-            placeholderExpansion = new EconomyPlaceholderExpansion(economyService, leaderboardService,
-                    getCurrencyManager());
-            placeholderExpansion.register();
+            EconomyPlaceholderExpansion expansion = new EconomyPlaceholderExpansion(economyService,
+                    leaderboardService, getCurrencyManager());
+            expansion.register();
+            placeholderExpansion = expansion;
         }
 
         return true;
@@ -126,7 +137,7 @@ public class UltiEconomy extends UltiToolsPlugin {
         // The expansion would otherwise keep answering placeholders from this unloaded module until
         // the server restarts (UltiKits/UltiEconomy#23).
         if (placeholderExpansion != null) {
-            placeholderExpansion.unregister();
+            ((EconomyPlaceholderExpansion) placeholderExpansion).unregister();
             placeholderExpansion = null;
         }
         if (configRangesWatch != null) {
