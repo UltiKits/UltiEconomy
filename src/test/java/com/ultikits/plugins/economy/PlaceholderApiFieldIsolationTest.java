@@ -124,7 +124,10 @@ class PlaceholderApiFieldIsolationTest {
         Class<?> type;
         try {
             type = Class.forName(className, false, loader);
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | LinkageError e) {
+            // On some JVMs, merely defining a class already resolves a poisoned field's type
+            // (rather than deferring that to getDeclaredFields() below) -- either point is a
+            // faithful reproduction of the real crash, so both are reported the same way.
             return java.util.Collections.singletonList(className + " could not even be loaded: " + e);
         }
         assertThat(type.getClassLoader())
