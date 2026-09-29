@@ -655,20 +655,22 @@ class InterestServiceTest {
             assertThat(next.getBank()).isCloseTo(10300.0, within(1e-6));
         }
 
+        /**
+         * A negative rate is outside 0 to 1, so the module uses the default instead (UltiKits/UltiEconomy#29,
+         * {@code ConfigRangesFileTest} and {@code InterestSettingsRangeTest}); 0 is in range and pays nothing.
+         */
         @Test
-        @DisplayName("interest.rate 0 or negative writes nothing and tells nobody")
+        @DisplayName("interest.rate 0 writes nothing and tells nobody")
         void nonPositiveRatePaysAndAnnouncesNothing() throws Exception {
             PlayerAccountEntity saver = account(PLAYER1_UUID, 10000.0);
             when(dataOperator.getAll()).thenReturn(Collections.singletonList(saver));
             Player owner = mock(Player.class);
             lenient().when(owner.isOnline()).thenReturn(true);
 
-            for (double rate : new double[] {0.0, -0.03}) {
-                config.setInterestRate(rate);
-                try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-                    bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(owner);
-                    service.distributeInterest();
-                }
+            config.setInterestRate(0.0);
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(owner);
+                service.distributeInterest();
             }
 
             verify(dataOperator, never()).update(any(PlayerAccountEntity.class));

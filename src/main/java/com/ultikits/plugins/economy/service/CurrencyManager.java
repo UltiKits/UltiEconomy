@@ -5,12 +5,16 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 public class CurrencyManager {
 
     private final Map<String, CurrencyDefinition> currencies = new LinkedHashMap<>();
     private final String primaryCurrencyId;
     private final ConfigurationSection primarySection;
+    // config.yml's currency-name and currency-symbol, read live (UltiKits/UltiEconomy#32); null until set
+    private Supplier<String> primaryName;
+    private Supplier<String> primarySymbol;
 
     public CurrencyManager(YamlConfiguration yaml) {
         ConfigurationSection section = yaml.getConfigurationSection("currencies");
@@ -62,8 +66,39 @@ public class CurrencyManager {
         return primarySection;
     }
 
+    /**
+     * Makes the primary currency's display name and symbol those of {@code config.yml}
+     * ({@code currency-name}, {@code currency-symbol}), read each time the currency is looked up so a
+     * reload is followed; the primary block of {@code currencies.yml} no longer decides them
+     * (maintainer decision 2026-09-27, UltiKits/UltiEconomy#32).
+     *
+     * @param name   supplies the primary currency's display name
+     * @param symbol supplies the primary currency's symbol
+     */
+    public void usePrimaryNaming(Supplier<String> name, Supplier<String> symbol) {
+        this.primaryName = name;
+        this.primarySymbol = symbol;
+    }
+
+    /** A currency as callers see it: the primary one carries config.yml's name and symbol. */
+    private CurrencyDefinition present(CurrencyDefinition def) {
+        if (def == null || !def.isPrimary() || primaryName == null) {
+            return def;
+        }
+        return CurrencyDefinition.builder()
+                .id(def.getId())
+                .displayName(primaryName.get())
+                .symbol(primarySymbol.get())
+                .initialCash(def.getInitialCash())
+                .bankEnabled(def.isBankEnabled())
+                .minDeposit(def.getMinDeposit())
+                .maxBankBalance(def.getMaxBankBalance())
+                .primary(true)
+                .build();
+    }
+
     public CurrencyDefinition getCurrency(String id) {
-        return currencies.get(id);
+        return present(currencies.get(id));
     }
 
     /**
@@ -83,11 +118,11 @@ public class CurrencyManager {
             return null;
         }
         String trimmed = rawId.trim();
-        return trimmed.isEmpty() ? null : currencies.get(trimmed);
+        return trimmed.isEmpty() ? null : present(currencies.get(trimmed));
     }
 
     public CurrencyDefinition getPrimaryCurrency() {
-        return currencies.get(primaryCurrencyId);
+        return present(currencies.get(primaryCurrencyId));
     }
 
     public String getPrimaryCurrencyId() {
@@ -99,6 +134,10 @@ public class CurrencyManager {
     }
 
     public Collection<CurrencyDefinition> getAllCurrencies() {
-        return Collections.unmodifiableCollection(currencies.values());
+        List<CurrencyDefinition> all = new ArrayList<>(currencies.size());
+        for (CurrencyDefinition def : currencies.values()) {
+            all.add(present(def));
+        }
+        return Collections.unmodifiableList(all);
     }
 }

@@ -1,4 +1,4 @@
-package com.ultikits.plugins.economy.placeholder;
+package com.ultikits.plugins.placeholderapi.economy;
 
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;

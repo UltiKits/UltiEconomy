@@ -77,6 +77,13 @@ class UltiEconomyLanguageCatalogueTest {
             //                 + "everything else to backup.reason.unknown",
             //         "backup.reason.manual", "backup.reason.auto", "backup.reason.death",
             //         "backup.reason.quit", "backup.reason.admin", "backup.reason.unknown")
+            new DynamicSite("src/main/java/com/ultikits/plugins/economy/UltiEconomy.java",
+                    "::getLocalizedText",
+                    "UltiEconomy#writeConfigTextInServerLanguage passes the jar catalogue's getLocalizedText "
+                            + "(ConfigTextDefaults#jarLanguage) to EconomyConfig#materializeText, which asks it for "
+                            + "exactly CURRENCY_NAME_KEY (config text written in the server's language, from the "
+                            + "module jar's own catalogue)",
+                    "economy.config.currency_name")
     ));
 
     private static List<SourceFile> sources;

@@ -501,15 +501,13 @@ class EcoAdminCommandTest {
         }
 
         @Test
-        @DisplayName("treasury commands show error when tax disabled")
-        void treasuryDisabled() {
-            EcoAdminCommand noTaxCommand = EcoAdminCommand.createForTest(plugin, economyService);
-
-            noTaxCommand.onTreasury(sender);
-
-            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(sender).sendMessage(captor.capture());
-            assertThat(captor.getValue()).contains("税收系统未启用");
+        @DisplayName("no treasury command has a tax-system-not-enabled refusal: the message is not in either catalogue (#28)")
+        void noTaxDisabledRefusalMessage() {
+            for (String code : new String[]{"en", "zh"}) {
+                assertThat(com.ultikits.plugins.economy.i18n.CatalogueText.entries(code).keySet())
+                        .as("control: the %s catalogue was read", code).contains("economy.error.currency_not_found")
+                        .doesNotContain("economy.error.tax_disabled");
+            }
         }
     }
 }

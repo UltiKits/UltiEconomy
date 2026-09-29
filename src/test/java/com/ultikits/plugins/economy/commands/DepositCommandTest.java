@@ -22,7 +22,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DepositCommandTest {
 
-    @Mock private UltiToolsPlugin plugin;
+    @Mock private com.ultikits.plugins.economy.UltiEconomy plugin;
     @Mock private EconomyService economyService;
     @Mock private Player player;
 
@@ -33,6 +33,7 @@ class DepositCommandTest {
     @BeforeEach
     void setUp() {
         config = new EconomyConfig();
+        lenient().when(plugin.getCurrencyManager()).thenReturn(com.ultikits.plugins.economy.testsupport.Currencies.coinsAndGems());
         lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         command = new DepositCommand(plugin, economyService, config);
@@ -190,5 +191,32 @@ class DepositCommandTest {
         helpMethod.invoke(command, sender);
 
         verify(sender, atLeast(2)).sendMessage(anyString());
+    }
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("an unknown currency is refused (#13)")
+    class UnknownCurrency {
+
+        @Test
+        @DisplayName("/deposit <amount> <unknown currency> says the currency does not exist and writes nothing")
+        void refusesAnUnknownCurrency() {
+            command.onDepositCurrency(player, "100", "rubies");
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(player).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains(CatalogueText.text("zh", "economy.error.currency_not_found"));
+            verify(economyService, never()).depositToBank(any(), anyDouble(), anyString());
+        }
+
+        @Test
+        @DisplayName("the canonical currency id is used downstream (incidental whitespace trimmed)")
+        void usesTheCanonicalCurrencyId() {
+            when(economyService.depositToBank(PLAYER_UUID, 100.0, "gems")).thenReturn(true);
+            when(economyService.formatAmount(100.0, "gems")).thenReturn("G100.00");
+
+            command.onDepositCurrency(player, "100", " gems ");
+
+            verify(economyService).depositToBank(PLAYER_UUID, 100.0, "gems");
+        }
     }
 }

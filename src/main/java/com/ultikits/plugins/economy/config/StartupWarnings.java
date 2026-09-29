@@ -30,6 +30,9 @@ public final class StartupWarnings {
     /** The file that defines the currencies, relative to the module's config folder. */
     private static final String CURRENCIES_FILE = "config/currencies.yml";
 
+    /** The primary currency's symbol every earlier version shipped in {@code currencies.yml}. */
+    private static final String SHIPPED_SYMBOL = "$";
+
     /** This module's runtime name, which is what {@code /ul reload <name>} expects. */
     private static final String RUNTIME_NAME = "UltiTools-Economy";
 
@@ -97,6 +100,19 @@ public final class StartupWarnings {
         if (primary.contains("min-deposit") && Double.compare(primary.getDouble("min-deposit"), config.getMinDeposit()) != 0) {
             warnConflict(logger, plugin, prefix + "min-deposit", String.valueOf(primary.getDouble("min-deposit")),
                     file, "bank.min-deposit", String.valueOf(config.getMinDeposit()));
+        }
+        // config.yml also owns the name and symbol (UltiKits/UltiEconomy#32). The name an earlier
+        // version shipped, or this jar's text for it in any language, is not an operator's choice and
+        // simply follows config.yml, so it is not reported.
+        if (primary.contains("display-name") && !primary.getString("display-name", "").equals(config.getCurrencyName())
+                && !EconomyConfig.builtInCurrencyNames().contains(primary.getString("display-name"))) {
+            warnConflict(logger, plugin, prefix + "display-name", primary.getString("display-name"),
+                    file, "currency-name", config.getCurrencyName());
+        }
+        if (primary.contains("symbol") && !primary.getString("symbol", "").equals(config.getCurrencySymbol())
+                && !SHIPPED_SYMBOL.equals(primary.getString("symbol"))) {
+            warnConflict(logger, plugin, prefix + "symbol", primary.getString("symbol"),
+                    file, "currency-symbol", config.getCurrencySymbol());
         }
         // Every reader treats a cap of 0 or below as "no cap", so 0 and -1 agree.
         if (primary.contains("max-bank-balance")

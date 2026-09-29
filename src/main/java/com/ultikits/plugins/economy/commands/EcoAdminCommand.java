@@ -281,10 +281,6 @@ public class EcoAdminCommand extends BaseCommandExecutor {
 
     @CmdMapping(format = "treasury")
     public void onTreasury(@CmdSender CommandSender sender) {
-        if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
-            return;
-        }
         if (currencyManager != null) {
             for (com.ultikits.plugins.economy.model.CurrencyDefinition def : currencyManager.getAllCurrencies()) {
                 double balance = taxService.getTreasuryBalance(def.getId());
@@ -298,10 +294,6 @@ public class EcoAdminCommand extends BaseCommandExecutor {
     public void onTreasuryWithdraw(
             @CmdSender CommandSender sender,
             @CmdParam("amount") String amountStr) {
-        if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
-            return;
-        }
         double amount = parseAmount(sender, amountStr);
         if (amount <= 0) return;
         String primaryId = currencyManager.getPrimaryCurrency().getId();
@@ -324,10 +316,6 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             @CmdSender CommandSender sender,
             @CmdParam("amount") String amountStr,
             @CmdParam("currency") String currencyId) {
-        if (taxService == null) {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.tax_disabled"));
-            return;
-        }
         double amount = parseAmount(sender, amountStr);
         if (amount <= 0) return;
         try {

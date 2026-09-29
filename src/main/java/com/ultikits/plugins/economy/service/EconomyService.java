@@ -38,6 +38,13 @@ public interface EconomyService {
 
     boolean transfer(UUID from, UUID to, double amount);
 
+    /**
+     * Transfers primary-currency cash and reports what the receiver was credited after tax.
+     *
+     * @return the receipt; {@link TransferReceipt#isSuccess()} is what {@link #transfer(UUID, UUID, double)} returns
+     */
+    TransferReceipt transferWithReceipt(UUID from, UUID to, double amount);
+
     boolean depositToBank(UUID playerUuid, double amount);
 
     boolean withdrawFromBank(UUID playerUuid, double amount);
@@ -73,6 +80,13 @@ public interface EconomyService {
     boolean takeBank(UUID playerUuid, double amount, String currencyId);
 
     boolean transfer(UUID from, UUID to, double amount, String currencyId);
+
+    /**
+     * Transfers cash in a currency and reports what the receiver was credited after tax.
+     *
+     * @return the receipt; {@link TransferReceipt#isSuccess()} is what {@link #transfer(UUID, UUID, double, String)} returns
+     */
+    TransferReceipt transferWithReceipt(UUID from, UUID to, double amount, String currencyId);
 
     boolean depositToBank(UUID playerUuid, double amount, String currencyId);
 

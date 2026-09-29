@@ -10,6 +10,9 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.UUID;
@@ -197,31 +200,58 @@ public class EconomyServiceImpl implements EconomyService {
         return updateAccount(account);
     }
 
+    /**
+     * The transaction tax on a transfer of {@code amount} by {@code payer}: none for a payer holding
+     * {@code tax.transaction-tax.exempt-permission} (UltiKits/UltiEconomy#26). A transfer is started
+     * by an online player ({@code /pay}), whose permissions are read here; a payer who is not
+     * online cannot be checked and is taxed.
+     */
+    private double transactionTax(UUID payer, double amount) {
+        if (taxService == null) {
+            return 0.0;
+        }
+        String exemptPermission = config.getTransactionTaxExemptPermission();
+        if (exemptPermission != null && !exemptPermission.isEmpty()) {
+            // No server means no online player whose permission could be read (the service used
+            // on its own, outside a running server): the payer is taxed.
+            Player player = Bukkit.getServer() == null ? null : Bukkit.getPlayer(payer);
+            if (player != null && player.hasPermission(exemptPermission)) {
+                return 0.0;
+            }
+        }
+        return taxService.calculateTransactionTax(amount);
+    }
+
     @Override
     public boolean transfer(UUID from, UUID to, double amount) {
+        return transferWithReceipt(from, to, amount).isSuccess();
+    }
+
+    @Override
+    public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount) {
         if (amount <= 0 || from.equals(to)) {
-            return false;
+            return TransferReceipt.refused();
         }
         PlayerAccountEntity sender = getAccount(from);
         if (sender == null || sender.getCash() < amount) {
-            return false;
+            return TransferReceipt.refused();
         }
         PlayerAccountEntity receiver = getAccount(to);
         if (receiver == null) {
-            return false;
+            return TransferReceipt.refused();
         }
-        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double tax = transactionTax(from, amount);
         double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
         receiver.setCash(receiver.getCash() + received);
         if (!updateAccount(sender)) {
             sender.setCash(sender.getCash() + amount);
-            return false;
+            return TransferReceipt.refused();
         }
         if (!updateAccount(receiver)) {
             sender.setCash(sender.getCash() + amount);
             updateAccount(sender);
-            return false;
+            return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
             try {
@@ -229,7 +259,7 @@ public class EconomyServiceImpl implements EconomyService {
             } catch (IllegalAccessException ignored) {
             }
         }
-        return true;
+        return TransferReceipt.completed(received, tax);
     }
 
     @Override
@@ -472,32 +502,37 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean transfer(UUID from, UUID to, double amount, String currencyId) {
+        return transferWithReceipt(from, to, amount, currencyId).isSuccess();
+    }
+
+    @Override
+    public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount, String currencyId) {
         if (isPrimary(currencyId)) {
-            return transfer(from, to, amount);
+            return transferWithReceipt(from, to, amount);
         }
         if (amount <= 0 || from.equals(to)) {
-            return false;
+            return TransferReceipt.refused();
         }
         CurrencyBalanceEntity sender = getBalance(from, currencyId);
         if (sender == null || sender.getCash() < amount) {
-            return false;
+            return TransferReceipt.refused();
         }
         CurrencyBalanceEntity receiver = getBalance(to, currencyId);
         if (receiver == null) {
-            return false;
+            return TransferReceipt.refused();
         }
-        double tax = (taxService != null) ? taxService.calculateTransactionTax(amount) : 0.0;
+        double tax = transactionTax(from, amount);
         double received = amount - tax;
         sender.setCash(sender.getCash() - amount);
         receiver.setCash(receiver.getCash() + received);
         if (!updateBalance(sender)) {
             sender.setCash(sender.getCash() + amount);
-            return false;
+            return TransferReceipt.refused();
         }
         if (!updateBalance(receiver)) {
             sender.setCash(sender.getCash() + amount);
             updateBalance(sender);
-            return false;
+            return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
             try {
@@ -505,7 +540,7 @@ public class EconomyServiceImpl implements EconomyService {
             } catch (IllegalAccessException ignored) {
             }
         }
-        return true;
+        return TransferReceipt.completed(received, tax);
     }
 
     @Override

@@ -175,6 +175,53 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `tax.transaction-tax.rate` outside 0 to 1 is no longer used: the default 0.05 applies, with a warning
+  naming the key, the value as written and the default, at start-up and after every reload. A negative
+  rate credited the recipient more than the payer paid, and a rate above 1 credited a negative amount.
+- `tax.transaction-tax.rate` 超出 0 到 1 的值不再使用：改用默认值 0.05，并在启动和每次重载后发出警告，写明键名、所写的值和
+  默认值。此前负税率会让收款人收到比付款人付出更多的钱，大于 1 的税率则让收款人收到负数金额。
+- The primary currency's name and symbol now come from `config.yml` (`currency-name`, `currency-symbol`)
+  everywhere: Vault, `/eco treasury` and every other place that shows them. The primary entry of
+  `currencies.yml` follows it; a different `display-name` or `symbol` written there is reported at
+  start-up. While `currency-name` is still the shipped `Coins`, it is written in the server's language
+  (`金币` under `language: zh`). Previously the two files were read by different paths and a rename in
+  one showed up in only half of the output (UltiKits/UltiEconomy#32).
+- 主货币的名称和符号现在一律取自 `config.yml`（`currency-name`、`currency-symbol`）：Vault、`/eco treasury` 以及所有
+  显示它们的地方都是如此。`currencies.yml` 中主货币那一条跟随它，若在那里写了不同的 `display-name` 或 `symbol`，启动
+  时会发出警告。`currency-name` 仍为出厂的 `Coins` 时，会按服务器语言写入（`language: zh` 下为 `金币`）。此前两个文件由
+  不同代码路径读取，只改其中一个只会影响一半的输出（UltiKits/UltiEconomy#32）。
+- `interest.rate` must now be from 0 to 1 and `interest.max-interest` must be -1 (no cap) or at least 0.
+  A value outside its range is not used: the default (`0.03`, `10000`) is, with a warning naming the
+  key, the value as written and the default, at start-up and after every reload. Previously any value
+  was used, so a typo such as `rate: 3` paid 300% per payment (UltiKits/UltiEconomy#29).
+- `interest.rate` 现在必须在 0 到 1 之间，`interest.max-interest` 必须为 -1（不设上限）或不小于 0。超出范围的值不会被
+  使用，而是改用默认值（`0.03`、`10000`），并在启动与每次重载后发出警告，写明配置项、原值和默认值。此前任何值都会被
+  直接使用，`rate: 3` 这样的笔误会让每次付息 300%（UltiKits/UltiEconomy#29）。
+- Unloading this module (`/upm uninstall UltiTools-Economy`) now also unregisters its PlaceholderAPI
+  expansion; `%ultieconomy_...%` placeholders used to keep answering from the unloaded module until a
+  restart (UltiKits/UltiEconomy#23).
+- 卸载本模块（`/upm uninstall UltiTools-Economy`）现在也会注销其 PlaceholderAPI 扩展；此前 `%ultieconomy_...%` 变量会在
+  重启前一直由已卸载的模块应答（UltiKits/UltiEconomy#23）。
+- A server without PlaceholderAPI no longer logs a class-load error for this module's placeholder
+  expansion at every start: the expansion is loaded only after the module has checked that
+  PlaceholderAPI is installed (UltiKits/UltiEconomy#20).
+- 未安装 PlaceholderAPI 的服务器不再在每次启动时为本模块的变量扩展记录类加载错误：扩展只在确认已安装 PlaceholderAPI
+  之后才加载（UltiKits/UltiEconomy#20）。
+- `tax.transaction-tax.exempt-permission` now works: a player holding it (`ultieconomy.tax.exempt` by
+  default) pays no transaction tax on `/pay`; it used to be declared but never checked
+  (UltiKits/UltiEconomy#26).
+- `tax.transaction-tax.exempt-permission` 现在生效：持有该权限（默认 `ultieconomy.tax.exempt`）的玩家使用 `/pay` 时不再
+  缴纳交易税；此前该配置项只有声明、从未检查（UltiKits/UltiEconomy#26）。
+- `/pay` now tells both players the amount the receiver was actually credited, after transaction tax
+  (for example `$95.00` for `/pay <player> 100` at the shipped 5% rate); it used to quote the amount
+  sent (UltiKits/UltiEconomy#18).
+- `/pay` 现在告诉双方收款人扣税后实际到账的金额（例如默认税率 5% 时 `/pay <玩家> 100` 显示 `$95.00`）；此前显示的是
+  发出的金额（UltiKits/UltiEconomy#18）。
+- `/deposit`, `/withdraw` and `/pay` with a currency name now refuse a currency that does not exist,
+  saying so (`Currency not found`), before any balance is touched; they used to answer with the
+  generic insufficient-balance line (UltiKits/UltiEconomy#13).
+- 带货币名的 `/deposit`、`/withdraw`、`/pay` 现在会在动用任何余额之前拒绝不存在的货币，并如实提示“货币不存在”；
+  此前回复的是通用的余额不足提示（UltiKits/UltiEconomy#13）。
 - `language: en` now applies to the command messages that showed their Chinese source text in every
   language because their keys were missing from both language files: the `/money` and `/bank`
   balance lines, the `/pay`, `/deposit` and `/withdraw` success lines, the `/eco give`, `take`, `set`
