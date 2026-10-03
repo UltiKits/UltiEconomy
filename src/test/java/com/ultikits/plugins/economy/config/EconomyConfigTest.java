@@ -21,7 +21,6 @@ class EconomyConfigTest {
         assertThat(config.isInterestEnabled()).isFalse();
         assertThat(config.getInterestRate()).isEqualTo(0.03);
         assertThat(config.getMaxInterest()).isEqualTo(10000.0);
-        assertThat(config.getLeaderboardDisplayCount()).isEqualTo(10);
         assertThat(config.isTaxEnabled()).isTrue();
         assertThat(config.isTransactionTaxEnabled()).isTrue();
         assertThat(config.getTransactionTaxRate()).isEqualTo(0.05);
@@ -39,6 +38,18 @@ class EconomyConfigTest {
     void noWealthTaxSettingIsDeclared() {
         assertThat(declaredPaths()).isNotEmpty().contains("tax.enabled")
                 .noneMatch(path -> path.startsWith("tax.wealth-tax"));
+    }
+
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} was written into every file and read
+     * by nothing -- no command or placeholder of this module shows a fixed number of leaderboard entries
+     * (each top-N placeholder names its own N). So the declaration is deleted rather than wired.
+     */
+    @Test
+    @DisplayName("leaderboard.display-count is not declared; leaderboard.update-interval still is (UltiEconomy#36)")
+    void noLeaderboardDisplayCountIsDeclared() {
+        assertThat(declaredPaths()).contains("leaderboard.update-interval")
+                .doesNotContain("leaderboard.display-count");
     }
 
     /** Every {@code @ConfigEntry} path {@link EconomyConfig} declares. */
@@ -79,7 +90,6 @@ class EconomyConfigTest {
         config.setInterestEnabled(true); // the declared default is false, so set the other value
         config.setInterestRate(0.05);
         config.setMaxInterest(5000.0);
-        config.setLeaderboardDisplayCount(20);
 
         assertThat(config.getInitialCash()).isEqualTo(500.0);
         assertThat(config.getCurrencyName()).isEqualTo("Gold");
@@ -90,6 +100,5 @@ class EconomyConfigTest {
         assertThat(config.isInterestEnabled()).isTrue();
         assertThat(config.getInterestRate()).isEqualTo(0.05);
         assertThat(config.getMaxInterest()).isEqualTo(5000.0);
-        assertThat(config.getLeaderboardDisplayCount()).isEqualTo(20);
     }
 }

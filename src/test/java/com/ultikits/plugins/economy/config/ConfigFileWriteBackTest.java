@@ -171,6 +171,32 @@ class ConfigFileWriteBackTest {
         assertThat(shipped.getInt("leaderboard.update-interval")).isEqualTo(60);
     }
 
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} is deleted, so neither the shipped file
+     * a new server starts from nor a first boot puts it into the operator's file any more.
+     */
+    @Test
+    @DisplayName("Neither the shipped config.yml nor a first boot carries leaderboard.display-count (UltiEconomy#36)")
+    void displayCountIsNeitherShippedNorWritten() throws Exception {
+        YamlConfiguration shipped;
+        try (java.io.InputStream in = ConfigFileWriteBackTest.class.getClassLoader()
+                .getResourceAsStream("config/config.yml")) {
+            assertThat(in).as("shipped config/config.yml on the classpath").isNotNull();
+            shipped = YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        assertThat(shipped.contains("leaderboard.update-interval")).as("control: the shipped file was read").isTrue();
+        assertThat(shipped.contains("leaderboard.display-count")).as("shipped leaderboard.display-count").isFalse();
+
+        File file = writeOperatorFile("");
+        new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
+        assertThat(onDisk.contains("leaderboard.update-interval"))
+                .withFailMessage("control: the first boot wrote nothing; file now reads:%n%s", read(file)).isTrue();
+        assertThat(onDisk.contains("leaderboard.display-count"))
+                .withFailMessage("leaderboard.display-count was written; file now reads:%n%s", read(file)).isFalse();
+    }
+
     private File writeOperatorFile(String content) throws Exception {
         File file = serverDir.resolve("config").resolve("config.yml").toFile();
         Files.createDirectories(file.getParentFile().toPath());

@@ -233,6 +233,38 @@ class StartupWarningsTest {
         }
     }
 
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} was declared and read by nothing; it is
+     * deleted, and a file that still holds it gets the removed-settings warning at load.
+     */
+    @Nested
+    @DisplayName("leaderboard.display-count left in the file (UltiEconomy#36)")
+    class RemovedDisplayCountKey {
+
+        @Test
+        @DisplayName("leaderboard.display-count still in the file logs one warning naming the key, the file and why it went")
+        void leftoverKeyIsNamed() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("leaderboard.display-count", 10);
+            onDisk.set("leaderboard.update-interval", 60);
+
+            List<String> warnings = bootWith(new EconomyConfig(), onDisk);
+
+            List<String> named = warningsMentioning("'leaderboard.display-count'", warnings);
+            assertThat(named).hasSize(1);
+            assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+                    .contains("no longer has any effect").contains("%ultieconomy_top_name_<N>%");
+            // Control: the live interval key beside it is not called dead.
+            assertThat(warningsMentioning("'leaderboard.update-interval'", warnings)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Control: a file without it logs no leaderboard.display-count warning")
+        void noLeftoverNoWarning() {
+            assertThat(warningsMentioning("leaderboard.display-count", bootWith(new EconomyConfig()))).isEmpty();
+        }
+    }
+
     @Nested
     @DisplayName("the warnings follow the language setting")
     class LanguageSetting {
