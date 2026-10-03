@@ -49,10 +49,15 @@ import java.util.function.Supplier;
  * files the other wrote. A server still running a version without this claim is not stopped by it.
  * And a holder that pauses for longer than {@link #STALE_MILLIS} right after a check -- between the
  * check before an account write and that write, or between two heartbeats while it marks or removes
- * rows -- and then goes on can still overlap with the server that took over, because the framework
- * cannot make a write conditional on the claim. The writes it could still make then are one account
- * write (which could add a player's second wallet twice or undo a later change to that account) or
- * row markings and removals, which repeat what the new holder writes.
+ * rows -- and then goes on still overlaps with the server that took over: the framework cannot make a
+ * write conditional on the claim. What it can no longer do is write on top of that server
+ * (UltiKits/UltiEconomy#39): {@link PrimaryWalletMerge} writes every account and second-wallet row
+ * conditionally on what it read, so a write the other server got in first does not apply and the merge
+ * reads again, and an account it creates has an id the table's primary key admits once per player. One
+ * case the balance condition cannot tell apart remains: an account that went back to exactly its
+ * "before" balances (cash and bank both) after the other server credited it and removed the player's
+ * rows -- which needs that server to finish the merge, start, and a player to spend back to the cent,
+ * all within the stalled holder's pause between reading the rows and writing.
  */
 public final class MergeClaim {
 

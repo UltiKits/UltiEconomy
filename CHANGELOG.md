@@ -195,6 +195,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The one-time wallet merge on servers that share one database can no longer add a player's second
+  wallet twice or undo a later change to their account when the server merging stalls for longer than
+  the 30-second takeover and then resumes while the server that took over is merging: every account
+  and second-wallet write now applies only if the row still holds what the merge read, and otherwise
+  the merge reads again and decides again; an account the merge creates gets an id
+  (`wallet-merge:<uuid>`) the database admits once per player, so it cannot be created twice
+  (UltiKits/UltiEconomy#39).
+- 多台服务器共用一个数据库时，一次性钱包合并在负责合并的服务器卡住超过 30 秒的接手时间、又在接手的服务器合并期间继续执行时，
+  不会再把玩家的第二钱包加两次，也不会撤销之后对账户的修改：每次写账户和第二钱包记录都只在记录仍是合并读到的值时才生效，
+  否则重新读取再决定；合并新建的账户使用每位玩家唯一的 id（`wallet-merge:<uuid>`），数据库只接受一次，不会被创建两次
+  （UltiKits/UltiEconomy#39）。
+
 - `bank.max-balance` in `config.yml`, and each non-primary currency's `max-bank-balance` in
   `currencies.yml`, must now be `-1` (no cap) or above 0. Any other value (`0`, another negative, `.inf`)
   is not used: there is no cap (`-1`), and a warning names the key, the value as written and the
