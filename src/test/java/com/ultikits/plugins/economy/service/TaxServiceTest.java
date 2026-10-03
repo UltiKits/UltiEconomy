@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.ultitools.interfaces.DataOperator;
@@ -12,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Arrays;
 import java.util.Collections;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -28,8 +30,8 @@ class TaxServiceTest {
     @BeforeEach
     void setUp() {
         taxService = new TaxService(config, treasuryDataOperator);
-        // Treasury writes go through DataOperator#updateCounted (UltiKits/UltiEconomy#42); 1 = written.
-        lenient().when(treasuryDataOperator.updateCounted(any(TreasuryEntity.class))).thenReturn(1);
+        // Treasury writes are conditional, DataOperator#updateIf (UltiKits/UltiEconomy#41, #42); true = written.
+        lenient().when(treasuryDataOperator.updateIf(any(TreasuryEntity.class), any(WhereCondition[].class))).thenReturn(true);
     }
 
     @Nested
@@ -161,15 +163,17 @@ class TaxServiceTest {
 
         /**
          * UltiKits/UltiEconomy#42: a treasury row another writer removed between the read and the write
-         * matches no stored row ({@code updateCounted} 0). A deposit then takes the method's own "no
+         * matches no stored row (the conditional write does not apply; the re-read finds none). A deposit then takes the method's own "no
          * treasury row yet" branch, so the tax is stored instead of lost; a withdrawal fails as for no row.
          */
         @Test
         @DisplayName("depositToTreasury stores a new row with the amount when the row it read is gone (UltiEconomy#42)")
         void depositRecreatesAVanishedRow() throws IllegalAccessException {
             TreasuryEntity existing = TreasuryEntity.builder().currencyId("coins").balance(1000.0).build();
-            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(existing)));
-            when(treasuryDataOperator.updateCounted(existing)).thenReturn(0);
+            // The conditional write does not apply, and the re-read finds no row.
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(existing)),
+                    new MockQuery<>(Collections.<TreasuryEntity>emptyList()));
+            when(treasuryDataOperator.updateIf(eq(existing), any(WhereCondition[].class))).thenReturn(false);
 
             taxService.depositToTreasury(500.0, "coins");
 
@@ -183,8 +187,9 @@ class TaxServiceTest {
         @DisplayName("withdrawFromTreasury returns false when the row it read is gone (UltiEconomy#42)")
         void withdrawFailsOnAVanishedRow() throws IllegalAccessException {
             TreasuryEntity entry = TreasuryEntity.builder().currencyId("coins").balance(5000.0).build();
-            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(entry)));
-            when(treasuryDataOperator.updateCounted(entry)).thenReturn(0);
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(entry)),
+                    new MockQuery<>(Collections.<TreasuryEntity>emptyList()));
+            when(treasuryDataOperator.updateIf(eq(entry), any(WhereCondition[].class))).thenReturn(false);
 
             assertThat(taxService.withdrawFromTreasury(2000.0, "coins")).isFalse();
         }
@@ -200,7 +205,7 @@ class TaxServiceTest {
 
             taxService.depositToTreasury(500.0, "coins");
 
-            verify(treasuryDataOperator).updateCounted(existing);
+            verify(treasuryDataOperator).updateIf(eq(existing), any(WhereCondition[].class));
             assertThat(existing.getBalance()).isEqualTo(1500.0);
         }
 
@@ -237,7 +242,7 @@ class TaxServiceTest {
 
             assertThat(result).isTrue();
             assertThat(entry.getBalance()).isEqualTo(3000.0);
-            verify(treasuryDataOperator).updateCounted(entry);
+            verify(treasuryDataOperator).updateIf(eq(entry), any(WhereCondition[].class));
         }
 
         @Test
@@ -264,11 +269,11 @@ class TaxServiceTest {
             // (constructing a synthetic zero-balance entry instead of returning early) would let
             // 0.0 < 0.0 fail its own balance check and fall through to update() -- both this
             // path and the correct early-return end up with the same (false, no update) surface,
-            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().updateCounted()`.
+            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().updateIf()`.
             boolean result = taxService.withdrawFromTreasury(0.0, "gems");
 
             assertThat(result).isFalse();
-            verify(treasuryDataOperator, never()).updateCounted(any());
+            verify(treasuryDataOperator, never()).updateIf(any(), any(WhereCondition[].class));
             // Also prove the missing-entry branch doesn't take the "auto-create a treasury row"
             // shortcut a copy-paste from depositToTreasury's insert-when-absent logic could
             // introduce -- update()-never() alone doesn't rule out an errant insert() call.
