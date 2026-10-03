@@ -79,6 +79,41 @@ public final class EconomyTestWorld {
         this.service = EconomyServiceImpl.createForTest(plugin, accounts, config, balances, currencies);
     }
 
+    /**
+     * A service on this world's store whose every balance write meets a row another server has just
+     * changed: right before each write, every row of the table being written gets 0.01 more cash
+     * (UltiKits/UltiEconomy#41). A conditional write is therefore refused on every attempt, which is how
+     * a caller's "busy, retry" reply is exercised.
+     */
+    public EconomyServiceImpl contendedService() {
+        return EconomyServiceImpl.createForTest(plugin, contended("economy_accounts", accounts), config,
+                contended("currency_balances", balances), currencies);
+    }
+
+    /** {@code shared} as seen by a server whose writes always lose to another server's change. */
+    public static <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> com.ultikits.ultitools.interfaces.DataOperator<T> contended(
+            String table, InMemoryDataOperator<T> shared) {
+        return new com.ultikits.plugins.economy.testsupport.SteppedOperator<>(table, shared, call -> {
+            if (call.startsWith("update")) {
+                for (T row : shared.getAll()) {
+                    bumpCash(shared, row);
+                }
+            }
+        });
+    }
+
+    private static <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> void bumpCash(
+            InMemoryDataOperator<T> shared, T row) {
+        try {
+            java.lang.reflect.Field cash = row.getClass().getDeclaredField(row instanceof com.ultikits.plugins.economy.entity.TreasuryEntity ? "balance" : "cash");
+            cash.setAccessible(true); // NOPMD - test support: another server's change, written raw
+            cash.setDouble(row, cash.getDouble(row) + 0.01);
+            shared.update(row);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** Storage like SQLite or MySQL: every write is durable when it returns. */
     public static EconomyTestWorld relational() {
         return new EconomyTestWorld(false, CURRENCIES_YAML);

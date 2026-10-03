@@ -1,15 +1,19 @@
 package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
+import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.testsupport.InMemoryDataOperator;
 import com.ultikits.plugins.economy.testsupport.SteppedOperator;
 import com.ultikits.ultitools.abstracts.data.BaseDataEntity;
+import com.ultikits.ultitools.exceptions.DataAccessException;
+import com.ultikits.ultitools.exceptions.ErrorCode;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import org.bukkit.Bukkit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 import java.util.List;
@@ -19,6 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mockStatic;
 
 /**
@@ -160,6 +166,65 @@ class ConcurrentBalanceChangeTest {
             }
             assertThat(steve).isEqualTo(940.0);
             assertThat(alex).isEqualTo(100.0);
+        }
+    }
+
+    /**
+     * Gate-1 top-up F-E2 and F-E3 (maintainer decision 2026-10-04). A transfer debits first and credits
+     * second. When the credit throws a storage error (not just is refused) after the debit committed, the
+     * same conditional refund runs; and when the refund itself cannot be written, one error line names
+     * both players, the amount and the currency, so an operator can restore it by hand.
+     */
+    @Nested
+    @DisplayName("transfer faults after the debit")
+    class TransferFaults {
+
+        /** Server A's account view that runs {@code onNth} right before its n-th conditional write. */
+        private DataOperator<PlayerAccountEntity> faultyAt(EconomyTestWorld world, int n, Runnable onNth) {
+            int[] writes = new int[1];
+            return new SteppedOperator<>("economy_accounts", world.accounts, call -> {
+                if (call.startsWith("update") && ++writes[0] == n) {
+                    onNth.run();
+                }
+            });
+        }
+
+        @Test
+        @DisplayName("a credit that throws a storage error refunds the sender; the transfer is refused and no money moves")
+        void aThrowingCreditRefundsTheSender() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.config.setTaxEnabled(false);
+            world.seedAccount(STEVE, "Steve", 1000.0, 0.0);
+            world.seedAccount(ALEX, "Alex", 0.0, 0.0);
+            EconomyServiceImpl a = EconomyServiceImpl.createForTest(world.plugin, faultyAt(world, 2, () -> {
+                throw new DataAccessException(ErrorCode.DATA_OPERATION_FAILED, "connection reset");
+            }), world.config, world.balances, world.currencies);
+
+            assertThat(a.transfer(STEVE, ALEX, 100.0)).isFalse();
+
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1000.0);
+            assertThat(world.account(ALEX).getCash()).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("when the credit and then the refund both cannot be written, one error line names both players, the amount and the currency")
+        void aLostRefundIsNamedForTheOperator() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.config.setTaxEnabled(false);
+            world.seedAccount(STEVE, "Steve", 1000.0, 0.0);
+            world.seedAccount(ALEX, "Alex", 0.0, 0.0);
+            // Before the credit, Alex's row is removed by another writer; before the refund, Steve's is.
+            EconomyServiceImpl a = EconomyServiceImpl.createForTest(world.plugin, faultyAt(world, 2, () -> {
+                world.accounts.delById(world.account(ALEX).getId());
+                world.accounts.delById(world.account(STEVE).getId());
+            }), world.config, world.balances, world.currencies);
+
+            assertThat(a.transfer(STEVE, ALEX, 100.0)).isFalse();
+
+            ArgumentCaptor<String> line = ArgumentCaptor.forClass(String.class);
+            verify(world.logger, atLeastOnce()).error(line.capture());
+            assertThat(line.getAllValues()).anySatisfy(l -> assertThat(l)
+                    .contains("Steve").contains("Alex").contains("100").contains("coins"));
         }
     }
 
