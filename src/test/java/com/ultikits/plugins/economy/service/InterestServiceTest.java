@@ -71,6 +71,11 @@ class InterestServiceTest {
         currencyManager = new CurrencyManager(yaml);
         lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
         lenient().when(currencyDataOperator.getAll()).thenReturn(Collections.emptyList());
+        // A payment writes through DataOperator#updateCounted (UltiKits/UltiEconomy#40): 1 is "the
+        // stored row was written". An unstubbed int on a mock is 0 -- "no such row" -- so every
+        // success path needs this, and a case about a vanished row overrides it for that row.
+        lenient().when(dataOperator.updateCounted(any(PlayerAccountEntity.class))).thenReturn(1);
+        lenient().when(currencyDataOperator.updateCounted(any(CurrencyBalanceEntity.class))).thenReturn(1);
         service = InterestService.createForTest(plugin, economyService, config, dataOperator, currencyDataOperator, currencyManager);
     }
 
@@ -172,7 +177,7 @@ class InterestServiceTest {
 
                 service.distributeInterest();
 
-                verify(dataOperator, never()).update(any(PlayerAccountEntity.class));
+                verify(dataOperator, never()).updateCounted(any(PlayerAccountEntity.class));
             }
         }
 
@@ -265,7 +270,7 @@ class InterestServiceTest {
 
                 service.distributeInterest();
 
-                verify(dataOperator, never()).update(any(PlayerAccountEntity.class));
+                verify(dataOperator, never()).updateCounted(any(PlayerAccountEntity.class));
             }
         }
     }
@@ -313,7 +318,7 @@ class InterestServiceTest {
 
                 service.distributeInterest();
 
-                verify(currencyDataOperator, never()).update(any(CurrencyBalanceEntity.class));
+                verify(currencyDataOperator, never()).updateCounted(any(CurrencyBalanceEntity.class));
             }
         }
 
@@ -385,7 +390,7 @@ class InterestServiceTest {
 
                 service.distributeInterest();
 
-                verify(currencyDataOperator, never()).update(any(CurrencyBalanceEntity.class));
+                verify(currencyDataOperator, never()).updateCounted(any(CurrencyBalanceEntity.class));
             }
         }
 
@@ -509,7 +514,7 @@ class InterestServiceTest {
             }
 
             // Two payments compound on the same row: 10000 -> 10300 -> 10609.
-            verify(dataOperator, times(2)).update(saver);
+            verify(dataOperator, times(2)).updateCounted(saver);
             assertThat(saver.getBank()).isCloseTo(10609.0, within(1e-6));
         }
 
@@ -554,9 +559,9 @@ class InterestServiceTest {
             verify(currencyDataOperator, never()).query();
             verify(economyService, never()).addBank(any(), anyDouble());
             verify(economyService, never()).addBank(any(), anyDouble(), anyString());
-            verify(dataOperator).update(a);
-            verify(dataOperator).update(b);
-            verify(currencyDataOperator).update(coins);
+            verify(dataOperator).updateCounted(a);
+            verify(dataOperator).updateCounted(b);
+            verify(currencyDataOperator).updateCounted(coins);
             assertThat(a.getBank()).isCloseTo(1030.0, within(1e-6));
             assertThat(b.getBank()).isCloseTo(2060.0, within(1e-6));
             assertThat(coins.getBank()).isCloseTo(3090.0, within(1e-6));
@@ -579,10 +584,10 @@ class InterestServiceTest {
                 service.distributeInterest();
             }
 
-            verify(dataOperator, never()).update(atCap);
+            verify(dataOperator, never()).updateCounted(atCap);
             assertThat(atCap.getBank()).isEqualTo(100000.0);
             verify(online, never()).sendMessage(anyString());
-            verify(dataOperator).update(nearCap);
+            verify(dataOperator).updateCounted(nearCap);
             assertThat(nearCap.getBank()).isCloseTo(100000.0, within(1e-6));
         }
 
@@ -606,9 +611,9 @@ class InterestServiceTest {
                 cappedService.distributeInterest();
             }
 
-            verify(currencyDataOperator, never()).update(atCap);
+            verify(currencyDataOperator, never()).updateCounted(atCap);
             assertThat(atCap.getBank()).isEqualTo(1000.0);
-            verify(currencyDataOperator).update(nearCap);
+            verify(currencyDataOperator).updateCounted(nearCap);
             assertThat(nearCap.getBank()).isCloseTo(1000.0, within(1e-6));
         }
 
@@ -630,7 +635,7 @@ class InterestServiceTest {
             PlayerAccountEntity failing = account(PLAYER1_UUID, 10000.0);
             PlayerAccountEntity next = account(PLAYER2_UUID, 10000.0);
             when(dataOperator.getAll()).thenReturn(Arrays.asList(failing, next));
-            doThrow(new IllegalAccessException("write failed")).when(dataOperator).update(failing);
+            doThrow(new IllegalStateException("write failed")).when(dataOperator).updateCounted(failing);
             com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger =
                     mock(com.ultikits.ultitools.interfaces.impl.logger.PluginLogger.class);
             lenient().when(plugin.getLogger()).thenReturn(logger);
@@ -656,6 +661,82 @@ class InterestServiceTest {
         }
 
         /**
+         * UltiKits/UltiEconomy#40 (UltiKits/UltiTools-Reborn#558): a balance row another writer removed
+         * between the read and the write matches no stored row. The framework then writes nothing and
+         * reports 0 from {@code updateCounted}; the payment must take the same path a failed write takes
+         * -- the failure logged with a reason saying the stored row is gone, the old balance restored in
+         * memory, no "interest received" message -- and carry on with the next row.
+         */
+        @Test
+        @DisplayName("an account row whose stored copy is gone (0 rows written) is not credited, not announced, and logged (UltiEconomy#40)")
+        void vanishedAccountRowIsAFailedWrite() throws Exception {
+            PlayerAccountEntity gone = account(PLAYER1_UUID, 10000.0);
+            PlayerAccountEntity next = account(PLAYER2_UUID, 10000.0);
+            when(dataOperator.getAll()).thenReturn(Arrays.asList(gone, next));
+            when(dataOperator.updateCounted(gone)).thenReturn(0);
+            com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger =
+                    mock(com.ultikits.ultitools.interfaces.impl.logger.PluginLogger.class);
+            lenient().when(plugin.getLogger()).thenReturn(logger);
+            Player goneOwner = mock(Player.class);
+            lenient().when(goneOwner.isOnline()).thenReturn(true);
+            Player nextOwner = mock(Player.class);
+            when(nextOwner.isOnline()).thenReturn(true);
+            when(economyService.formatAmount(300.0)).thenReturn("$300.00");
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(goneOwner);
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER2_UUID)).thenReturn(nextOwner);
+                service.distributeInterest();
+            }
+
+            assertThat(gone.getBank()).as("the vanished row keeps its old balance in memory").isEqualTo(10000.0);
+            verify(goneOwner, never()).sendMessage(anyString());
+            verify(logger).error(rowGoneFailureLine());
+            verify(nextOwner).sendMessage(contains("$300.00"));
+            assertThat(next.getBank()).isCloseTo(10300.0, within(1e-6));
+        }
+
+        @Test
+        @DisplayName("a currency balance row whose stored copy is gone (0 rows written) is not credited, not announced, and logged (UltiEconomy#40)")
+        void vanishedCurrencyRowIsAFailedWrite() throws Exception {
+            CurrencyBalanceEntity gone = balance(PLAYER1_UUID, "silver", 1000.0);
+            CurrencyBalanceEntity next = balance(PLAYER2_UUID, "silver", 1000.0);
+            when(dataOperator.getAll()).thenReturn(Collections.emptyList());
+            when(currencyDataOperator.getAll()).thenReturn(Arrays.asList(gone, next));
+            when(currencyDataOperator.updateCounted(gone)).thenReturn(0);
+            com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger =
+                    mock(com.ultikits.ultitools.interfaces.impl.logger.PluginLogger.class);
+            lenient().when(plugin.getLogger()).thenReturn(logger);
+            Player goneOwner = mock(Player.class);
+            lenient().when(goneOwner.isOnline()).thenReturn(true);
+            Player nextOwner = mock(Player.class);
+            when(nextOwner.isOnline()).thenReturn(true);
+            when(economyService.formatAmount(30.0, "silver")).thenReturn("S30.00");
+
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER1_UUID)).thenReturn(goneOwner);
+                bukkit.when(() -> Bukkit.getPlayer(PLAYER2_UUID)).thenReturn(nextOwner);
+                service.distributeInterest();
+            }
+
+            assertThat(gone.getBank()).as("the vanished row keeps its old balance in memory").isEqualTo(1000.0);
+            verify(goneOwner, never()).sendMessage(anyString());
+            verify(logger).error(rowGoneFailureLine());
+            verify(nextOwner).sendMessage(contains("S30.00"));
+            assertThat(next.getBank()).isCloseTo(1030.0, within(1e-6));
+        }
+
+        /** The failure line for a vanished row, in the server's language (zh here), with the reason filled in. */
+        private String rowGoneFailureLine() {
+            String line = CatalogueText.entries("zh").get("economy.log.interest_write_failed");
+            String reason = CatalogueText.entries("zh").get("economy.log.interest_row_gone");
+            if (line == null || reason == null) {
+                return "<lang/zh.json lacks economy.log.interest_write_failed or economy.log.interest_row_gone>";
+            }
+            return String.format(line, reason);
+        }
+
+        /**
          * A negative rate is outside 0 to 1, so the module uses the default instead (UltiKits/UltiEconomy#29,
          * {@code ConfigRangesFileTest} and {@code InterestSettingsRangeTest}); 0 is in range and pays nothing.
          */
@@ -673,7 +754,7 @@ class InterestServiceTest {
                 service.distributeInterest();
             }
 
-            verify(dataOperator, never()).update(any(PlayerAccountEntity.class));
+            verify(dataOperator, never()).updateCounted(any(PlayerAccountEntity.class));
             verify(owner, never()).sendMessage(anyString());
             assertThat(saver.getBank()).isEqualTo(10000.0);
         }
@@ -701,7 +782,7 @@ class InterestServiceTest {
             }
 
             assertThat(account.getBank()).isCloseTo(10300.0, within(1e-6));
-            verify(currencyDataOperator, never()).update(any(CurrencyBalanceEntity.class));
+            verify(currencyDataOperator, never()).updateCounted(any(CurrencyBalanceEntity.class));
             assertThat(primaryRow.getBank()).isEqualTo(10000.0);
             verify(owner, times(1)).sendMessage(anyString());
         }
@@ -741,7 +822,7 @@ class InterestServiceTest {
     /** The primary account of {@code uuid} was written exactly once, holding {@code expectedBank}. */
     private void assertPrimaryBankWritten(UUID uuid, double expectedBank) throws Exception {
         ArgumentCaptor<PlayerAccountEntity> written = ArgumentCaptor.forClass(PlayerAccountEntity.class);
-        verify(dataOperator, atLeastOnce()).update(written.capture());
+        verify(dataOperator, atLeastOnce()).updateCounted(written.capture());
         long matching = written.getAllValues().stream().filter(e -> uuid.toString().equals(e.getUuid())).count();
         assertThat(matching).as("writes of %s's account", uuid).isEqualTo(1);
         PlayerAccountEntity entity = written.getAllValues().stream()
@@ -752,7 +833,7 @@ class InterestServiceTest {
     /** The {@code currencyId} balance of {@code uuid} was written exactly once, holding {@code expectedBank}. */
     private void assertCurrencyBankWritten(UUID uuid, String currencyId, double expectedBank) throws Exception {
         ArgumentCaptor<CurrencyBalanceEntity> written = ArgumentCaptor.forClass(CurrencyBalanceEntity.class);
-        verify(currencyDataOperator, atLeastOnce()).update(written.capture());
+        verify(currencyDataOperator, atLeastOnce()).updateCounted(written.capture());
         List<CurrencyBalanceEntity> matching = new java.util.ArrayList<>();
         for (CurrencyBalanceEntity e : written.getAllValues()) {
             if (uuid.toString().equals(e.getUuid()) && currencyId.equals(e.getCurrencyId())) {
