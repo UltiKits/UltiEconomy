@@ -84,6 +84,27 @@ class PrimaryWalletMergeTest {
     @DisplayName("what one start does")
     class OneStart {
 
+        /**
+         * The id an account created by the merge gets is the same for the same player on every server
+         * (so the primary key admits one, UltiKits/UltiEconomy#39) and is a plain UUID: the JSON backend
+         * stores each record as {@code <id>.json}, and Windows refuses a file name containing {@code :}
+         * (local Codex review of the follow-up pull request, P1).
+         */
+        @Test
+        @DisplayName("an account the merge creates gets a deterministic, file-name-safe UUID id (UltiEconomy#39)")
+        void createdAccountIdIsADeterministicFileNameSafeUuid() {
+            String[] ids = new String[2];
+            for (int i = 0; i < 2; i++) {
+                EconomyTestWorld world = EconomyTestWorld.relational();
+                world.seedBalance(ALEX, "coins", 7.5, 0.0);
+                assertThat(merge(world).run()).isTrue();
+                ids[i] = world.account(ALEX).getId();
+            }
+            assertThat(ids[0]).isEqualTo(ids[1]);
+            assertThat(java.util.UUID.fromString(ids[0]).toString()).isEqualTo(ids[0]);
+            assertThat(ids[0]).doesNotContain(ALEX.toString()).matches("[0-9a-f-]+");
+        }
+
         @Test
         @DisplayName("cash and bank of the second wallet are added to the account, the row is removed, and the player and the total are logged")
         void mergesCashAndBank() {
