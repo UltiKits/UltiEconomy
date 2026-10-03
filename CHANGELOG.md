@@ -175,6 +175,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `bank.max-balance` in `config.yml`, and each non-primary currency's `max-bank-balance` in
+  `currencies.yml`, must now be `-1` (no cap) or above 0. Any other value (`0`, another negative, `.inf`)
+  is not used: there is no cap (`-1`), and a warning names the key, the value as written and the
+  default — for `config.yml` at start-up and after every reload, for `currencies.yml` at start-up.
+  Before, `0` and every negative silently meant "no cap" too, although the setting documented only
+  `-1`, so writing `0` to mean "no bank deposits" gave an unlimited bank (UltiKits/UltiEconomy#35).
+- `config.yml` 的 `bank.max-balance` 以及 `currencies.yml` 中每种非主货币的 `max-bank-balance` 现在必须为 `-1`（不设
+  上限）或大于 0。其他值（`0`、其他负数、`.inf`）不会被使用：不设上限（`-1`），并发出警告写明配置项、原值和默认值——
+  `config.yml` 在启动和每次重载后检查，`currencies.yml` 在启动时检查。此前 `0` 和所有负数也悄悄表示「不设上限」，而注释只写了
+  `-1`，因此写 `0` 想表示「禁止存款」实际上得到的是无上限的银行（UltiKits/UltiEconomy#35）。
+
 - An interest payment whose bank balance row another writer removed after the payment read it is now
   reported as not credited on every storage type: the failure is logged (`Interest payment: failed to
   write a bank balance, it was not credited: The stored balance row no longer exists ...`), the

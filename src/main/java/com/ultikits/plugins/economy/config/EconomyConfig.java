@@ -27,6 +27,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     static final double DEFAULT_MAX_INTEREST = 10000.0;
     /** Declared default of {@code tax.transaction-tax.rate}, used while the file's value is outside 0 to 1. */
     static final double DEFAULT_TRANSACTION_TAX_RATE = 0.05;
+    /** Declared default of {@code bank.max-balance} (no cap), used while the file's is neither -1 nor above 0. */
+    public static final double DEFAULT_MAX_BANK_BALANCE = -1;
 
     public EconomyConfig() {
         super("config/config.yml");
@@ -81,8 +83,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "bank.min-deposit", comment = "Minimum deposit amount")
     private double minDeposit = 100.0;
 
-    @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited)")
-    private double maxBankBalance = -1;
+    @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited, otherwise above 0)")
+    private double maxBankBalance = DEFAULT_MAX_BANK_BALANCE;
 
     @ConfigEntry(path = "interest.enabled", comment = "Pay bank interest every interest.interval seconds; read at each payment")
     private boolean interestEnabled = false;
@@ -154,6 +156,21 @@ public class EconomyConfig extends AbstractConfigEntity {
         return isUsableFraction(transactionTaxRate) ? transactionTaxRate : DEFAULT_TRANSACTION_TAX_RATE;
     }
 
+    /**
+     * The primary currency's bank cap the module uses: the file's value when it is -1 (no cap) or above
+     * 0, else the default -1 (UltiKits/UltiEconomy#35). Every reader checks the cap as "above 0", so
+     * before this 0 and every other negative also meant "no cap" while the setting documents only -1;
+     * now such a value is refused and named at load and after every reload ({@link ConfigRanges}).
+     */
+    public double getMaxBankBalance() {
+        return isUsableBankCap(maxBankBalance) ? maxBankBalance : DEFAULT_MAX_BANK_BALANCE;
+    }
+
+    /** {@code bank.max-balance} as the file holds it. */
+    double writtenMaxBankBalance() {
+        return maxBankBalance;
+    }
+
     /** {@code interest.rate} as the file holds it. */
     double writtenInterestRate() {
         return interestRate;
@@ -180,5 +197,17 @@ public class EconomyConfig extends AbstractConfigEntity {
      */
     static boolean isUsableCap(double value) {
         return value == -1 || (value >= 0 && !Double.isInfinite(value));
+    }
+
+    /**
+     * A bank cap: -1 for none, or a finite value above 0 (UltiKits/UltiEconomy#35). Unlike the interest
+     * cap, 0 is refused: it reads as "no deposits" but every reader treated it as "no cap". The same
+     * rule applies to a currency's own {@code max-bank-balance} in {@code currencies.yml}.
+     *
+     * @param value the cap as written
+     * @return whether the module can use it as written
+     */
+    public static boolean isUsableBankCap(double value) {
+        return value == -1 || (value > 0 && !Double.isInfinite(value));
     }
 }

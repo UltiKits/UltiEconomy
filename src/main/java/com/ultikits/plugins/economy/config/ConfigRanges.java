@@ -18,6 +18,10 @@ import java.math.BigDecimal;
  * The same rule covers {@code tax.transaction-tax.rate}, the fraction of a transfer kept as tax: from 0
  * to 1. A negative rate credited the recipient more than the payer paid, creating money, and a rate
  * above 1 credited the recipient a negative amount.
+ * <p>
+ * And {@code bank.max-balance}, the primary currency's bank cap: -1 (no cap) or above 0
+ * (UltiKits/UltiEconomy#35). Every reader checks the cap as "above 0", so 0 and every other negative
+ * used to mean "no cap" silently, while the setting documents only -1.
  */
 public final class ConfigRanges {
 
@@ -57,6 +61,11 @@ public final class ConfigRanges {
         if (!EconomyConfig.isUsableCap(cap)) {
             warn(config, logger, plugin, "interest.max-interest", cap, plugin.i18n("economy.warn.range_max_interest"),
                     EconomyConfig.DEFAULT_MAX_INTEREST);
+        }
+        double bankCap = config.writtenMaxBankBalance();
+        if (!EconomyConfig.isUsableBankCap(bankCap)) {
+            warn(config, logger, plugin, "bank.max-balance", bankCap, plugin.i18n("economy.warn.range_max_bank_balance"),
+                    EconomyConfig.DEFAULT_MAX_BANK_BALANCE);
         }
         double taxRate = config.writtenTransactionTaxRate();
         if (!EconomyConfig.isUsableFraction(taxRate)) {

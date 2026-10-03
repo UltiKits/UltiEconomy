@@ -44,7 +44,7 @@ currency-symbol: "$"            # Currency symbol / 货币符号
 bank:
   enabled: true                 # Enable bank feature / 启用银行功能
   min-deposit: 100.0            # Minimum deposit amount / 最低存款金额
-  max-balance: -1               # Max bank balance (-1 = unlimited) / 最高银行余额
+  max-balance: -1               # Max bank balance: -1 = unlimited, otherwise above 0 (0 or another negative is refused with a warning and -1 used) / 最高银行余额：-1 为无限，否则须大于 0（0 或其他负数会被拒绝并警告，改用 -1）
 
 interest:
   enabled: false                # Pay bank interest (creates money) / 发放银行利息（凭空产生货币）
