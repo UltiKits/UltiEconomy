@@ -8,6 +8,7 @@ import com.ultikits.ultitools.interfaces.Cached;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 
 /**
@@ -56,8 +58,8 @@ import java.util.function.Function;
  * still holds what this merge read -- an account its "before" balances, a row its amounts and the
  * primary currency's id -- and when it does not apply, the merge reads that player's rows and account
  * again and decides again, never writing on top. An account the merge creates gets an id derived from
- * the player ({@link #CREATED_ACCOUNT_ID_PREFIX}), so the table's primary key admits one such account per
- * player and a second server's insert is refused instead of creating a duplicate.
+ * the player ({@link #createdAccountId}), so the table's primary key admits one such account per player
+ * and a second server's insert is refused instead of creating a duplicate.
  */
 public final class PrimaryWalletMerge {
 
@@ -73,13 +75,8 @@ public final class PrimaryWalletMerge {
 
     private static final String NONE = "none";
 
-    /**
-     * Id prefix of an account this merge creates, followed by the player's UUID: one possible id per
-     * player, so on SQLite and MySQL the table's primary key refuses a second server's insert of the
-     * same player's account (UltiKits/UltiEconomy#39). Accounts created anywhere else keep their random
-     * ids; nothing reads an account's id except to write that row back.
-     */
-    static final String CREATED_ACCOUNT_ID_PREFIX = "wallet-merge:";
+    /** Name space of {@link #createdAccountId}: no other id this module or the framework makes is derived from it. */
+    private static final String CREATED_ACCOUNT_NAMESPACE = "UltiEconomy primary-wallet merge account:";
 
     /**
      * How many times one player's settlement is decided, at most: a decision ends early only when one of
@@ -269,7 +266,7 @@ public final class PrimaryWalletMerge {
                         .cash(0.0)
                         .bank(0.0)
                         .build();
-                created.setId(CREATED_ACCOUNT_ID_PREFIX + uuid);
+                created.setId(createdAccountId(uuid));
                 beforeAccountWrite.run();
                 // Refused only when another server created this player's account meanwhile: nothing left to do.
                 insertAccount(created);
@@ -423,7 +420,7 @@ public final class PrimaryWalletMerge {
                     .cash(targetCash)
                     .bank(targetBank)
                     .build();
-            account.setId(CREATED_ACCOUNT_ID_PREFIX + uuid);
+            account.setId(createdAccountId(uuid));
             beforeAccountWrite.run();
             if (!insertAccount(account)) {
                 return false;
@@ -468,6 +465,18 @@ public final class PrimaryWalletMerge {
             }
             throw e;
         }
+    }
+
+    /**
+     * The id of an account this merge creates for {@code uuid}: the same on every server, so on SQLite and
+     * MySQL the table's primary key refuses a second server's insert of the same player's account
+     * (UltiKits/UltiEconomy#39); and a plain UUID (a name-based, version 3 one), because the JSON backend
+     * stores each record as {@code <id>.json} and Windows refuses a file name containing {@code :}.
+     * Accounts created anywhere else keep their random ids; nothing reads an account's id except to write
+     * that row back.
+     */
+    static String createdAccountId(String uuid) {
+        return UUID.nameUUIDFromBytes((CREATED_ACCOUNT_NAMESPACE + uuid).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /** Files a second-wallet row under its player: marked by this merge, or still the primary currency's. */
