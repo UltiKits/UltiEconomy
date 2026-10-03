@@ -2,9 +2,12 @@ package com.ultikits.plugins.economy.service;
 
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
+import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 public class TaxService {
 
@@ -30,24 +33,51 @@ public class TaxService {
         return amount * config.getTransactionTaxRate();
     }
 
-    public void depositToTreasury(double amount, String currencyId) throws IllegalAccessException {
-        List<TreasuryEntity> results = treasuryDataOperator.query()
-                .where("currency_id").eq(currencyId)
-                .list();
-        if (!results.isEmpty()) {
-            TreasuryEntity existing = results.get(0);
-            existing.setBalance(existing.getBalance() + amount);
-            if (treasuryDataOperator.updateCounted(existing) > 0) {
-                return;
+    /** How many times one treasury change is attempted when another writer keeps changing the row. */
+    private static final int MAX_WRITE_ATTEMPTS = 3;
+
+    /**
+     * Adds {@code amount} to the treasury of {@code currencyId}. The write applies only while the row
+     * still holds the balance read ({@code DataOperator#updateIf}), so a deposit another server made in
+     * between is not overwritten (UltiKits/UltiEconomy#41); when it does not apply, the row is read
+     * again, at most {@link #MAX_WRITE_ATTEMPTS} times. With no row -- none yet, or removed after it was
+     * read (UltiKits/UltiEconomy#42) -- a row is created with an id derived from the currency
+     * ({@link #treasuryId}), so two servers making the first deposit at once create one row: the second
+     * insert is refused and that server reads again and adds to the row.
+     *
+     * @return true when the amount was stored; false when the row kept changing on every attempt
+     */
+    public boolean depositToTreasury(double amount, String currencyId) throws IllegalAccessException {
+        for (int attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+            List<TreasuryEntity> results = treasuryDataOperator.query()
+                    .where("currency_id").eq(currencyId)
+                    .list();
+            if (results.isEmpty()) {
+                TreasuryEntity entity = TreasuryEntity.builder()
+                        .currencyId(currencyId)
+                        .balance(amount)
+                        .build();
+                entity.setId(treasuryId(currencyId));
+                try {
+                    treasuryDataOperator.insert(entity);
+                    return true;
+                } catch (RuntimeException e) {
+                    // The primary key refused it: another server created this currency's row first.
+                    if (treasuryDataOperator.getById(entity.getId()) == null) {
+                        throw e;
+                    }
+                    continue;
+                }
             }
-            // The row was removed after it was read, so nothing was written (UltiKits/UltiEconomy#42):
-            // there is no treasury row for this currency now, which the branch below handles.
+            TreasuryEntity existing = results.get(0);
+            double read = existing.getBalance();
+            existing.setBalance(read + amount);
+            if (treasuryDataOperator.updateIf(existing, balanceIs(read))) {
+                return true;
+            }
+            existing.setBalance(read);
         }
-        TreasuryEntity entity = TreasuryEntity.builder()
-                .currencyId(currencyId)
-                .balance(amount)
-                .build();
-        treasuryDataOperator.insert(entity);
+        return false;
     }
 
     public double getTreasuryBalance(String currencyId) {
@@ -60,19 +90,43 @@ public class TaxService {
         return results.get(0).getBalance();
     }
 
+    /**
+     * Takes {@code amount} from the treasury of {@code currencyId}: false when there is no row or not
+     * enough in it. Conditional on the balance read, like {@link #depositToTreasury}; when the write does
+     * not apply the row is read again and the withdrawal decided again (it may now be unaffordable, or
+     * the row gone, UltiKits/UltiEconomy#42), at most {@link #MAX_WRITE_ATTEMPTS} times, then false.
+     */
     public boolean withdrawFromTreasury(double amount, String currencyId) throws IllegalAccessException {
-        List<TreasuryEntity> results = treasuryDataOperator.query()
-                .where("currency_id").eq(currencyId)
-                .list();
-        if (results.isEmpty()) {
-            return false;
+        for (int attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+            List<TreasuryEntity> results = treasuryDataOperator.query()
+                    .where("currency_id").eq(currencyId)
+                    .list();
+            if (results.isEmpty()) {
+                return false;
+            }
+            TreasuryEntity entry = results.get(0);
+            double read = entry.getBalance();
+            if (read < amount) {
+                return false;
+            }
+            entry.setBalance(read - amount);
+            if (treasuryDataOperator.updateIf(entry, balanceIs(read))) {
+                return true;
+            }
+            entry.setBalance(read);
         }
-        TreasuryEntity entry = results.get(0);
-        if (entry.getBalance() < amount) {
-            return false;
-        }
-        entry.setBalance(entry.getBalance() - amount);
-        // A row removed after it was read is written nothing; it is "no treasury row", as above (UltiKits/UltiEconomy#42).
-        return treasuryDataOperator.updateCounted(entry) > 0;
+        return false;
+    }
+
+    /**
+     * The id a treasury row this class creates gets: the same for a currency on every server, so the
+     * primary key admits one; a plain (name-based) UUID, safe as a JSON file name.
+     */
+    static String treasuryId(String currencyId) {
+        return UUID.nameUUIDFromBytes(("UltiEconomy treasury:" + currencyId).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    private static WhereCondition balanceIs(double balance) {
+        return WhereCondition.builder().column("balance").value(balance).build();
     }
 }

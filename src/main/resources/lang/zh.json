@@ -66,6 +66,8 @@
   "economy.log.balance_update_failed": "更新余额失败: %s",
   "economy.log.row_gone": "数据库中已没有这条记录（读取后被其他写入方删除）",
   "economy.log.note_currency_removed": "%s 尝试兑换一张面值 %s 的 %s 纸币，该货币已不在 config/currencies.yml 中；已拒绝兑换并保留纸币。将该货币加回后即可兑换此类纸币。",
+  "economy.log.write_contended": "重试期间这条记录一直在被修改（另一台服务器正在写入），本次未写入",
+  "economy.log.treasury_write_failed": "交易税 %s（%s）未能存入国库：%s",
   "economy.log.interest_write_failed": "利息发放：写入银行余额失败，本次未入账：%s",
   "economy.log.interest_row_gone": "数据库中已没有这条余额记录（本次发放读取后被其他写入方删除）",
   "economy.warn.interest_cap": "每次最多 interest.max-interest = %s",

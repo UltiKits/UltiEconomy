@@ -66,6 +66,8 @@
   "economy.log.balance_update_failed": "Failed to update balance: %s",
   "economy.log.row_gone": "The stored row no longer exists (another writer removed it after it was read)",
   "economy.log.note_currency_removed": "%s tried to redeem a money note worth %s of %s, a currency no longer defined in config/currencies.yml; the note was refused and kept. Add the currency back to redeem such notes.",
+  "economy.log.write_contended": "The stored row kept changing while this write was retried (another server is writing it); nothing was written",
+  "economy.log.treasury_write_failed": "Transaction tax of %s (%s) could not be added to the treasury: %s",
   "economy.log.interest_write_failed": "Interest payment: failed to write a bank balance, it was not credited: %s",
   "economy.log.interest_row_gone": "The stored balance row no longer exists (another writer removed it after this payment read it)",
   "economy.warn.interest_cap": "capped at interest.max-interest = %s per payment",

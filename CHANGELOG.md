@@ -195,6 +195,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Servers that share one database no longer overwrite each other's balance changes. Every cash, bank
+  and treasury change — `/pay`, `/deposit`, `/withdraw`, `/eco give`/`take`/`set`, Vault, money notes,
+  interest, the transfer tax and `/eco treasury withdraw` — now applies only if the balance is still the
+  value this server read; otherwise it reads again and decides again, up to three times, and then fails
+  the way a failed write already did (the change is reported as not made and logged; a transfer whose
+  receiver cannot be credited refunds the sender). Two servers making the first tax deposit of a
+  currency now create one treasury row. Before, the second server's write replaced the first server's
+  change, creating or destroying money (UltiKits/UltiEconomy#41).
+- 多台服务器共用一个数据库时，不再互相覆盖余额变动。所有现金、银行和国库变动——`/pay`、`/deposit`、`/withdraw`、
+  `/eco give`/`take`/`set`、Vault、纸币、利息、交易税以及 `/eco treasury withdraw`——现在只在余额仍是本服读到的值时才生效，否则重新
+  读取再决定，最多三次，之后按原有的写入失败方式处理（报告未完成并记录日志；无法给接收方入账的转账会退还发送方）。两台服务器同时为
+  某货币首次存入交易税时只会创建一条国库记录。此前后写入的服务器会覆盖先写入的修改，凭空增减货币（UltiKits/UltiEconomy#41）。
+
 - A money note whose currency has been removed from `config/currencies.yml` is now refused by design,
   by `/note redeem` and by right-clicking it: nothing is credited, the player keeps the note and is told
   the currency no longer exists, and the console logs one warning naming the player, the value and the
