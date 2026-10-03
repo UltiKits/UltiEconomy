@@ -300,9 +300,11 @@ class StartupWarningsTest {
 
     /**
      * As {@link #bootWith(EconomyConfig)}, with {@code onDisk} standing for the operator's parsed
-     * file. {@code AbstractConfigEntity#getConfig()} returns that parsed file, including keys the
-     * entity no longer declares, so a spy that returns {@code onDisk} is how a unit test presents
-     * "this key is still in your file".
+     * file. UltiTools-API 6.3.0 answers "is this key in your file?" through
+     * {@code AbstractConfigEntity#isPresentInFile(String)}, including keys the entity no longer
+     * declares, so a spy whose {@code isPresentInFile} answers from {@code onDisk} is how a unit test
+     * presents "this key is still in your file" (UltiKits/UltiEconomy#34: the 6.2 accessor that
+     * returned the parsed file is gone in 6.3.0).
      */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk) {
         return bootWith(config, onDisk, "en");
@@ -318,7 +320,7 @@ class StartupWarningsTest {
     /** As {@link #bootWith(EconomyConfig, YamlConfiguration, String)}, with {@code currenciesYaml} as {@code config/currencies.yml}. */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk, String language, String currenciesYaml) {
         EconomyConfig effective = org.mockito.Mockito.spy(config);
-        when(effective.getConfig()).thenReturn(onDisk);
+        when(effective.isPresentInFile(anyString())).thenAnswer(ask -> onDisk.contains(ask.<String>getArgument(0)));
         when(effective.getConfigFilePath()).thenReturn(CONFIG_FILE);
 
         UltiEconomy plugin = mock(UltiEconomy.class);
