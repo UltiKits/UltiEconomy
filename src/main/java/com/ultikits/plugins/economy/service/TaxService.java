@@ -34,17 +34,20 @@ public class TaxService {
         List<TreasuryEntity> results = treasuryDataOperator.query()
                 .where("currency_id").eq(currencyId)
                 .list();
-        if (results.isEmpty()) {
-            TreasuryEntity entity = TreasuryEntity.builder()
-                    .currencyId(currencyId)
-                    .balance(amount)
-                    .build();
-            treasuryDataOperator.insert(entity);
-        } else {
+        if (!results.isEmpty()) {
             TreasuryEntity existing = results.get(0);
             existing.setBalance(existing.getBalance() + amount);
-            treasuryDataOperator.update(existing);
+            if (treasuryDataOperator.updateCounted(existing) > 0) {
+                return;
+            }
+            // The row was removed after it was read, so nothing was written (UltiKits/UltiEconomy#42):
+            // there is no treasury row for this currency now, which the branch below handles.
         }
+        TreasuryEntity entity = TreasuryEntity.builder()
+                .currencyId(currencyId)
+                .balance(amount)
+                .build();
+        treasuryDataOperator.insert(entity);
     }
 
     public double getTreasuryBalance(String currencyId) {
@@ -69,7 +72,7 @@ public class TaxService {
             return false;
         }
         entry.setBalance(entry.getBalance() - amount);
-        treasuryDataOperator.update(entry);
-        return true;
+        // A row removed after it was read is written nothing; it is "no treasury row", as above (UltiKits/UltiEconomy#42).
+        return treasuryDataOperator.updateCounted(entry) > 0;
     }
 }

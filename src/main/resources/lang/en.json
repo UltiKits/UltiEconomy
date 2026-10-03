@@ -63,6 +63,7 @@
   "economy.note.item_creator": "Created by: %s",
   "economy.log.account_update_failed": "Failed to update account: %s",
   "economy.log.balance_update_failed": "Failed to update balance: %s",
+  "economy.log.row_gone": "The stored row no longer exists (another writer removed it after it was read)",
   "economy.log.interest_write_failed": "Interest payment: failed to write a bank balance, it was not credited: %s",
   "economy.log.interest_row_gone": "The stored balance row no longer exists (another writer removed it after this payment read it)",
   "economy.warn.interest_cap": "capped at interest.max-interest = %s per payment",

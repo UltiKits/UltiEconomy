@@ -7,7 +7,9 @@ import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.abstracts.data.BaseDataEntity;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.exceptions.DataAccessException;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import org.bukkit.Bukkit;
@@ -615,23 +617,41 @@ public class EconomyServiceImpl implements EconomyService {
         return currencyManager;
     }
 
+    /**
+     * Writes an account row; false, having logged why, when nothing was written. A write that matches no
+     * stored row -- another writer removed it after it was read -- writes nothing on every storage type,
+     * and {@code updateCounted} reports it as 0 (UltiKits/UltiTools-Reborn#558); it fails like a write
+     * whose entity could not be read, so a transfer refuses and rolls the sender back
+     * (UltiKits/UltiEconomy#42).
+     */
     private boolean updateAccount(PlayerAccountEntity account) {
-        try {
-            dataOperator.update(account);
-            return true;
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(String.format(plugin.i18n("economy.log.account_update_failed"), e.getMessage()));
-            return false;
-        }
+        return write(dataOperator, account, true);
     }
 
+    /** As {@link #updateAccount}, for a non-primary currency's balance row. */
     private boolean updateBalance(CurrencyBalanceEntity balance) {
+        return write(currencyDataOperator, balance, false);
+    }
+
+    private <T extends BaseDataEntity<String>> boolean write(DataOperator<T> operator, T row, boolean accountRow) {
+        String reason;
         try {
-            currencyDataOperator.update(balance);
-            return true;
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(String.format(plugin.i18n("economy.log.balance_update_failed"), e.getMessage()));
-            return false;
+            if (operator.updateCounted(row) > 0) {
+                return true;
+            }
+            reason = plugin.i18n("economy.log.row_gone");
+        } catch (DataAccessException e) {
+            // The framework wraps a failure to read the entity's fields (formerly an
+            // IllegalAccessException from update) in this exception; anything else is a storage failure
+            // and propagates as before.
+            if (!(e.getCause() instanceof IllegalAccessException)) {
+                throw e;
+            }
+            reason = e.getCause().getMessage();
         }
+        String line = accountRow ? plugin.i18n("economy.log.account_update_failed")
+                : plugin.i18n("economy.log.balance_update_failed");
+        plugin.getLogger().error(String.format(line, reason));
+        return false;
     }
 }

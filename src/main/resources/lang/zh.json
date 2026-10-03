@@ -63,6 +63,7 @@
   "economy.note.item_creator": "创建者: %s",
   "economy.log.account_update_failed": "更新账户失败: %s",
   "economy.log.balance_update_failed": "更新余额失败: %s",
+  "economy.log.row_gone": "数据库中已没有这条记录（读取后被其他写入方删除）",
   "economy.log.interest_write_failed": "利息发放：写入银行余额失败，本次未入账：%s",
   "economy.log.interest_row_gone": "数据库中已没有这条余额记录（本次发放读取后被其他写入方删除）",
   "economy.warn.interest_cap": "每次最多 interest.max-interest = %s",

@@ -195,6 +195,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A balance or treasury change whose stored row another writer removed after it was read is now a
+  failure on every storage type, as a failed write already was: the change is logged as failed (`... The
+  stored row no longer exists ...`) and reported as not made — a `/pay` whose sender row is gone credits
+  nobody, one whose receiver row is gone writes the sender's money back, and `/eco treasury withdraw`
+  says the withdrawal failed. A transfer tax whose treasury row is gone is stored in a new treasury row
+  instead of being lost. Before, these writes wrote nothing and counted as made (UltiKits/UltiEconomy#42).
+- 余额或国库变动若在读取后对应记录被其他写入方删除，现在在所有存储类型上都按失败处理（与写入失败一致）：记录失败日志
+  （「数据库中已没有这条记录」），并报告未完成——发送方记录已不存在的 `/pay` 不会给任何人入账，接收方记录已不存在时会把发送方的钱
+  写回，`/eco treasury withdraw` 会报告取款失败。国库记录已不存在时，交易税会存入一条新的国库记录而不是丢失。此前这些写入什么都
+  没写却被当作成功（UltiKits/UltiEconomy#42）。
+
 - The one-time wallet merge on servers that share one database can no longer add a player's second
   wallet twice or undo a later change to their account when the server merging stalls for longer than
   the 30-second takeover and then resumes while the server that took over is merging: every account
