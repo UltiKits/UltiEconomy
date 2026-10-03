@@ -17,6 +17,7 @@ UltiTools-API 的完整 Vault 经济提供者模块。支持双钱包（现金 +
 - **Leaderboard** - Cached wealth rankings on a configurable refresh interval (60 seconds by default) / 按可配置间隔（默认 60 秒）刷新的财富排行榜
 - **PlaceholderAPI** - Rich placeholder support / 丰富的占位符支持
 - **Admin Commands** - Give, take, set, check player balances / 管理员经济管理命令
+- **Money notes** - `/note` turns cash into a tradeable item. A note whose currency has been removed from `config/currencies.yml` cannot be redeemed, by design: the player keeps the note and is told the currency no longer exists, and the console names the currency; adding the currency back makes such notes redeemable again / 纸币：`/note` 把现金换成可交易的物品。货币已从 `config/currencies.yml` 删除的纸币按设计无法兑换：玩家保留纸币并收到该货币已不存在的提示，控制台记录货币名；把该货币加回后即可再次兑换
 - **i18n** - Chinese and English language support / 中英文支持
 
 ## Commands / 命令
@@ -44,7 +45,7 @@ currency-symbol: "$"            # Currency symbol / 货币符号
 bank:
   enabled: true                 # Enable bank feature / 启用银行功能
   min-deposit: 100.0            # Minimum deposit amount / 最低存款金额
-  max-balance: -1               # Max bank balance (-1 = unlimited) / 最高银行余额
+  max-balance: -1               # Max bank balance: -1 = unlimited, otherwise above 0 (0 or another negative is refused with a warning and -1 used) / 最高银行余额：-1 为无限，否则须大于 0（0 或其他负数会被拒绝并警告，改用 -1）
 
 interest:
   enabled: false                # Pay bank interest (creates money) / 发放银行利息（凭空产生货币）
@@ -54,7 +55,6 @@ interest:
 
 leaderboard:
   update-interval: 60           # Seconds between refreshes; /ul reload applies / 刷新间隔（秒），重载生效
-  display-count: 10             # Default top N / 默认显示前 N 名
 
 tax:
   enabled: true                 # Master switch: false collects no tax at all / 总开关：false 时不征收任何税

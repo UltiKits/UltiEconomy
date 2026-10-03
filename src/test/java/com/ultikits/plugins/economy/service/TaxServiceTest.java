@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.ultitools.interfaces.DataOperator;
@@ -11,10 +12,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -27,15 +27,11 @@ class TaxServiceTest {
 
     private TaxService taxService;
 
-    private static final List<TaxService.TaxBracket> BRACKETS = Arrays.asList(
-            new TaxService.TaxBracket(0, 10000, 0.0),
-            new TaxService.TaxBracket(10000, 100000, 0.01),
-            new TaxService.TaxBracket(100000, -1, 0.02)
-    );
-
     @BeforeEach
     void setUp() {
         taxService = new TaxService(config, treasuryDataOperator);
+        // Treasury writes are conditional, DataOperator#updateIf (UltiKits/UltiEconomy#41, #42); true = written.
+        lenient().when(treasuryDataOperator.updateIf(any(TreasuryEntity.class), any(WhereCondition[].class))).thenReturn(true);
     }
 
     @Nested
@@ -134,52 +130,18 @@ class TaxServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("Wealth Tax")
-    class WealthTaxTests {
-
-        @Test
-        @DisplayName("progressive brackets: 0% below 10k, 1% on 10k-100k, 2% above")
-        void progressiveBrackets() {
-            // Player has 150,000 total wealth
-            // Bracket 1: 0-10,000 @ 0% = 0
-            // Bracket 2: 10,000-100,000 @ 1% = 900
-            // Bracket 3: 100,000-150,000 @ 2% = 1000
-            // Total tax = 1900
-            double tax = taxService.calculateWealthTax(150000.0, BRACKETS);
-            assertThat(tax).isCloseTo(1900.0, within(0.01));
-        }
-
-        @Test
-        @DisplayName("no tax below first bracket threshold")
-        void belowFirstBracket() {
-            double tax = taxService.calculateWealthTax(5000.0, BRACKETS);
-            assertThat(tax).isEqualTo(0.0);
-        }
-
-        @Test
-        @DisplayName("taxes only the amount within each bracket")
-        void partialSecondBracket() {
-            // Player has 50,000
-            // Bracket 1: 0-10,000 @ 0% = 0
-            // Bracket 2: 10,000-50,000 @ 1% = 400
-            double tax = taxService.calculateWealthTax(50000.0, BRACKETS);
-            assertThat(tax).isCloseTo(400.0, within(0.01));
-        }
-
-        @Test
-        @DisplayName("returns 0 for zero wealth")
-        void zeroWealth() {
-            double tax = taxService.calculateWealthTax(0.0, BRACKETS);
-            assertThat(tax).isEqualTo(0.0);
-        }
-
-        @Test
-        @DisplayName("returns 0 for empty brackets")
-        void emptyBrackets() {
-            double tax = taxService.calculateWealthTax(100000.0, Collections.emptyList());
-            assertThat(tax).isEqualTo(0.0);
-        }
+    /**
+     * UltiKits/UltiEconomy#27, maintainer decision 2026-09-29: the wealth tax was a calculation nothing
+     * called -- no schedule, no debit, no setting for its brackets. It is deleted with its settings, and
+     * implementing a wealth tax is the feature request UltiKits/UltiEconomy#38.
+     */
+    @Test
+    @DisplayName("TaxService has no wealth-tax calculation and no bracket type (UltiEconomy#27)")
+    void noWealthTaxCalculation() {
+        assertThat(Arrays.stream(TaxService.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName))
+                .contains("calculateTransactionTax")
+                .noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("wealth"));
+        assertThat(TaxService.class.getDeclaredClasses()).noneMatch(c -> c.getSimpleName().contains("Bracket"));
     }
 
     @Nested
@@ -199,6 +161,39 @@ class TaxServiceTest {
             assertThat(captor.getValue().getBalance()).isEqualTo(500.0);
         }
 
+        /**
+         * UltiKits/UltiEconomy#42: a treasury row another writer removed between the read and the write
+         * matches no stored row (the conditional write does not apply; the re-read finds none). A deposit then takes the method's own "no
+         * treasury row yet" branch, so the tax is stored instead of lost; a withdrawal fails as for no row.
+         */
+        @Test
+        @DisplayName("depositToTreasury stores a new row with the amount when the row it read is gone (UltiEconomy#42)")
+        void depositRecreatesAVanishedRow() throws IllegalAccessException {
+            TreasuryEntity existing = TreasuryEntity.builder().currencyId("coins").balance(1000.0).build();
+            // The conditional write does not apply, and the re-read finds no row.
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(existing)),
+                    new MockQuery<>(Collections.<TreasuryEntity>emptyList()));
+            when(treasuryDataOperator.updateIf(eq(existing), any(WhereCondition[].class))).thenReturn(false);
+
+            taxService.depositToTreasury(500.0, "coins");
+
+            ArgumentCaptor<TreasuryEntity> inserted = ArgumentCaptor.forClass(TreasuryEntity.class);
+            verify(treasuryDataOperator).insert(inserted.capture());
+            assertThat(inserted.getValue().getCurrencyId()).isEqualTo("coins");
+            assertThat(inserted.getValue().getBalance()).isEqualTo(500.0);
+        }
+
+        @Test
+        @DisplayName("withdrawFromTreasury returns false when the row it read is gone (UltiEconomy#42)")
+        void withdrawFailsOnAVanishedRow() throws IllegalAccessException {
+            TreasuryEntity entry = TreasuryEntity.builder().currencyId("coins").balance(5000.0).build();
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(entry)),
+                    new MockQuery<>(Collections.<TreasuryEntity>emptyList()));
+            when(treasuryDataOperator.updateIf(eq(entry), any(WhereCondition[].class))).thenReturn(false);
+
+            assertThat(taxService.withdrawFromTreasury(2000.0, "coins")).isFalse();
+        }
+
         @Test
         @DisplayName("depositToTreasury adds to existing balance")
         void addsToExisting() throws IllegalAccessException {
@@ -210,7 +205,7 @@ class TaxServiceTest {
 
             taxService.depositToTreasury(500.0, "coins");
 
-            verify(treasuryDataOperator).update(existing);
+            verify(treasuryDataOperator).updateIf(eq(existing), any(WhereCondition[].class));
             assertThat(existing.getBalance()).isEqualTo(1500.0);
         }
 
@@ -247,7 +242,7 @@ class TaxServiceTest {
 
             assertThat(result).isTrue();
             assertThat(entry.getBalance()).isEqualTo(3000.0);
-            verify(treasuryDataOperator).update(entry);
+            verify(treasuryDataOperator).updateIf(eq(entry), any(WhereCondition[].class));
         }
 
         @Test
@@ -274,11 +269,11 @@ class TaxServiceTest {
             // (constructing a synthetic zero-balance entry instead of returning early) would let
             // 0.0 < 0.0 fail its own balance check and fall through to update() -- both this
             // path and the correct early-return end up with the same (false, no update) surface,
-            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().update()`.
+            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().updateIf()`.
             boolean result = taxService.withdrawFromTreasury(0.0, "gems");
 
             assertThat(result).isFalse();
-            verify(treasuryDataOperator, never()).update(any());
+            verify(treasuryDataOperator, never()).updateIf(any(), any(WhereCondition[].class));
             // Also prove the missing-entry branch doesn't take the "auto-create a treasury row"
             // shortcut a copy-paste from depositToTreasury's insert-when-absent logic could
             // introduce -- update()-never() alone doesn't rule out an errant insert() call.

@@ -24,7 +24,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class NoteRedeemListenerTest {
 
-    @Mock private UltiToolsPlugin plugin;
+    // The module itself, so a redeem can ask it which currencies currencies.yml defines (UltiKits/UltiEconomy#37).
+    @Mock private com.ultikits.plugins.economy.UltiEconomy plugin;
     @Mock private EconomyService economyService;
     @Mock private MoneyNoteFactory noteFactory;
     @Mock private Player player;
@@ -40,6 +41,9 @@ class NoteRedeemListenerTest {
         lenient().when(player.getUniqueId()).thenReturn(PLAYER_UUID);
         lenient().when(player.getInventory()).thenReturn(inventory);
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
+        lenient().when(plugin.getCurrencyManager()).thenReturn(new com.ultikits.plugins.economy.service.CurrencyManager(
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.StringReader(
+                        "currencies:\n  coins:\n    primary: true\n  gems:\n    bank-enabled: true\n"))));
         listener = NoteRedeemListener.createForTest(plugin, economyService, noteFactory);
     }
 
@@ -75,6 +79,38 @@ class NoteRedeemListenerTest {
         listener.onInteract(event);
 
         verify(economyService).addCash(PLAYER_UUID, 250.0, "gems");
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    /**
+     * UltiKits/UltiEconomy#37, maintainer decision 2026-10-04: a note whose currency an operator removed
+     * from currencies.yml is refused -- the note is kept, the player is told the currency no longer
+     * exists, and an operator-facing line names the currency. Before, a player who still had a wallet
+     * row for it redeemed the note into that hidden wallet.
+     */
+    @Test
+    @DisplayName("a note of a currency no longer in currencies.yml is refused: kept, the player told, the currency logged (UltiEconomy#37)")
+    void refusesANoteOfARemovedCurrency() {
+        com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger =
+                mock(com.ultikits.ultitools.interfaces.impl.logger.PluginLogger.class);
+        when(plugin.getLogger()).thenReturn(logger);
+        lenient().when(player.getName()).thenReturn("Steve");
+        when(inventory.getItemInMainHand()).thenReturn(heldItem);
+        when(noteFactory.isMoneyNote(heldItem)).thenReturn(true);
+        lenient().when(noteFactory.getNoteValue(heldItem)).thenReturn(250.0);
+        when(noteFactory.getNoteCurrency(heldItem)).thenReturn("rubies");
+        lenient().when(economyService.addCash(any(), anyDouble(), anyString())).thenReturn(true);
+        lenient().when(heldItem.getAmount()).thenReturn(1);
+
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, heldItem, null, null);
+        listener.onInteract(event);
+
+        verify(economyService, never()).addCash(any(), anyDouble(), anyString());
+        verify(economyService, never()).addCash(any(), anyDouble());
+        verify(inventory, never()).setItemInMainHand(any());
+        verify(heldItem, never()).setAmount(anyInt());
+        verify(player).sendMessage(contains("rubies"));
+        verify(logger).warn(contains("rubies"));
         assertThat(event.isCancelled()).isTrue();
     }
 

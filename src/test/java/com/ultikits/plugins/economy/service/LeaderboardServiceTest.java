@@ -327,15 +327,18 @@ class LeaderboardServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("getDefaultDisplayCount")
-    class DefaultDisplayCountTests {
-
-        @Test
-        @DisplayName("returns the configured leaderboard display count")
-        void returnsConfiguredValue() {
-            assertThat(service.getDefaultDisplayCount()).isEqualTo(config.getLeaderboardDisplayCount());
-        }
+    /**
+     * UltiKits/UltiEconomy#36: the leaderboard has no "default number of entries". Its only readers --
+     * the {@code top_name_<N>} and {@code top_balance_<N>} placeholders -- pass their own N, so the
+     * accessor that reported {@code leaderboard.display-count} had no caller and is deleted with the key.
+     */
+    @Test
+    @DisplayName("the leaderboard has no default-display-count accessor; top-N takes N from its caller (UltiEconomy#36)")
+    void noDefaultDisplayCountAccessor() {
+        assertThat(java.util.Arrays.stream(LeaderboardService.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName))
+                .contains("getTopPlayers")
+                .noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("displaycount"));
     }
 
     /**

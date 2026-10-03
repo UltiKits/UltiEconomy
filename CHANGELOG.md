@@ -163,6 +163,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- `leaderboard.display-count` is removed from `config.yml`. Nothing ever read it: no command or
+  placeholder shows a fixed number of leaderboard entries, and each top-N placeholder
+  (`%ultieconomy_top_name_<N>%`, `%ultieconomy_top_balance_<N>%`) names its own N. A `config.yml` that
+  still holds it gets one warning at start-up saying it no longer has any effect and can be deleted;
+  the file is not changed (UltiKits/UltiEconomy#36).
+- 从 `config.yml` 删除 `leaderboard.display-count`。它从未被读取：没有任何命令或变量显示固定数量的排行榜条目，每个前 N 名
+  变量（`%ultieconomy_top_name_<N>%`、`%ultieconomy_top_balance_<N>%`）都自己指定 N。仍含有该键的 `config.yml` 会在启动时
+  给出一条警告，说明它已不再起作用、可以删除；文件不会被修改（UltiKits/UltiEconomy#36）。
+
+- The wealth tax's settings `tax.wealth-tax.enabled`, `tax.wealth-tax.interval` and
+  `tax.wealth-tax.exempt-permission` are removed. The wealth tax never collected anything: nothing
+  scheduled it, nothing took money, and no setting defined its brackets. A `config.yml` that still holds
+  one of them gets one warning per key at start-up saying it no longer has any effect and can be
+  deleted; the file is not changed. Implementing a wealth tax is a feature request for a later version
+  (UltiKits/UltiEconomy#38; maintainer decision 2026-09-29, UltiKits/UltiEconomy#27).
+- 删除财富税的设置 `tax.wealth-tax.enabled`、`tax.wealth-tax.interval` 和 `tax.wealth-tax.exempt-permission`。财富税
+  从未收取过任何税款：从未被调度、从未扣款，也没有定义税率档位的设置。仍含有这些键的 `config.yml` 会在启动时每个键给出一条
+  警告，说明它已不再起作用、可以删除；文件不会被修改。财富税本身作为功能请求排到以后的版本（UltiKits/UltiEconomy#38；
+  维护者 2026-09-29 的决定，UltiKits/UltiEconomy#27）。
+
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen
   near-duplicates of the command messages above that carried one `%s` too many (the reason those
   messages never matched), and nine that no version of this module ever referenced (a leaderboard
@@ -174,6 +194,72 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `/eco` 用法行）。运维和玩家看到的内容没有任何变化。
 
 ### Fixed
+
+- Servers that share one database no longer overwrite each other's balance changes. Every cash, bank
+  and treasury change — `/pay`, `/deposit`, `/withdraw`, `/eco give`/`take`/`set`, Vault, money notes,
+  interest, the transfer tax and `/eco treasury withdraw` — now applies only if the balance is still the
+  value this server read; otherwise it reads again and decides again, up to three times, and then fails
+  the way a failed write already did (the change is reported as not made and logged; a transfer whose
+  receiver cannot be credited refunds the sender). Two servers making the first tax deposit of a
+  currency now create one treasury row. Before, the second server's write replaced the first server's
+  change, creating or destroying money (UltiKits/UltiEconomy#41).
+- 多台服务器共用一个数据库时，不再互相覆盖余额变动。所有现金、银行和国库变动——`/pay`、`/deposit`、`/withdraw`、
+  `/eco give`/`take`/`set`、Vault、纸币、利息、交易税以及 `/eco treasury withdraw`——现在只在余额仍是本服读到的值时才生效，否则重新
+  读取再决定，最多三次，之后按原有的写入失败方式处理（报告未完成并记录日志；无法给接收方入账的转账会退还发送方）。两台服务器同时为
+  某货币首次存入交易税时只会创建一条国库记录。此前后写入的服务器会覆盖先写入的修改，凭空增减货币（UltiKits/UltiEconomy#41）。
+
+- A money note whose currency has been removed from `config/currencies.yml` is now refused by design,
+  by `/note redeem` and by right-clicking it: nothing is credited, the player keeps the note and is told
+  the currency no longer exists, and the console logs one warning naming the player, the value and the
+  currency. Adding the currency back makes such notes redeemable again. Before, a player who still had a
+  wallet for that currency redeemed the note into it — the note was consumed and the money went into a
+  wallet no command shows (UltiKits/UltiEconomy#37).
+- 货币已从 `config/currencies.yml` 删除的纸币，现在按设计拒绝兑换（`/note redeem` 与右键均如此）：不入账，玩家保留纸币并收到该货币已
+  不存在的提示，控制台记录一条警告，写明玩家、面值和货币。把该货币加回后可再次兑换。此前仍持有该货币钱包的玩家会兑换成功——纸币被消耗，
+  钱进入一个任何命令都看不到的钱包（UltiKits/UltiEconomy#37）。
+
+- A balance or treasury change whose stored row another writer removed after it was read is now a
+  failure on every storage type, as a failed write already was: the change is logged as failed (`... The
+  stored row no longer exists ...`) and reported as not made — a `/pay` whose sender row is gone credits
+  nobody, one whose receiver row is gone writes the sender's money back, and `/eco treasury withdraw`
+  says the withdrawal failed. A transfer tax whose treasury row is gone is stored in a new treasury row
+  instead of being lost. Before, these writes wrote nothing and counted as made (UltiKits/UltiEconomy#42).
+- 余额或国库变动若在读取后对应记录被其他写入方删除，现在在所有存储类型上都按失败处理（与写入失败一致）：记录失败日志
+  （「数据库中已没有这条记录」），并报告未完成——发送方记录已不存在的 `/pay` 不会给任何人入账，接收方记录已不存在时会把发送方的钱
+  写回，`/eco treasury withdraw` 会报告取款失败。国库记录已不存在时，交易税会存入一条新的国库记录而不是丢失。此前这些写入什么都
+  没写却被当作成功（UltiKits/UltiEconomy#42）。
+
+- The one-time wallet merge on servers that share one database can no longer add a player's second
+  wallet twice or undo a later change to their account when the server merging stalls for longer than
+  the 30-second takeover and then resumes while the server that took over is merging: every account
+  and second-wallet write now applies only if the row still holds what the merge read, and otherwise
+  the merge reads again and decides again; an account the merge creates gets an id derived from
+  the player's UUID, which the database admits once per player, so it cannot be created twice
+  (UltiKits/UltiEconomy#39).
+- 多台服务器共用一个数据库时，一次性钱包合并在负责合并的服务器卡住超过 30 秒的接手时间、又在接手的服务器合并期间继续执行时，
+  不会再把玩家的第二钱包加两次，也不会撤销之后对账户的修改：每次写账户和第二钱包记录都只在记录仍是合并读到的值时才生效，
+  否则重新读取再决定；合并新建的账户使用由玩家 UUID 推导的唯一 id，数据库只接受一次，不会被创建两次
+  （UltiKits/UltiEconomy#39）。
+
+- `bank.max-balance` in `config.yml`, and each non-primary currency's `max-bank-balance` in
+  `currencies.yml`, must now be `-1` (no cap) or above 0. Any other value (`0`, another negative, `.inf`)
+  is not used: there is no cap (`-1`), and a warning names the key, the value as written and the
+  default — for `config.yml` at start-up and after every reload, for `currencies.yml` at start-up.
+  Before, `0` and every negative silently meant "no cap" too, although the setting documented only
+  `-1`, so writing `0` to mean "no bank deposits" gave an unlimited bank (UltiKits/UltiEconomy#35).
+- `config.yml` 的 `bank.max-balance` 以及 `currencies.yml` 中每种非主货币的 `max-bank-balance` 现在必须为 `-1`（不设
+  上限）或大于 0。其他值（`0`、其他负数、`.inf`）不会被使用：不设上限（`-1`），并发出警告写明配置项、原值和默认值——
+  `config.yml` 在启动和每次重载后检查，`currencies.yml` 在启动时检查。此前 `0` 和所有负数也悄悄表示「不设上限」，而注释只写了
+  `-1`，因此写 `0` 想表示「禁止存款」实际上得到的是无上限的银行（UltiKits/UltiEconomy#35）。
+
+- An interest payment whose bank balance row another writer removed after the payment read it is now
+  reported as not credited on every storage type: the failure is logged (`Interest payment: failed to
+  write a bank balance, it was not credited: The stored balance row no longer exists ...`), the
+  balance is not changed and the player is not told they were paid. Before, only the JSON backend
+  reported it; on SQLite and MySQL the payment counted as made (UltiKits/UltiEconomy#40).
+- 利息发放读取某条银行余额记录后，若该记录已被其他写入方删除，现在在所有存储类型上都报告为未入账：记录失败日志
+  （原因为「数据库中已没有这条余额记录」），余额不变，也不会告诉玩家利息已到账。此前只有 JSON 后端会报告；SQLite 和
+  MySQL 上会当作已发放（UltiKits/UltiEconomy#40）。
 
 - `tax.transaction-tax.rate` outside 0 to 1 is no longer used: the default 0.05 applies, with a warning
   naming the key, the value as written and the default, at start-up and after every reload. A negative

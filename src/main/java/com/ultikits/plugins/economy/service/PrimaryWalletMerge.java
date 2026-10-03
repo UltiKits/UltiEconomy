@@ -8,6 +8,7 @@ import com.ultikits.ultitools.interfaces.Cached;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 
 /**
@@ -48,8 +50,16 @@ import java.util.function.Function;
  * less. (A crash while the JSON backend is rewriting one record's file can still leave that file
  * unreadable; that is the framework's file write, not something a module can make atomic.)
  *
- * <p>This class assumes it is the only writer while it runs. Servers that share one database run it
- * through {@link MergeClaim}, which lets one server at a time run it.
+ * <p>Servers that share one database run it through {@link MergeClaim}, which lets one server at a
+ * time run it. One overlap remains that a claim cannot prevent: a holder that stalls for longer than
+ * the takeover right after a check, and then goes on while the server that took over is merging
+ * (UltiKits/UltiEconomy#39). So every write to an account or a second-wallet row is conditional
+ * ({@code DataOperator#updateIf}, maintainer decision 2026-09-29): it applies only while the stored row
+ * still holds what this merge read -- an account its "before" balances, a row its amounts and the
+ * primary currency's id -- and when it does not apply, the merge reads that player's rows and account
+ * again and decides again, never writing on top. An account the merge creates gets an id derived from
+ * the player ({@link #createdAccountId}), so the table's primary key admits one such account per player
+ * and a second server's insert is refused instead of creating a duplicate.
  */
 public final class PrimaryWalletMerge {
 
@@ -64,6 +74,17 @@ public final class PrimaryWalletMerge {
     static final String MARKER_PREFIX = "~merging-into-account.marker:";
 
     private static final String NONE = "none";
+
+    /** Name space of {@link #createdAccountId}: no other id this module or the framework makes is derived from it. */
+    private static final String CREATED_ACCOUNT_NAMESPACE = "UltiEconomy primary-wallet merge account:";
+
+    /**
+     * How many times one player's settlement is decided, at most: a decision ends early only when one of
+     * its conditional writes did not apply because another writer changed the player's rows or account
+     * since they were read. Each further decision reads them again; a player still refused after this
+     * many is left for an operator, like any other merge that no longer adds up.
+     */
+    private static final int MAX_DECISIONS = 3;
 
     private final UltiToolsPlugin plugin;
     private final DataOperator<PlayerAccountEntity> accounts;
@@ -138,7 +159,7 @@ public final class PrimaryWalletMerge {
             settleMarked();
             markSecondWallets();
             settleMarked();
-        } catch (RuntimeException | IllegalAccessException e) {
+        } catch (RuntimeException e) {
             plugin.getLogger().error(String.format(
                     plugin.i18n("economy.log.wallet_merge.failed"), String.valueOf(e.getMessage())));
             return false;
@@ -152,7 +173,7 @@ public final class PrimaryWalletMerge {
     }
 
     /** Step 1 for every player: record what the merge will do on each of their second-wallet rows. */
-    private void markSecondWallets() throws IllegalAccessException {
+    private void markSecondWallets() {
         heartbeat.run();
         Map<String, List<CurrencyBalanceEntity>> byPlayer = group(balances.getAll(
                 WhereCondition.builder().column("currency_id").value(primaryId).build()));
@@ -220,8 +241,16 @@ public final class PrimaryWalletMerge {
                     + (account == null ? NONE : account.getCash() + "/" + account.getBank())
                     + ":" + encode(addCash) + "/" + encode(addBank);
             for (CurrencyBalanceEntity row : player.getValue()) {
+                double readCash = row.getCash();
+                double readBank = row.getBank();
                 row.setCurrencyId(marker);
-                balances.update(row);
+                if (!balances.updateIf(row, where("currency_id", primaryId), where("cash", readCash),
+                        where("bank", readBank))) {
+                    // Another writer changed or removed this row since it was read (a server that took
+                    // the claim over): stop marking this player. The settle pass that follows reads every
+                    // row again and decides from what is on disk.
+                    break;
+                }
                 marked = true;
             }
         }
@@ -237,8 +266,10 @@ public final class PrimaryWalletMerge {
                         .cash(0.0)
                         .bank(0.0)
                         .build();
+                created.setId(createdAccountId(uuid));
                 beforeAccountWrite.run();
-                accounts.insert(created);
+                // Refused only when another server created this player's account meanwhile: nothing left to do.
+                insertAccount(created);
             }
             // Every such account is on disk before its empty wallet is removed; a start interrupted in
             // between finds the account and only removes the rows.
@@ -258,27 +289,26 @@ public final class PrimaryWalletMerge {
      * {@code currency_id}, so those unmarked rows are the ones whose amounts, added to the marked
      * rows', give the recorded sum. This start finishes that marking (durably) before it credits or
      * removes anything. Rows that do not add up are left for an operator.
+     *
+     * <p>Every write here is conditional on what this pass read (UltiKits/UltiEconomy#39). When one does
+     * not apply -- another server wrote the player's rows or account since -- the player's rows and
+     * account are read again and the decision is made again from them: credited by the other server
+     * means only the removal is left, nothing marked left means the other server finished the player,
+     * and anything else is decided exactly as on a first reading.
      */
-    private void settleMarked() throws IllegalAccessException {
+    private void settleMarked() {
         heartbeat.run();
         Map<String, List<CurrencyBalanceEntity>> markedByPlayer = new LinkedHashMap<>();
         Map<String, List<CurrencyBalanceEntity>> unmarkedByPlayer = new LinkedHashMap<>();
         for (CurrencyBalanceEntity row : balances.getAll()) {
-            String id = row.getCurrencyId();
-            if (id != null && id.startsWith(MARKER_PREFIX)) {
-                add(markedByPlayer, row);
-            } else if (primaryId.equals(id)) {
-                add(unmarkedByPlayer, row);
-            }
+            classify(row, markedByPlayer, unmarkedByPlayer);
         }
         markedByPlayer.keySet().removeAll(unsettledPlayers);
         if (markedByPlayer.isEmpty()) {
             return;
         }
         Map<String, PlayerAccountEntity> byUuid = accountsByUuid();
-        List<CurrencyBalanceEntity> markedDone = new ArrayList<>();
-        boolean credited = false;
-        boolean completedMarking = false;
+        Pass pass = new Pass();
         for (Map.Entry<String, List<CurrencyBalanceEntity>> player : markedByPlayer.entrySet()) {
             heartbeat.run();
             String uuid = player.getKey();
@@ -286,88 +316,189 @@ public final class PrimaryWalletMerge {
             List<CurrencyBalanceEntity> unmarkedRows = unmarkedByPlayer.containsKey(uuid)
                     ? unmarkedByPlayer.get(uuid) : new ArrayList<CurrencyBalanceEntity>();
             PlayerAccountEntity account = byUuid.get(uuid);
-            Marker m = Marker.parse(markedRows.get(0).getCurrencyId());
-            if (m == null || !sameMarker(markedRows)) {
-                leaveUnsettled(uuid, account, markedRows.get(0));
-                continue;
-            }
-            if (!unmarkedRows.isEmpty()) {
-                if (!addsUpTo(m, markedRows, unmarkedRows)) {
+            for (int decision = 1; ; decision++) {
+                if (settlePlayer(uuid, markedRows, unmarkedRows, account, pass)) {
+                    break;
+                }
+                // A conditional write did not apply: read this player's rows and account again.
+                Map<String, List<CurrencyBalanceEntity>> marked = new LinkedHashMap<>();
+                Map<String, List<CurrencyBalanceEntity>> unmarked = new LinkedHashMap<>();
+                for (CurrencyBalanceEntity row : balances.getAll(where("uuid", uuid))) {
+                    classify(row, marked, unmarked);
+                }
+                List<PlayerAccountEntity> accountRows = accounts.getAll(where("uuid", uuid));
+                PlayerAccountEntity reread = accountRows.isEmpty() ? null : accountRows.get(0);
+                if (!marked.containsKey(uuid)) {
+                    // Nothing marked is left: the server that wrote first finished this player's merge.
+                    break;
+                }
+                markedRows = marked.get(uuid);
+                unmarkedRows = unmarked.containsKey(uuid) ? unmarked.get(uuid) : new ArrayList<CurrencyBalanceEntity>();
+                account = reread;
+                if (decision >= MAX_DECISIONS) {
                     leaveUnsettled(uuid, account, markedRows.get(0));
-                    continue;
+                    break;
                 }
-                // Finish the interrupted marking, so that no row is ever removed unmarked.
-                for (CurrencyBalanceEntity row : unmarkedRows) {
-                    row.setCurrencyId(markedRows.get(0).getCurrencyId());
-                    balances.update(row);
-                    markedRows.add(row);
-                }
-                completedMarking = true;
             }
-            Double exactCash = exactTarget(m.hasBefore ? m.cashBefore : 0.0, m.cashToAdd);
-            Double exactBank = exactTarget(m.hasBefore ? m.bankBefore : 0.0, m.bankToAdd);
-            if (exactCash == null || exactBank == null) {
-                // Marking never records such a merge; a marker that leads here was not written by it.
-                leaveUnsettled(uuid, account, markedRows.get(0));
-                continue;
-            }
-            double targetCash = exactCash;
-            double targetBank = exactBank;
-            if (account != null && holds(account, targetCash, targetBank)) {
-                if (!withinMarker(m, markedRows)) {
-                    // What an interrupted removal leaves is some of the marked rows, so never more than
-                    // the marker's amounts; more means these rows were not marked by this merge.
-                    leaveUnsettled(uuid, account, markedRows.get(0));
-                    continue;
-                }
-                // Credited by an earlier, interrupted start: only the removal is left.
-                markedDone.addAll(markedRows);
-                continue;
-            }
-            if (!addsUpTo(m, markedRows, new ArrayList<CurrencyBalanceEntity>())) {
-                // Not credited yet, so every row the marking recorded is still there, holding what it
-                // held (marking changes only currency_id): together they hold exactly the marker's
-                // amounts. Rows that do not were not marked by this merge -- a currency id that only
-                // has the marker's shape -- and move nothing.
-                leaveUnsettled(uuid, account, markedRows.get(0));
-                continue;
-            }
-            if (!m.hasBefore && account == null) {
-                account = PlayerAccountEntity.builder()
-                        .uuid(uuid)
-                        .playerName(nameFor(uuid, null))
-                        .cash(targetCash)
-                        .bank(targetBank)
-                        .build();
-                beforeAccountWrite.run();
-                accounts.insert(account);
-            } else if (m.hasBefore && account != null && holds(account, m.cashBefore, m.bankBefore)) {
-                account.setCash(targetCash);
-                account.setBank(targetBank);
-                beforeAccountWrite.run();
-                accounts.update(account);
-            } else {
-                leaveUnsettled(uuid, account, markedRows.get(0));
-                continue;
-            }
-            credited = true;
-            markedDone.addAll(markedRows);
-            merged++;
-            cashAdded = cashAdded.add(m.cashToAdd);
-            bankAdded = bankAdded.add(m.bankToAdd);
-            plugin.getLogger().info(String.format(plugin.i18n("economy.log.wallet_merge.player"),
-                    m.cashToAdd.toPlainString(), m.bankToAdd.toPlainString(), nameFor(uuid, account),
-                    plain(targetCash), plain(targetBank)));
         }
-        if (completedMarking) {
+        if (pass.completedMarking) {
             // Every row is marked on disk before any row is removed.
             flush(balances);
         }
-        if (credited) {
+        if (pass.credited) {
             // Every credit is on disk before any row is removed.
             flush(accounts);
         }
-        remove(markedDone);
+        remove(pass.markedDone);
+    }
+
+    /**
+     * Decides and carries out one player's settlement from the rows and account given.
+     *
+     * @return true when the player is decided -- credited, found credited, or left for an operator;
+     *         false when one of its conditional writes did not apply, so the caller reads again
+     */
+    private boolean settlePlayer(String uuid, List<CurrencyBalanceEntity> markedRows,
+                                 List<CurrencyBalanceEntity> unmarkedRows, PlayerAccountEntity account,
+                                 Pass pass) {
+        Marker m = Marker.parse(markedRows.get(0).getCurrencyId());
+        if (m == null || !sameMarker(markedRows)) {
+            leaveUnsettled(uuid, account, markedRows.get(0));
+            return true;
+        }
+        if (!unmarkedRows.isEmpty()) {
+            if (!addsUpTo(m, markedRows, unmarkedRows)) {
+                leaveUnsettled(uuid, account, markedRows.get(0));
+                return true;
+            }
+            // Finish the interrupted marking, so that no row is ever removed unmarked.
+            for (CurrencyBalanceEntity row : unmarkedRows) {
+                double readCash = row.getCash();
+                double readBank = row.getBank();
+                row.setCurrencyId(markedRows.get(0).getCurrencyId());
+                if (!balances.updateIf(row, where("currency_id", primaryId), where("cash", readCash),
+                        where("bank", readBank))) {
+                    return false;
+                }
+                markedRows.add(row);
+                pass.completedMarking = true;
+            }
+            unmarkedRows.clear();
+        }
+        Double exactCash = exactTarget(m.hasBefore ? m.cashBefore : 0.0, m.cashToAdd);
+        Double exactBank = exactTarget(m.hasBefore ? m.bankBefore : 0.0, m.bankToAdd);
+        if (exactCash == null || exactBank == null) {
+            // Marking never records such a merge; a marker that leads here was not written by it.
+            leaveUnsettled(uuid, account, markedRows.get(0));
+            return true;
+        }
+        double targetCash = exactCash;
+        double targetBank = exactBank;
+        if (account != null && holds(account, targetCash, targetBank)) {
+            if (!withinMarker(m, markedRows)) {
+                // What an interrupted removal leaves is some of the marked rows, so never more than
+                // the marker's amounts; more means these rows were not marked by this merge.
+                leaveUnsettled(uuid, account, markedRows.get(0));
+                return true;
+            }
+            // Credited by an earlier, interrupted start, or by another server: only the removal is left.
+            pass.markedDone.addAll(markedRows);
+            return true;
+        }
+        if (!addsUpTo(m, markedRows, new ArrayList<CurrencyBalanceEntity>())) {
+            // Not credited yet, so every row the marking recorded is still there, holding what it
+            // held (marking changes only currency_id): together they hold exactly the marker's
+            // amounts. Rows that do not were not marked by this merge -- a currency id that only
+            // has the marker's shape -- and move nothing.
+            leaveUnsettled(uuid, account, markedRows.get(0));
+            return true;
+        }
+        if (!m.hasBefore && account == null) {
+            account = PlayerAccountEntity.builder()
+                    .uuid(uuid)
+                    .playerName(nameFor(uuid, null))
+                    .cash(targetCash)
+                    .bank(targetBank)
+                    .build();
+            account.setId(createdAccountId(uuid));
+            beforeAccountWrite.run();
+            if (!insertAccount(account)) {
+                return false;
+            }
+        } else if (m.hasBefore && account != null && holds(account, m.cashBefore, m.bankBefore)) {
+            account.setCash(targetCash);
+            account.setBank(targetBank);
+            beforeAccountWrite.run();
+            // Applies only while the account still holds the "before" balances this pass read.
+            if (!accounts.updateIf(account, where("cash", m.cashBefore), where("bank", m.bankBefore))) {
+                return false;
+            }
+        } else {
+            leaveUnsettled(uuid, account, markedRows.get(0));
+            return true;
+        }
+        pass.credited = true;
+        pass.markedDone.addAll(markedRows);
+        merged++;
+        cashAdded = cashAdded.add(m.cashToAdd);
+        bankAdded = bankAdded.add(m.bankToAdd);
+        plugin.getLogger().info(String.format(plugin.i18n("economy.log.wallet_merge.player"),
+                m.cashToAdd.toPlainString(), m.bankToAdd.toPlainString(), nameFor(uuid, account),
+                plain(targetCash), plain(targetBank)));
+        return true;
+    }
+
+    /**
+     * Inserts an account this merge creates. On SQLite and MySQL the table's primary key refuses a
+     * second account with the same id, so a refused insert whose id is now stored means another server
+     * created this player's account since this one read the accounts.
+     *
+     * @return true when this insert stored the account; false when another server's did
+     */
+    private boolean insertAccount(PlayerAccountEntity created) {
+        try {
+            accounts.insert(created);
+            return true;
+        } catch (RuntimeException e) {
+            if (accounts.getById(created.getId()) != null) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * The id of an account this merge creates for {@code uuid}: the same on every server, so on SQLite and
+     * MySQL the table's primary key refuses a second server's insert of the same player's account
+     * (UltiKits/UltiEconomy#39); and a plain UUID (a name-based, version 3 one), because the JSON backend
+     * stores each record as {@code <id>.json} and Windows refuses a file name containing {@code :}.
+     * Accounts created anywhere else keep their random ids; nothing reads an account's id except to write
+     * that row back.
+     */
+    static String createdAccountId(String uuid) {
+        return UUID.nameUUIDFromBytes((CREATED_ACCOUNT_NAMESPACE + uuid).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    /** Files a second-wallet row under its player: marked by this merge, or still the primary currency's. */
+    private void classify(CurrencyBalanceEntity row, Map<String, List<CurrencyBalanceEntity>> markedByPlayer,
+                          Map<String, List<CurrencyBalanceEntity>> unmarkedByPlayer) {
+        String id = row.getCurrencyId();
+        if (id != null && id.startsWith(MARKER_PREFIX)) {
+            add(markedByPlayer, row);
+        } else if (primaryId.equals(id)) {
+            add(unmarkedByPlayer, row);
+        }
+    }
+
+    private static WhereCondition where(String column, Object value) {
+        return WhereCondition.builder().column(column).value(value).build();
+    }
+
+    /** What one settle pass has done so far, for the flushes and the removal at its end. */
+    private static final class Pass {
+        private final List<CurrencyBalanceEntity> markedDone = new ArrayList<>();
+        private boolean credited;
+        private boolean completedMarking;
     }
 
     /** Removes {@code rows} and makes the removal durable before returning. */

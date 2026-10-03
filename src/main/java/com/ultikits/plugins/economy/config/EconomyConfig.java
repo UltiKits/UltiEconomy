@@ -27,6 +27,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     static final double DEFAULT_MAX_INTEREST = 10000.0;
     /** Declared default of {@code tax.transaction-tax.rate}, used while the file's value is outside 0 to 1. */
     static final double DEFAULT_TRANSACTION_TAX_RATE = 0.05;
+    /** Declared default of {@code bank.max-balance} (no cap), used while the file's is neither -1 nor above 0. */
+    public static final double DEFAULT_MAX_BANK_BALANCE = -1;
 
     public EconomyConfig() {
         super("config/config.yml");
@@ -81,8 +83,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "bank.min-deposit", comment = "Minimum deposit amount")
     private double minDeposit = 100.0;
 
-    @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited)")
-    private double maxBankBalance = -1;
+    @ConfigEntry(path = "bank.max-balance", comment = "Maximum bank balance (-1 = unlimited, otherwise above 0)")
+    private double maxBankBalance = DEFAULT_MAX_BANK_BALANCE;
 
     @ConfigEntry(path = "interest.enabled", comment = "Pay bank interest every interest.interval seconds; read at each payment")
     private boolean interestEnabled = false;
@@ -109,10 +111,10 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "leaderboard.update-interval", comment = "Seconds between leaderboard refreshes (1 to 107374182)")
     private int leaderboardUpdateInterval = 60;
 
-    @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
-    private int leaderboardDisplayCount = 10;
+    // leaderboard.display-count was deleted in 6.3.0: nothing read it, and each top-N placeholder names
+    // its own N (UltiKits/UltiEconomy#36). A file that still holds it is told so by RemovedConfigKeys.
 
-    @ConfigEntry(path = "tax.enabled", comment = "Master switch for all taxation: false collects no transaction tax and no wealth tax")
+    @ConfigEntry(path = "tax.enabled", comment = "Master switch for taxation: false collects no transaction tax")
     private boolean taxEnabled = true;
 
     @ConfigEntry(path = "tax.transaction-tax.enabled", comment = "Enable transaction tax on transfers")
@@ -124,14 +126,9 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "tax.transaction-tax.exempt-permission", comment = "Permission to exempt from transaction tax")
     private String transactionTaxExemptPermission = "ultieconomy.tax.exempt";
 
-    @ConfigEntry(path = "tax.wealth-tax.enabled", comment = "Enable periodic wealth tax")
-    private boolean wealthTaxEnabled = false;
-
-    @ConfigEntry(path = "tax.wealth-tax.interval", comment = "Wealth tax interval in seconds")
-    private int wealthTaxInterval = 3600;
-
-    @ConfigEntry(path = "tax.wealth-tax.exempt-permission", comment = "Permission to exempt from wealth tax")
-    private String wealthTaxExemptPermission = "ultieconomy.wealthtax.exempt";
+    // tax.wealth-tax.enabled, .interval and .exempt-permission were deleted in 6.3.0: nothing ever
+    // collected a wealth tax (UltiKits/UltiEconomy#27; the feature request is UltiKits/UltiEconomy#38).
+    // A file that still holds them is told so by RemovedConfigKeys.
 
     // The three ranged values (UltiKits/UltiEconomy#29, maintainer decision 2026-09-27). The field keeps
     // what the file holds, so any save of this file - the module writes it when it puts the currency
@@ -152,6 +149,21 @@ public class EconomyConfig extends AbstractConfigEntity {
     /** The transaction tax rate the module uses: the file's value when it is from 0 to 1, else the default. */
     public double getTransactionTaxRate() {
         return isUsableFraction(transactionTaxRate) ? transactionTaxRate : DEFAULT_TRANSACTION_TAX_RATE;
+    }
+
+    /**
+     * The primary currency's bank cap the module uses: the file's value when it is -1 (no cap) or above
+     * 0, else the default -1 (UltiKits/UltiEconomy#35). Every reader checks the cap as "above 0", so
+     * before this 0 and every other negative also meant "no cap" while the setting documents only -1;
+     * now such a value is refused and named at load and after every reload ({@link ConfigRanges}).
+     */
+    public double getMaxBankBalance() {
+        return isUsableBankCap(maxBankBalance) ? maxBankBalance : DEFAULT_MAX_BANK_BALANCE;
+    }
+
+    /** {@code bank.max-balance} as the file holds it. */
+    double writtenMaxBankBalance() {
+        return maxBankBalance;
     }
 
     /** {@code interest.rate} as the file holds it. */
@@ -180,5 +192,17 @@ public class EconomyConfig extends AbstractConfigEntity {
      */
     static boolean isUsableCap(double value) {
         return value == -1 || (value >= 0 && !Double.isInfinite(value));
+    }
+
+    /**
+     * A bank cap: -1 for none, or a finite value above 0 (UltiKits/UltiEconomy#35). Unlike the interest
+     * cap, 0 is refused: it reads as "no deposits" but every reader treated it as "no cap". The same
+     * rule applies to a currency's own {@code max-bank-balance} in {@code currencies.yml}.
+     *
+     * @param value the cap as written
+     * @return whether the module can use it as written
+     */
+    public static boolean isUsableBankCap(double value) {
+        return value == -1 || (value > 0 && !Double.isInfinite(value));
     }
 }

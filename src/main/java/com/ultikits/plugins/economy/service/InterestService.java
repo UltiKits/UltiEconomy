@@ -8,6 +8,7 @@ import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Scheduled;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -15,6 +16,8 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.ObjDoubleConsumer;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Pays bank interest every {@code interest.interval} seconds while {@code interest.enabled} is true.
@@ -123,25 +126,20 @@ public class InterestService {
      *       above 0, the same caps a deposit obeys. The credit is the smallest of rate x balance,
      *       {@code interest.max-interest} (when above 0) and the room left under the cap; a balance
      *       with no room gets nothing.</li>
-     *   <li>The owner is told only after the write succeeded. A write that fails is logged, the row
-     *       keeps its old balance, and the payment carries on with the next row.</li>
+     *   <li>The owner is told only after the write succeeded. A write that fails -- it throws, or it
+     *       matches no stored row because another writer removed the row after it was read -- is
+     *       logged, the row keeps its old balance, and the payment carries on with the next row.</li>
      * </ul>
      */
     public void distributeInterest() {
         // Primary currency interest
         List<PlayerAccountEntity> accounts = dataOperator.getAll();
         for (PlayerAccountEntity account : accounts) {
-            double interest = creditFor(account.getBank(), config.getMaxBankBalance());
-            if (interest <= 0) {
-                continue;
+            double interest = pay(dataOperator, account, PlayerAccountEntity::getCash, PlayerAccountEntity::getBank,
+                    PlayerAccountEntity::setBank, row -> creditFor(row.getBank(), config.getMaxBankBalance()));
+            if (interest > 0) {
+                notifyPlayer(account.getUuid(), interest);
             }
-            double before = account.getBank();
-            account.setBank(before + interest);
-            if (!write(dataOperator, account)) {
-                account.setBank(before);
-                continue;
-            }
-            notifyPlayer(account.getUuid(), interest);
         }
 
         // Per-currency interest
@@ -161,17 +159,12 @@ public class InterestService {
             if (def == null || !def.isBankEnabled()) {
                 continue;
             }
-            double interest = creditFor(balance.getBank(), def.getMaxBankBalance());
-            if (interest <= 0) {
-                continue;
+            double interest = pay(currencyDataOperator, balance, CurrencyBalanceEntity::getCash,
+                    CurrencyBalanceEntity::getBank, CurrencyBalanceEntity::setBank,
+                    row -> creditFor(row.getBank(), def.getMaxBankBalance()));
+            if (interest > 0) {
+                notifyPlayer(balance.getUuid(), interest, balance.getCurrencyId());
             }
-            double before = balance.getBank();
-            balance.setBank(before + interest);
-            if (!write(currencyDataOperator, balance)) {
-                balance.setBank(before);
-                continue;
-            }
-            notifyPlayer(balance.getUuid(), interest, balance.getCurrencyId());
         }
     }
 
@@ -188,16 +181,65 @@ public class InterestService {
         return interest;
     }
 
-    /** Writes one row; returns false, having logged why, if the write failed. */
-    private <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> boolean write(
-            DataOperator<T> operator, T row) {
-        try {
-            operator.update(row);
-            return true;
-        } catch (IllegalAccessException | RuntimeException e) {
-            plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"), e.getMessage()));
-            return false;
+    /** How many times one row's payment is attempted when another writer keeps changing the row. */
+    private static final int MAX_WRITE_ATTEMPTS = 3;
+
+    /**
+     * Credits one row its interest and writes it so that the write applies only while the stored row
+     * still holds the cash and bank this payment read ({@code DataOperator#updateIf},
+     * UltiKits/UltiEconomy#41): a change another server made in between -- a deposit, a payment -- is
+     * not overwritten. When the write does not apply the row is read again by id and its interest
+     * worked out again from the balance now stored, at most {@link #MAX_WRITE_ATTEMPTS} times.
+     *
+     * <p>A failure -- the write throws, the row is gone on the re-read (another writer removed it,
+     * UltiKits/UltiEconomy#40), or it kept changing on every attempt -- is logged, the row object keeps
+     * its old balance, and 0 comes back, so the caller tells nobody.
+     *
+     * @return the interest written, or 0 when nothing was credited
+     */
+    private <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> double pay(
+            DataOperator<T> operator, T row, ToDoubleFunction<T> cash, ToDoubleFunction<T> bank,
+            ObjDoubleConsumer<T> setBank, ToDoubleFunction<T> creditFor) {
+        T current = row;
+        for (int attempt = 1; ; attempt++) {
+            double readCash = cash.applyAsDouble(current);
+            double before = bank.applyAsDouble(current);
+            double interest = creditFor.applyAsDouble(current);
+            if (interest <= 0) {
+                return 0;
+            }
+            setBank.accept(current, before + interest);
+            boolean written;
+            try {
+                written = operator.updateIf(current, where("cash", readCash), where("bank", before));
+            } catch (RuntimeException e) {
+                setBank.accept(current, before);
+                logFailure(e.getMessage());
+                return 0;
+            }
+            if (written) {
+                return interest;
+            }
+            setBank.accept(current, before);
+            T fresh = operator.getById(current.getId());
+            if (fresh == null) {
+                logFailure(plugin.i18n("economy.log.interest_row_gone"));
+                return 0;
+            }
+            if (attempt >= MAX_WRITE_ATTEMPTS) {
+                logFailure(plugin.i18n("economy.log.write_contended"));
+                return 0;
+            }
+            current = fresh;
         }
+    }
+
+    private void logFailure(String reason) {
+        plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"), reason));
+    }
+
+    private static WhereCondition where(String column, double value) {
+        return WhereCondition.builder().column(column).value(value).build();
     }
 
     /**

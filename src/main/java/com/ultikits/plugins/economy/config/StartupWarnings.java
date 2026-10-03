@@ -5,6 +5,9 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import org.bukkit.configuration.ConfigurationSection;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 /**
  * Warnings this module logs once per boot about settings whose effect changed in 6.3.0.
  *
@@ -114,12 +117,42 @@ public final class StartupWarnings {
             warnConflict(logger, plugin, prefix + "symbol", primary.getString("symbol"),
                     file, "currency-symbol", config.getCurrencySymbol());
         }
-        // Every reader treats a cap of 0 or below as "no cap", so 0 and -1 agree.
+        // A cap that is neither -1 nor above 0 is refused and means "no cap" (UltiKits/UltiEconomy#35), so 0 and -1 agree.
         if (primary.contains("max-bank-balance")
                 && Double.compare(cap(primary.getDouble("max-bank-balance")), cap(config.getMaxBankBalance())) != 0) {
             warnConflict(logger, plugin, prefix + "max-bank-balance", String.valueOf(primary.getDouble("max-bank-balance")),
                     file, "bank.max-balance", String.valueOf(config.getMaxBankBalance()));
         }
+    }
+
+    /**
+     * Logs one warning for each non-primary currency whose {@code max-bank-balance} in
+     * {@code currencies.yml} the module refused -- neither -1 (no cap) nor above 0 -- naming the file,
+     * the key, the value as written and the default -1 the currency uses instead
+     * (UltiKits/UltiEconomy#35). {@code currencies.yml} is read once, when the module loads.
+     *
+     * @param currencies the currency definitions; may be null, in which case nothing is reported
+     * @param logger     the module's logger; may be null, in which case nothing is reported
+     * @param plugin     the module, for its catalogue; may be null, in which case nothing is reported
+     */
+    public static void logRefusedCurrencyBankCaps(CurrencyManager currencies, PluginLogger logger,
+                                                  UltiToolsPlugin plugin) {
+        if (currencies == null || logger == null || plugin == null) {
+            return;
+        }
+        for (Map.Entry<String, Double> refused : currencies.getRefusedBankCaps()) {
+            logger.warn(String.format(plugin.i18n("economy.warn.currency_value_out_of_range"), MODULE,
+                    "currencies." + refused.getKey() + ".max-bank-balance", CURRENCIES_FILE, plain(refused.getValue()),
+                    plugin.i18n("economy.warn.range_max_bank_balance"), plain(EconomyConfig.DEFAULT_MAX_BANK_BALANCE)));
+        }
+    }
+
+    /** A number as an operator would write it: no trailing zeros, no exponent. */
+    private static String plain(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return String.valueOf(value);
+        }
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
     /** A bank cap as every reader applies it: a value of 0 or below means "no cap". */

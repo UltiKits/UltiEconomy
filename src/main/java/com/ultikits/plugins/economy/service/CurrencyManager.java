@@ -1,5 +1,6 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -12,6 +13,8 @@ public class CurrencyManager {
     private final Map<String, CurrencyDefinition> currencies = new LinkedHashMap<>();
     private final String primaryCurrencyId;
     private final ConfigurationSection primarySection;
+    // Each non-primary currency whose max-bank-balance the module refused: {id, value as written} (UltiKits/UltiEconomy#35)
+    private final List<Map.Entry<String, Double>> refusedBankCaps = new ArrayList<>();
     // config.yml's currency-name and currency-symbol, read live (UltiKits/UltiEconomy#32); null until set
     private Supplier<String> primaryName;
     private Supplier<String> primarySymbol;
@@ -28,6 +31,15 @@ public class CurrencyManager {
             ConfigurationSection cs = section.getConfigurationSection(id);
             if (cs == null) continue;
 
+            boolean primary = cs.getBoolean("primary", false);
+            double bankCap = cs.getDouble("max-bank-balance", -1);
+            // A cap is -1 (no cap) or above 0; anything else is refused and the default -1 used
+            // (UltiKits/UltiEconomy#35). The primary currency's cap comes from config.yml, so its entry
+            // here is not read and not reported.
+            if (!primary && !EconomyConfig.isUsableBankCap(bankCap)) {
+                refusedBankCaps.add(new AbstractMap.SimpleImmutableEntry<>(id, bankCap));
+                bankCap = EconomyConfig.DEFAULT_MAX_BANK_BALANCE;
+            }
             CurrencyDefinition def = CurrencyDefinition.builder()
                     .id(id)
                     .displayName(cs.getString("display-name", id))
@@ -35,8 +47,8 @@ public class CurrencyManager {
                     .initialCash(cs.getDouble("initial-cash", 0.0))
                     .bankEnabled(cs.getBoolean("bank-enabled", false))
                     .minDeposit(cs.getDouble("min-deposit", 0.0))
-                    .maxBankBalance(cs.getDouble("max-bank-balance", -1))
-                    .primary(cs.getBoolean("primary", false))
+                    .maxBankBalance(bankCap)
+                    .primary(primary)
                     .build();
 
             currencies.put(id, def);
@@ -54,6 +66,16 @@ public class CurrencyManager {
         }
         this.primaryCurrencyId = foundPrimary;
         this.primarySection = foundSection;
+    }
+
+    /**
+     * Each non-primary currency whose {@code max-bank-balance} was neither -1 nor above 0, with the value
+     * as written, in file order; the currency uses -1 (no cap) instead (UltiKits/UltiEconomy#35).
+     *
+     * @return the refused caps, currency id to value as written
+     */
+    public List<Map.Entry<String, Double>> getRefusedBankCaps() {
+        return Collections.unmodifiableList(refusedBankCaps);
     }
 
     /**
