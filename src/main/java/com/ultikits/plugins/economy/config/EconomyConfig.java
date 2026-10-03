@@ -114,7 +114,7 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
     private int leaderboardDisplayCount = 10;
 
-    @ConfigEntry(path = "tax.enabled", comment = "Master switch for all taxation: false collects no transaction tax and no wealth tax")
+    @ConfigEntry(path = "tax.enabled", comment = "Master switch for taxation: false collects no transaction tax")
     private boolean taxEnabled = true;
 
     @ConfigEntry(path = "tax.transaction-tax.enabled", comment = "Enable transaction tax on transfers")
@@ -126,14 +126,9 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "tax.transaction-tax.exempt-permission", comment = "Permission to exempt from transaction tax")
     private String transactionTaxExemptPermission = "ultieconomy.tax.exempt";
 
-    @ConfigEntry(path = "tax.wealth-tax.enabled", comment = "Enable periodic wealth tax")
-    private boolean wealthTaxEnabled = false;
-
-    @ConfigEntry(path = "tax.wealth-tax.interval", comment = "Wealth tax interval in seconds")
-    private int wealthTaxInterval = 3600;
-
-    @ConfigEntry(path = "tax.wealth-tax.exempt-permission", comment = "Permission to exempt from wealth tax")
-    private String wealthTaxExemptPermission = "ultieconomy.wealthtax.exempt";
+    // tax.wealth-tax.enabled, .interval and .exempt-permission were deleted in 6.3.0: nothing ever
+    // collected a wealth tax (UltiKits/UltiEconomy#27; the feature request is UltiKits/UltiEconomy#38).
+    // A file that still holds them is told so by RemovedConfigKeys.
 
     // The three ranged values (UltiKits/UltiEconomy#29, maintainer decision 2026-09-27). The field keeps
     // what the file holds, so any save of this file - the module writes it when it puts the currency

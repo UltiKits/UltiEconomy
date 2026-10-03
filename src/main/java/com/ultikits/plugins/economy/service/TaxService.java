@@ -3,8 +3,6 @@ package com.ultikits.plugins.economy.service;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.ultitools.interfaces.DataOperator;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 import java.util.List;
 
@@ -30,26 +28,6 @@ public class TaxService {
             return 0.0;
         }
         return amount * config.getTransactionTaxRate();
-    }
-
-    public double calculateWealthTax(double totalWealth, List<TaxBracket> brackets) {
-        double tax = 0.0;
-        for (TaxBracket bracket : brackets) {
-            if (totalWealth <= bracket.threshold) {
-                break;
-            }
-            double taxableInBracket;
-            if (bracket.ceiling < 0) {
-                // Unbounded top bracket
-                taxableInBracket = totalWealth - bracket.threshold;
-            } else if (totalWealth >= bracket.ceiling) {
-                taxableInBracket = bracket.ceiling - bracket.threshold;
-            } else {
-                taxableInBracket = totalWealth - bracket.threshold;
-            }
-            tax += taxableInBracket * bracket.rate;
-        }
-        return tax;
     }
 
     public void depositToTreasury(double amount, String currencyId) throws IllegalAccessException {
@@ -93,13 +71,5 @@ public class TaxService {
         entry.setBalance(entry.getBalance() - amount);
         treasuryDataOperator.update(entry);
         return true;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    public static class TaxBracket {
-        private final double threshold;
-        private final double ceiling;
-        private final double rate;
     }
 }

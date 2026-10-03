@@ -32,6 +32,9 @@ public final class RemovedConfigKeys {
      */
     private static final String[] REMOVED = {
             // tax.wealth-tax.* (UltiKits/UltiEconomy#27)
+            "tax.wealth-tax.enabled",
+            "tax.wealth-tax.interval",
+            "tax.wealth-tax.exempt-permission",
             // leaderboard.display-count (UltiKits/UltiEconomy#36)
     };
 
@@ -45,6 +48,10 @@ public final class RemovedConfigKeys {
     private static String reasonFor(String removedKey, UltiToolsPlugin plugin) {
         switch (removedKey) {
             // tax.wealth-tax.* (UltiKits/UltiEconomy#27)
+            case "tax.wealth-tax.enabled":
+            case "tax.wealth-tax.interval":
+            case "tax.wealth-tax.exempt-permission":
+                return plugin.i18n("economy.warn.removed_key_reason.wealth_tax");
             // leaderboard.display-count (UltiKits/UltiEconomy#36)
             default:
                 throw new IllegalStateException("No reason recorded for removed key " + removedKey);

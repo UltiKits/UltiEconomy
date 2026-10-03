@@ -163,6 +163,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- The wealth tax's settings `tax.wealth-tax.enabled`, `tax.wealth-tax.interval` and
+  `tax.wealth-tax.exempt-permission` are removed. The wealth tax never collected anything: nothing
+  scheduled it, nothing took money, and no setting defined its brackets. A `config.yml` that still holds
+  one of them gets one warning per key at start-up saying it no longer has any effect and can be
+  deleted; the file is not changed. Implementing a wealth tax is a feature request for a later version
+  (UltiKits/UltiEconomy#38; maintainer decision 2026-09-29, UltiKits/UltiEconomy#27).
+- 删除财富税的设置 `tax.wealth-tax.enabled`、`tax.wealth-tax.interval` 和 `tax.wealth-tax.exempt-permission`。财富税
+  从未收取过任何税款：从未被调度、从未扣款，也没有定义税率档位的设置。仍含有这些键的 `config.yml` 会在启动时每个键给出一条
+  警告，说明它已不再起作用、可以删除；文件不会被修改。财富税本身作为功能请求排到以后的版本（UltiKits/UltiEconomy#38；
+  维护者 2026-09-29 的决定，UltiKits/UltiEconomy#27）。
+
 - Twenty-two language entries that no code displayed were removed from both language files: thirteen
   near-duplicates of the command messages above that carried one `%s` too many (the reason those
   messages never matched), and nine that no version of this module ever referenced (a leaderboard
