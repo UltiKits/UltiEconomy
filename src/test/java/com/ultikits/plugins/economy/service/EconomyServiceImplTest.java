@@ -1,5 +1,7 @@
 package com.ultikits.plugins.economy.service;
 
+import com.ultikits.ultitools.exceptions.ErrorCode;
+import com.ultikits.ultitools.exceptions.DataAccessException;
 import com.ultikits.plugins.economy.i18n.CatalogueText;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
@@ -72,6 +74,10 @@ class EconomyServiceImplTest {
         service = EconomyServiceImpl.createForTest(plugin, dataOperator, config, currencyDataOperator, currencyManager);
         // Console lines come from the module's catalogue; answer from the real zh one.
         lenient().when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
+        // Every balance write goes through DataOperator#updateCounted (UltiKits/UltiEconomy#42): 1 is
+        // "the stored row was written"; an unstubbed int on a mock is 0, "no such row".
+        lenient().when(dataOperator.updateCounted(any(PlayerAccountEntity.class))).thenReturn(1);
+        lenient().when(currencyDataOperator.updateCounted(any(CurrencyBalanceEntity.class))).thenReturn(1);
     }
 
     private void mockQueryReturns(UUID uuid, PlayerAccountEntity account) {
@@ -193,7 +199,7 @@ class EconomyServiceImplTest {
             boolean result = service.setCash(PLAYER_UUID, 2000);
             assertThat(result).isTrue();
             assertThat(account.getCash()).isEqualTo(2000.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -217,7 +223,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.addCash(PLAYER_UUID, 500)).isTrue();
             assertThat(account.getCash()).isEqualTo(1500.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -242,7 +248,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.takeCash(PLAYER_UUID, 300)).isTrue();
             assertThat(account.getCash()).isEqualTo(700.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -286,7 +292,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.setBank(PLAYER_UUID, 1000)).isTrue();
             assertThat(account.getBank()).isEqualTo(1000.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -303,7 +309,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.addBank(PLAYER_UUID, 200)).isTrue();
             assertThat(account.getBank()).isEqualTo(700.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -314,7 +320,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.takeBank(PLAYER_UUID, 200)).isTrue();
             assertThat(account.getBank()).isEqualTo(300.0);
-            verify(dataOperator).update(account);
+            verify(dataOperator).updateCounted(account);
         }
 
         @Test
@@ -556,13 +562,13 @@ class EconomyServiceImplTest {
             when(query.list())
                     .thenReturn(Collections.singletonList(sender))
                     .thenReturn(Collections.singletonList(receiver));
-            doThrow(new IllegalAccessException("sender persist failed")).when(dataOperator).update(sender);
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("sender persist failed"))).when(dataOperator).updateCounted(sender);
 
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 300);
 
             assertThat(result).isFalse();
             assertThat(sender.getCash()).isEqualTo(1000.0);
-            verify(dataOperator, never()).update(receiver);
+            verify(dataOperator, never()).updateCounted(receiver);
         }
 
         @Test
@@ -581,14 +587,14 @@ class EconomyServiceImplTest {
             when(query.list())
                     .thenReturn(Collections.singletonList(sender))
                     .thenReturn(Collections.singletonList(receiver));
-            doNothing().when(dataOperator).update(sender);
-            doThrow(new IllegalAccessException("receiver persist failed")).when(dataOperator).update(receiver);
+            doReturn(1).when(dataOperator).updateCounted(sender);
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("receiver persist failed"))).when(dataOperator).updateCounted(receiver);
 
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 300);
 
             assertThat(result).isFalse();
             assertThat(sender.getCash()).isEqualTo(1000.0);
-            verify(dataOperator, times(2)).update(sender);
+            verify(dataOperator, times(2)).updateCounted(sender);
         }
 
         @Test
@@ -656,13 +662,13 @@ class EconomyServiceImplTest {
             when(currencyQuery.list())
                     .thenReturn(Collections.singletonList(sender))
                     .thenReturn(Collections.singletonList(receiver));
-            doThrow(new IllegalAccessException("sender persist failed")).when(currencyDataOperator).update(sender);
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("sender persist failed"))).when(currencyDataOperator).updateCounted(sender);
 
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
 
             assertThat(result).isFalse();
             assertThat(sender.getCash()).isEqualTo(500.0);
-            verify(currencyDataOperator, never()).update(receiver);
+            verify(currencyDataOperator, never()).updateCounted(receiver);
         }
 
         @Test
@@ -685,14 +691,14 @@ class EconomyServiceImplTest {
             when(currencyQuery.list())
                     .thenReturn(Collections.singletonList(sender))
                     .thenReturn(Collections.singletonList(receiver));
-            doNothing().when(currencyDataOperator).update(sender);
-            doThrow(new IllegalAccessException("receiver persist failed")).when(currencyDataOperator).update(receiver);
+            doReturn(1).when(currencyDataOperator).updateCounted(sender);
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("receiver persist failed"))).when(currencyDataOperator).updateCounted(receiver);
 
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
 
             assertThat(result).isFalse();
             assertThat(sender.getCash()).isEqualTo(500.0);
-            verify(currencyDataOperator, times(2)).update(sender);
+            verify(currencyDataOperator, times(2)).updateCounted(sender);
         }
 
         @Test
@@ -783,7 +789,7 @@ class EconomyServiceImplTest {
 
             PlayerAccountEntity account = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
             mockQueryReturns(PLAYER_UUID, account);
-            doThrow(new IllegalAccessException("test")).when(dataOperator).update(any());
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("test"))).when(dataOperator).updateCounted(any());
             when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
             assertThat(service.setCash(PLAYER_UUID, 2000)).isFalse();
@@ -923,7 +929,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.setCash(PLAYER_UUID, 500.0, "gems")).isTrue();
             assertThat(balance.getCash()).isEqualTo(500.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -935,7 +941,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.addCash(PLAYER_UUID, 200.0, "gems")).isTrue();
             assertThat(balance.getCash()).isEqualTo(300.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -947,7 +953,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.takeCash(PLAYER_UUID, 200.0, "gems")).isTrue();
             assertThat(balance.getCash()).isEqualTo(300.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -993,7 +999,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.setBank(PLAYER_UUID, 800.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(800.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -1005,7 +1011,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.addBank(PLAYER_UUID, 200.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(500.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -1017,7 +1023,7 @@ class EconomyServiceImplTest {
 
             assertThat(service.takeBank(PLAYER_UUID, 200.0, "gold")).isTrue();
             assertThat(balance.getBank()).isEqualTo(300.0);
-            verify(currencyDataOperator).update(balance);
+            verify(currencyDataOperator).updateCounted(balance);
         }
 
         @Test
@@ -1217,12 +1223,84 @@ class EconomyServiceImplTest {
             CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
                     .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
             mockCurrencyQueryReturns(PLAYER_UUID, "gems", balance);
-            doThrow(new IllegalAccessException("test")).when(currencyDataOperator).update(any());
+            doThrow(new DataAccessException(ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("test"))).when(currencyDataOperator).updateCounted(any());
             when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
             assertThat(service.setCash(PLAYER_UUID, 500.0, "gems")).isFalse();
             // The operator reads this line in the server's language (zh here).
             verify(logger).error(String.format(zhText("economy.log.balance_update_failed"), "test"));
+        }
+
+        /**
+         * UltiKits/UltiEconomy#42 (row-count sweep, UltiKits/UltiTools-Reborn#558): a balance row another
+         * writer removed between the read and the write matches no stored row; {@code updateCounted}
+         * reports 0, and the change must fail exactly as a thrown write does instead of reporting success.
+         */
+        @Test
+        @DisplayName("setCash with currencyId returns false and logs when the stored balance row is gone (0 rows written) (UltiEconomy#42)")
+        void setCashCurrencyRowGone() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+            CurrencyBalanceEntity balance = CurrencyBalanceEntity.builder()
+                    .uuid(PLAYER_UUID.toString()).currencyId("gems").cash(100.0).bank(0.0).build();
+            mockCurrencyQueryReturns(PLAYER_UUID, "gems", balance);
+            when(currencyDataOperator.updateCounted(balance)).thenReturn(0);
+
+            assertThat(service.setCash(PLAYER_UUID, 500.0, "gems")).isFalse();
+            verify(logger).error(String.format(zhText("economy.log.balance_update_failed"), zhText("economy.log.row_gone")));
+        }
+
+        @Test
+        @DisplayName("setCash returns false and logs when the stored account row is gone (0 rows written) (UltiEconomy#42)")
+        void setCashAccountRowGone() throws Exception {
+            PluginLogger logger = mock(PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+            PlayerAccountEntity account = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            mockQueryReturns(PLAYER_UUID, account);
+            when(dataOperator.updateCounted(account)).thenReturn(0);
+
+            assertThat(service.setCash(PLAYER_UUID, 2000)).isFalse();
+            verify(logger).error(String.format(zhText("economy.log.account_update_failed"), zhText("economy.log.row_gone")));
+        }
+
+        @Test
+        @DisplayName("a transfer whose sender row is gone (0 rows written) is refused and credits nobody (UltiEconomy#42)")
+        void transferSenderRowGone() throws Exception {
+            when(plugin.getLogger()).thenReturn(mock(PluginLogger.class));
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 200, 0);
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            when(dataOperator.updateCounted(sender)).thenReturn(0);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 300)).isFalse();
+            assertThat(sender.getCash()).isEqualTo(1000.0);
+            verify(dataOperator, never()).updateCounted(receiver);
+        }
+
+        @Test
+        @DisplayName("a transfer whose receiver row is gone (0 rows written) is refused and the sender's debit is written back (UltiEconomy#42)")
+        void transferReceiverRowGone() throws Exception {
+            when(plugin.getLogger()).thenReturn(mock(PluginLogger.class));
+            PlayerAccountEntity sender = makeAccount(PLAYER_UUID, "Steve", 1000, 0);
+            PlayerAccountEntity receiver = makeAccount(OTHER_UUID, "Alex", 200, 0);
+            when(dataOperator.query()).thenReturn(query);
+            when(query.where("uuid")).thenReturn(query);
+            when(query.eq(PLAYER_UUID.toString())).thenReturn(query);
+            when(query.eq(OTHER_UUID.toString())).thenReturn(query);
+            when(query.list())
+                    .thenReturn(Collections.singletonList(sender))
+                    .thenReturn(Collections.singletonList(receiver));
+            when(dataOperator.updateCounted(receiver)).thenReturn(0);
+
+            assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 300)).isFalse();
+            assertThat(sender.getCash()).isEqualTo(1000.0);
+            verify(dataOperator, times(2)).updateCounted(sender);
         }
 
         @Test
@@ -1266,7 +1344,7 @@ class EconomyServiceImplTest {
             assertThat(sender.getCash()).isEqualTo(900.0);
             assertThat(receiver.getCash()).isEqualTo(100.0);
             verify(treasuryDataOperator, never()).insert(any());
-            verify(treasuryDataOperator, never()).update(any());
+            verify(treasuryDataOperator, never()).updateCounted(any());
         }
 
         @Test
@@ -1302,7 +1380,7 @@ class EconomyServiceImplTest {
             assertThat(sender.getCash()).isEqualTo(300.0);
             assertThat(receiver.getCash()).isEqualTo(300.0);
             verify(treasuryDataOperator, never()).insert(any());
-            verify(treasuryDataOperator, never()).update(any());
+            verify(treasuryDataOperator, never()).updateCounted(any());
         }
 
         @Test

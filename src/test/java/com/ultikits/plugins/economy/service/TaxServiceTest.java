@@ -28,6 +28,8 @@ class TaxServiceTest {
     @BeforeEach
     void setUp() {
         taxService = new TaxService(config, treasuryDataOperator);
+        // Treasury writes go through DataOperator#updateCounted (UltiKits/UltiEconomy#42); 1 = written.
+        lenient().when(treasuryDataOperator.updateCounted(any(TreasuryEntity.class))).thenReturn(1);
     }
 
     @Nested
@@ -157,6 +159,36 @@ class TaxServiceTest {
             assertThat(captor.getValue().getBalance()).isEqualTo(500.0);
         }
 
+        /**
+         * UltiKits/UltiEconomy#42: a treasury row another writer removed between the read and the write
+         * matches no stored row ({@code updateCounted} 0). A deposit then takes the method's own "no
+         * treasury row yet" branch, so the tax is stored instead of lost; a withdrawal fails as for no row.
+         */
+        @Test
+        @DisplayName("depositToTreasury stores a new row with the amount when the row it read is gone (UltiEconomy#42)")
+        void depositRecreatesAVanishedRow() throws IllegalAccessException {
+            TreasuryEntity existing = TreasuryEntity.builder().currencyId("coins").balance(1000.0).build();
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(existing)));
+            when(treasuryDataOperator.updateCounted(existing)).thenReturn(0);
+
+            taxService.depositToTreasury(500.0, "coins");
+
+            ArgumentCaptor<TreasuryEntity> inserted = ArgumentCaptor.forClass(TreasuryEntity.class);
+            verify(treasuryDataOperator).insert(inserted.capture());
+            assertThat(inserted.getValue().getCurrencyId()).isEqualTo("coins");
+            assertThat(inserted.getValue().getBalance()).isEqualTo(500.0);
+        }
+
+        @Test
+        @DisplayName("withdrawFromTreasury returns false when the row it read is gone (UltiEconomy#42)")
+        void withdrawFailsOnAVanishedRow() throws IllegalAccessException {
+            TreasuryEntity entry = TreasuryEntity.builder().currencyId("coins").balance(5000.0).build();
+            when(treasuryDataOperator.query()).thenReturn(new MockQuery<>(Collections.singletonList(entry)));
+            when(treasuryDataOperator.updateCounted(entry)).thenReturn(0);
+
+            assertThat(taxService.withdrawFromTreasury(2000.0, "coins")).isFalse();
+        }
+
         @Test
         @DisplayName("depositToTreasury adds to existing balance")
         void addsToExisting() throws IllegalAccessException {
@@ -168,7 +200,7 @@ class TaxServiceTest {
 
             taxService.depositToTreasury(500.0, "coins");
 
-            verify(treasuryDataOperator).update(existing);
+            verify(treasuryDataOperator).updateCounted(existing);
             assertThat(existing.getBalance()).isEqualTo(1500.0);
         }
 
@@ -205,7 +237,7 @@ class TaxServiceTest {
 
             assertThat(result).isTrue();
             assertThat(entry.getBalance()).isEqualTo(3000.0);
-            verify(treasuryDataOperator).update(entry);
+            verify(treasuryDataOperator).updateCounted(entry);
         }
 
         @Test
@@ -232,11 +264,11 @@ class TaxServiceTest {
             // (constructing a synthetic zero-balance entry instead of returning early) would let
             // 0.0 < 0.0 fail its own balance check and fall through to update() -- both this
             // path and the correct early-return end up with the same (false, no update) surface,
-            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().update()`.
+            // so amount=0.0 alone doesn't discriminate them; the real proof is `never().updateCounted()`.
             boolean result = taxService.withdrawFromTreasury(0.0, "gems");
 
             assertThat(result).isFalse();
-            verify(treasuryDataOperator, never()).update(any());
+            verify(treasuryDataOperator, never()).updateCounted(any());
             // Also prove the missing-entry branch doesn't take the "auto-create a treasury row"
             // shortcut a copy-paste from depositToTreasury's insert-when-absent logic could
             // introduce -- update()-never() alone doesn't rule out an errant insert() call.
