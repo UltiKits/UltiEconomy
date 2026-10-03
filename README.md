@@ -17,6 +17,7 @@ UltiTools-API 的完整 Vault 经济提供者模块。支持双钱包（现金 +
 - **Leaderboard** - Cached wealth rankings on a configurable refresh interval (60 seconds by default) / 按可配置间隔（默认 60 秒）刷新的财富排行榜
 - **PlaceholderAPI** - Rich placeholder support / 丰富的占位符支持
 - **Admin Commands** - Give, take, set, check player balances / 管理员经济管理命令
+- **Money notes** - `/note` turns cash into a tradeable item. A note whose currency has been removed from `config/currencies.yml` cannot be redeemed, by design: the player keeps the note and is told the currency no longer exists, and the console names the currency; adding the currency back makes such notes redeemable again / 纸币：`/note` 把现金换成可交易的物品。货币已从 `config/currencies.yml` 删除的纸币按设计无法兑换：玩家保留纸币并收到该货币已不存在的提示，控制台记录货币名；把该货币加回后即可再次兑换
 - **i18n** - Chinese and English language support / 中英文支持
 
 ## Commands / 命令

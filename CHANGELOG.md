@@ -195,6 +195,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A money note whose currency has been removed from `config/currencies.yml` is now refused by design,
+  by `/note redeem` and by right-clicking it: nothing is credited, the player keeps the note and is told
+  the currency no longer exists, and the console logs one warning naming the player, the value and the
+  currency. Adding the currency back makes such notes redeemable again. Before, a player who still had a
+  wallet for that currency redeemed the note into it — the note was consumed and the money went into a
+  wallet no command shows (UltiKits/UltiEconomy#37).
+- 货币已从 `config/currencies.yml` 删除的纸币，现在按设计拒绝兑换（`/note redeem` 与右键均如此）：不入账，玩家保留纸币并收到该货币已
+  不存在的提示，控制台记录一条警告，写明玩家、面值和货币。把该货币加回后可再次兑换。此前仍持有该货币钱包的玩家会兑换成功——纸币被消耗，
+  钱进入一个任何命令都看不到的钱包（UltiKits/UltiEconomy#37）。
+
 - A balance or treasury change whose stored row another writer removed after it was read is now a
   failure on every storage type, as a failed write already was: the change is logged as failed (`... The
   stored row no longer exists ...`) and reported as not made — a `/pay` whose sender row is gone credits

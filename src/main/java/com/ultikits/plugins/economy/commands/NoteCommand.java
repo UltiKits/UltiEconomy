@@ -2,6 +2,7 @@ package com.ultikits.plugins.economy.commands;
 
 import com.ultikits.plugins.economy.UltiEconomy;
 import com.ultikits.plugins.economy.factory.MoneyNoteFactory;
+import com.ultikits.plugins.economy.listener.NoteRedeemListener;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.plugins.economy.service.CurrencyManager;
 import com.ultikits.plugins.economy.service.EconomyService;
@@ -111,6 +112,11 @@ public class NoteCommand extends BaseCommandExecutor {
 
         double value = noteFactory.getNoteValue(held);
         String currencyId = noteFactory.getNoteCurrency(held);
+        // A note of a currency no longer in currencies.yml is refused and kept (UltiKits/UltiEconomy#37).
+        if (!currencyId.equals(economyService.getPrimaryCurrencyId()) && !currencyManager.hasCurrency(currencyId)) {
+            NoteRedeemListener.refuseRemovedCurrency(plugin, player, value, currencyId);
+            return;
+        }
 
         boolean success;
         if (currencyId.equals(economyService.getPrimaryCurrencyId())) {
