@@ -10,6 +10,8 @@ import com.ultikits.plugins.economy.testsupport.SteppedOperator;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -21,6 +23,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -282,6 +291,116 @@ class PrimaryWalletMergeConcurrencyTest {
                 .as("%d of %d interleavings went wrong (%s); the first:%n%s", failures.size(), SEEDS, kinds,
                         String.join("\n", failures.subList(0, Math.min(2, failures.size()))))
                 .isZero();
+    }
+
+    // ==================== UltiKits/UltiEconomy#39: a holder that stalls past the takeover ====================
+
+    /**
+     * The window {@link MergeClaim} cannot close on its own (UltiKits/UltiEconomy#39): holder A passes its
+     * claim check right before an account write, then stalls for longer than the 30-second takeover. Server
+     * B takes the claim over and finishes the merge, B's server starts, and a player spends there. Then A
+     * resumes and makes the write it had prepared. The stall is driven through the merge's own claim seam
+     * ({@code withClaim}: the check before each account write), not by sleeping, and every later check of
+     * A's passes -- the worst case, a holder that never notices it lost the claim. Maintainer decision
+     * 2026-09-29 (question 4, option 1): every account write is conditioned on the balance the merge read,
+     * so A's stale write does not apply; A reads again and decides again.
+     */
+    @Test
+    @DisplayName("UltiEconomy#39: a holder that stalls past the takeover and resumes after the new holder merged credits nothing a second time and undoes no later spend")
+    void aStalledHolderResumingAfterTheTakeoverCreditsNothingTwice() {
+        SharedDatabase db = new SharedDatabase(false);
+        PrimaryWalletMerge b = merge(db);
+        AtomicBoolean stalled = new AtomicBoolean();
+        PrimaryWalletMerge a = merge(db).withClaim(() -> { }, () -> {
+            if (stalled.compareAndSet(false, true)) {
+                // A's check passed; A stalls past the takeover. B takes the claim over and merges everything.
+                assertThat(b.run()).isTrue();
+                // B's server starts and Steve spends 200 of his merged cash there.
+                PlayerAccountEntity steve = db.accounts.getAll(where("uuid", STEVE.toString())).get(0);
+                steve.setCash(steve.getCash() - 200.0);
+                assertThat(db.accounts.updateCounted(steve)).isEqualTo(1);
+            }
+        });
+
+        assertThat(a.run()).isTrue();
+
+        assertThat(stalled).as("the stall happened, so the interleaving was exercised").isTrue();
+        Map<String, List<String>> expected = new TreeMap<>(EXPECTED_ACCOUNTS);
+        expected.put(STEVE.toString(), list("1300.0/150.0"));
+        assertThat(db.accountsByUuid()).as("every account credited exactly once, Steve's later spend kept").isEqualTo(expected);
+        assertThat(db.pendingRows()).isEmpty();
+    }
+
+    /**
+     * The other interleaving the issue names: A resumes between B's first and second account write, runs
+     * to its end while B is stopped there, and then B goes on. Whichever server's write reaches a row
+     * first, the other's must not apply on top of it, and no account may be created twice.
+     */
+    @Test
+    @Timeout(30)
+    @DisplayName("UltiEconomy#39: a holder that resumes between the new holder's first and second account write leaves every account credited exactly once")
+    void aStalledHolderResumingBetweenTheNewHoldersWritesCreditsEachAccountOnce() throws Exception {
+        SharedDatabase db = new SharedDatabase(false);
+        CountDownLatch aStalled = new CountDownLatch(1);
+        CountDownLatch resumeA = new CountDownLatch(1);
+        CountDownLatch aDone = new CountDownLatch(1);
+        AtomicBoolean aHasStalled = new AtomicBoolean();
+        AtomicInteger bChecks = new AtomicInteger();
+        PrimaryWalletMerge a = merge(db).withClaim(() -> { }, () -> {
+            if (aHasStalled.compareAndSet(false, true)) {
+                aStalled.countDown();
+                await(resumeA);
+            }
+        });
+        PrimaryWalletMerge b = merge(db).withClaim(() -> { }, () -> {
+            if (bChecks.incrementAndGet() == 2) {
+                // B has made its first account write; A resumes now and runs to its end, then B goes on.
+                resumeA.countDown();
+                await(aDone);
+            }
+        });
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> aResult = threads.submit(() -> {
+                try {
+                    return a.run();
+                } finally {
+                    aDone.countDown();
+                }
+            });
+            await(aStalled);
+            Future<Boolean> bResult = threads.submit(b::run);
+
+            assertThat(aResult.get(20, TimeUnit.SECONDS)).isTrue();
+            assertThat(bResult.get(20, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            threads.shutdownNow();
+        }
+
+        assertThat(bChecks.get()).as("B reached its second account write, so the interleaving was exercised").isGreaterThanOrEqualTo(2);
+        assertThat(db.accountsByUuid()).as("every account credited exactly once, none created twice").isEqualTo(EXPECTED_ACCOUNTS);
+        assertThat(db.pendingRows()).isEmpty();
+    }
+
+    /** One server's merge over the shared database, with no claim (the tests drive the claim seam themselves). */
+    private static PrimaryWalletMerge merge(SharedDatabase db) {
+        return new PrimaryWalletMerge(plugin(), db.accounts, db.balances, "coins",
+                uuid -> "offline-" + uuid.substring(uuid.length() - 1));
+    }
+
+    private static com.ultikits.ultitools.entities.WhereCondition where(String column, String value) {
+        return com.ultikits.ultitools.entities.WhereCondition.builder().column(column).value(value).build();
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(20, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the interleaving did not arrive within 20 seconds");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 
     private static double credit(String cashSlashBank) {
