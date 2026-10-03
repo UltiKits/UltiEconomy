@@ -123,8 +123,9 @@ public class InterestService {
      *       above 0, the same caps a deposit obeys. The credit is the smallest of rate x balance,
      *       {@code interest.max-interest} (when above 0) and the room left under the cap; a balance
      *       with no room gets nothing.</li>
-     *   <li>The owner is told only after the write succeeded. A write that fails is logged, the row
-     *       keeps its old balance, and the payment carries on with the next row.</li>
+     *   <li>The owner is told only after the write succeeded. A write that fails -- it throws, or it
+     *       matches no stored row because another writer removed the row after it was read -- is
+     *       logged, the row keeps its old balance, and the payment carries on with the next row.</li>
      * </ul>
      */
     public void distributeInterest() {
@@ -188,13 +189,23 @@ public class InterestService {
         return interest;
     }
 
-    /** Writes one row; returns false, having logged why, if the write failed. */
+    /**
+     * Writes one row; returns false, having logged why, if nothing was written. A write that matches
+     * no stored row -- another writer removed it after this payment read it -- writes nothing on every
+     * storage type, and {@code updateCounted} reports it as 0 (UltiKits/UltiTools-Reborn#558); it is a
+     * failed write like a thrown one, so the caller restores the old balance and tells nobody
+     * (UltiKits/UltiEconomy#40).
+     */
     private <T extends com.ultikits.ultitools.abstracts.data.BaseDataEntity<String>> boolean write(
             DataOperator<T> operator, T row) {
         try {
-            operator.update(row);
+            if (operator.updateCounted(row) == 0) {
+                plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"),
+                        plugin.i18n("economy.log.interest_row_gone")));
+                return false;
+            }
             return true;
-        } catch (IllegalAccessException | RuntimeException e) {
+        } catch (RuntimeException e) {
             plugin.getLogger().error(String.format(plugin.i18n("economy.log.interest_write_failed"), e.getMessage()));
             return false;
         }

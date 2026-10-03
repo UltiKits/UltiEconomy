@@ -64,6 +64,7 @@
   "economy.log.account_update_failed": "更新账户失败: %s",
   "economy.log.balance_update_failed": "更新余额失败: %s",
   "economy.log.interest_write_failed": "利息发放：写入银行余额失败，本次未入账：%s",
+  "economy.log.interest_row_gone": "数据库中已没有这条余额记录（本次发放读取后被其他写入方删除）",
   "economy.warn.interest_cap": "每次最多 interest.max-interest = %s",
   "economy.warn.interest_no_cap": "不设上限，因为 interest.max-interest = %s 不大于 0",
   "economy.warn.interest_enabled_one_wallet": "%s：%s 中 interest.enabled 为 true，因此会发放利息：每隔 interest.interval = %d 秒（首次发放在加载后一个间隔），玩家的主货币银行存款（即 /bank、/money 和 Vault 显示的那一项，命令写出主货币名时也是这一项；每位玩家只发放一次）以及其他每种 bank-enabled: true 货币的银行存款，各自获得自身的 interest.rate = %s 作为利息，%s，且不会超过银行自身的余额上限。这会凭空产生货币。在此版本之前（UltiEconomy 2.0.0 及更早），此开关不起作用，从未发放过利息。若多台服务器共用此数据库，每台开启利息的服务器都会按全额利率发放，因此只应在其中一台上开启。要停止发放利息，请在 %s 中设置 interest.enabled: false 并执行 /ul reload %s；下一次发放将被跳过。",

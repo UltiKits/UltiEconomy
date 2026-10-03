@@ -175,6 +175,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- An interest payment whose bank balance row another writer removed after the payment read it is now
+  reported as not credited on every storage type: the failure is logged (`Interest payment: failed to
+  write a bank balance, it was not credited: The stored balance row no longer exists ...`), the
+  balance is not changed and the player is not told they were paid. Before, only the JSON backend
+  reported it; on SQLite and MySQL the payment counted as made (UltiKits/UltiEconomy#40).
+- 利息发放读取某条银行余额记录后，若该记录已被其他写入方删除，现在在所有存储类型上都报告为未入账：记录失败日志
+  （原因为「数据库中已没有这条余额记录」），余额不变，也不会告诉玩家利息已到账。此前只有 JSON 后端会报告；SQLite 和
+  MySQL 上会当作已发放（UltiKits/UltiEconomy#40）。
+
 - `tax.transaction-tax.rate` outside 0 to 1 is no longer used: the default 0.05 applies, with a warning
   naming the key, the value as written and the default, at start-up and after every reload. A negative
   rate credited the recipient more than the payer paid, and a rate above 1 credited a negative amount.
