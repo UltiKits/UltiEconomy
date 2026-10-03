@@ -54,7 +54,6 @@ interest:
 
 leaderboard:
   update-interval: 60           # Seconds between refreshes; /ul reload applies / 刷新间隔（秒），重载生效
-  display-count: 10             # Default top N / 默认显示前 N 名
 
 tax:
   enabled: true                 # Master switch: false collects no tax at all / 总开关：false 时不征收任何税

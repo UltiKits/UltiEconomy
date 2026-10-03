@@ -163,6 +163,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- `leaderboard.display-count` is removed from `config.yml`. Nothing ever read it: no command or
+  placeholder shows a fixed number of leaderboard entries, and each top-N placeholder
+  (`%ultieconomy_top_name_<N>%`, `%ultieconomy_top_balance_<N>%`) names its own N. A `config.yml` that
+  still holds it gets one warning at start-up saying it no longer has any effect and can be deleted;
+  the file is not changed (UltiKits/UltiEconomy#36).
+- 从 `config.yml` 删除 `leaderboard.display-count`。它从未被读取：没有任何命令或变量显示固定数量的排行榜条目，每个前 N 名
+  变量（`%ultieconomy_top_name_<N>%`、`%ultieconomy_top_balance_<N>%`）都自己指定 N。仍含有该键的 `config.yml` 会在启动时
+  给出一条警告，说明它已不再起作用、可以删除；文件不会被修改（UltiKits/UltiEconomy#36）。
+
 - The wealth tax's settings `tax.wealth-tax.enabled`, `tax.wealth-tax.interval` and
   `tax.wealth-tax.exempt-permission` are removed. The wealth tax never collected anything: nothing
   scheduled it, nothing took money, and no setting defined its brackets. A `config.yml` that still holds

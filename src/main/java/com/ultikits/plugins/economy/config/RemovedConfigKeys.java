@@ -36,6 +36,7 @@ public final class RemovedConfigKeys {
             "tax.wealth-tax.interval",
             "tax.wealth-tax.exempt-permission",
             // leaderboard.display-count (UltiKits/UltiEconomy#36)
+            "leaderboard.display-count",
     };
 
     private RemovedConfigKeys() {
@@ -53,6 +54,8 @@ public final class RemovedConfigKeys {
             case "tax.wealth-tax.exempt-permission":
                 return plugin.i18n("economy.warn.removed_key_reason.wealth_tax");
             // leaderboard.display-count (UltiKits/UltiEconomy#36)
+            case "leaderboard.display-count":
+                return plugin.i18n("economy.warn.removed_key_reason.display_count");
             default:
                 throw new IllegalStateException("No reason recorded for removed key " + removedKey);
         }

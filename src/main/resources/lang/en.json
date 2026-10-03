@@ -77,6 +77,7 @@
   "economy.config.currency_name": "Coins",
   "economy.warn.config_save_failed": "Could not save %s after writing its built-in text in the server's language: %s",
   "economy.warn.tax_disabled": "%s: tax.enabled is false in %s, so no tax is collected at all: transfers pay no transaction tax, whatever tax.transaction-tax.* says. Before this release (UltiEconomy 2.0.0 and earlier) this switch had no effect and transfers were taxed whenever tax.transaction-tax.enabled was true. To collect taxes, set tax.enabled: true in %s and run /ul reload %s; the next transfer is taxed.",
+  "economy.warn.removed_key_reason.display_count": "nothing read it; each leaderboard placeholder names its own number of entries (%ultieconomy_top_name_<N>%, %ultieconomy_top_balance_<N>%), so it was removed in 6.3.0 (UltiKits/UltiEconomy#36)",
   "economy.warn.removed_key": "%s: '%s' in %s no longer has any effect and can be deleted from the file: %s",
   "economy.warn.removed_key_reason.wealth_tax": "the wealth tax never collected anything (nothing scheduled it or took money), so its settings were removed in 6.3.0; a wealth tax is a feature request for a later version (UltiKits/UltiEconomy#38)",
   "economy.log.wallet_merge.player": "Primary-currency wallet merge: added %s cash and %s bank from %s's second wallet to their account, which now holds %s cash and %s bank.",

@@ -33,5 +33,3 @@ leaderboard:
   # Seconds between refreshes (1 to 107374182); /ul reload applies it
   # 刷新间隔（秒，1 到 107374182）；/ul reload 生效
   update-interval: 60
-  # Default entries shown / 默认显示数量
-  display-count: 10

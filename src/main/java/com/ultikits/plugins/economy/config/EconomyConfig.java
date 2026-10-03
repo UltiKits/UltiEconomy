@@ -111,8 +111,8 @@ public class EconomyConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "leaderboard.update-interval", comment = "Seconds between leaderboard refreshes (1 to 107374182)")
     private int leaderboardUpdateInterval = 60;
 
-    @ConfigEntry(path = "leaderboard.display-count", comment = "Default leaderboard entries")
-    private int leaderboardDisplayCount = 10;
+    // leaderboard.display-count was deleted in 6.3.0: nothing read it, and each top-N placeholder names
+    // its own N (UltiKits/UltiEconomy#36). A file that still holds it is told so by RemovedConfigKeys.
 
     @ConfigEntry(path = "tax.enabled", comment = "Master switch for taxation: false collects no transaction tax")
     private boolean taxEnabled = true;
