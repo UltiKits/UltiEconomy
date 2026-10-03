@@ -56,7 +56,7 @@ import java.util.function.Supplier;
  * reads again, and an account it creates has an id the table's primary key admits once per player. One
  * case the balance condition cannot tell apart remains: an account that went back to exactly its
  * "before" balances (cash and bank both) after the other server credited it and removed the player's
- * rows -- which needs that server to finish the merge, start, and a player to spend back to the cent,
+ * rows -- most plausibly 0 and 0, a player who had no account and spent all the merged money -- which needs that server to finish the merge, start, and a player to spend back to the cent,
  * all within the stalled holder's pause between reading the rows and writing.
  */
 public final class MergeClaim {
