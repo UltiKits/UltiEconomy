@@ -52,7 +52,7 @@ class StartupWarningsTest {
     class TaxMasterSwitch {
 
         @Test
-        @DisplayName("tax.enabled: false logs one warning that no transaction tax and no wealth tax is collected")
+        @DisplayName("tax.enabled: false logs one warning that no transaction tax is collected, promising no wealth tax (UltiEconomy#27)")
         void taxOffIsAnnounced() {
             EconomyConfig config = new EconomyConfig();
             config.setTaxEnabled(false);
@@ -65,7 +65,7 @@ class StartupWarningsTest {
                     .contains(CONFIG_FILE)
                     .contains("tax.enabled")
                     .contains("no transaction tax")
-                    .contains("no wealth tax")
+                    .doesNotContain("wealth")
                     .contains("tax.enabled: true");
         }
 
@@ -184,6 +184,52 @@ class StartupWarningsTest {
             assertThat(warningsMentioning("no longer has any effect", warnings)).isEmpty();
             assertThat(warningsMentioning("interest.interval'", warnings)).isEmpty();
             assertThat(warningsMentioning("leaderboard.update-interval'", warnings)).isEmpty();
+        }
+    }
+
+    /**
+     * UltiKits/UltiEconomy#27: the wealth tax's three settings are deleted, and a file that still holds
+     * one gets the module's removed-settings warning at load, naming the key and the file and saying why
+     * it went -- the operator who set it would otherwise never learn it never did anything.
+     */
+    @Nested
+    @DisplayName("tax.wealth-tax.* left in the file (UltiEconomy#27)")
+    class RemovedWealthTaxKeys {
+
+        @Test
+        @DisplayName("each tax.wealth-tax.* key still in the file logs one warning naming the key, the file and why it went")
+        void eachLeftoverKeyIsNamed() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("tax.wealth-tax.enabled", true);
+            onDisk.set("tax.wealth-tax.interval", 3600);
+            onDisk.set("tax.wealth-tax.exempt-permission", "ultieconomy.wealthtax.exempt");
+
+            List<String> warnings = bootWith(new EconomyConfig(), onDisk);
+
+            for (String key : new String[] {"tax.wealth-tax.enabled", "tax.wealth-tax.interval", "tax.wealth-tax.exempt-permission"}) {
+                List<String> named = warningsMentioning("'" + key + "'", warnings);
+                assertThat(named).as("warnings naming %s", key).hasSize(1);
+                assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+                        .contains("no longer has any effect").contains("never collected").contains("UltiKits/UltiEconomy#38");
+            }
+        }
+
+        @Test
+        @DisplayName("under language: zh the warning is Chinese and keeps the key and the file")
+        void warningInChinese() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("tax.wealth-tax.enabled", true);
+
+            List<String> named = warningsMentioning("'tax.wealth-tax.enabled'", bootWith(new EconomyConfig(), onDisk, "zh"));
+
+            assertThat(named).hasSize(1);
+            assertThat(named.get(0)).contains(CONFIG_FILE).contains("\u8d22\u5bcc\u7a0e");
+        }
+
+        @Test
+        @DisplayName("Control: a file without them logs no tax.wealth-tax warning")
+        void noLeftoverNoWarning() {
+            assertThat(warningsMentioning("tax.wealth-tax", bootWith(new EconomyConfig()))).isEmpty();
         }
     }
 

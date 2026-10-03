@@ -83,6 +83,45 @@ class ConfigFileWriteBackTest {
     }
 
     /**
+     * UltiKits/UltiEconomy#27: the wealth tax's settings are deleted, so a first boot no longer writes
+     * them into a new server's file (before, the framework wrote every declared key it found missing).
+     */
+    @Test
+    @DisplayName("A first boot writes no tax.wealth-tax.* key into the operator's file (UltiEconomy#27)")
+    void firstBootWritesNoWealthTaxKey() throws Exception {
+        File file = writeOperatorFile("");
+
+        new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
+
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
+        assertThat(onDisk.contains("tax.enabled"))
+                .withFailMessage("control: the first boot wrote nothing at all; file now reads:%n%s", read(file))
+                .isTrue();
+        assertThat(onDisk.contains("tax.wealth-tax"))
+                .withFailMessage("tax.wealth-tax was written; file now reads:%n%s", read(file))
+                .isFalse();
+    }
+
+    /**
+     * The instrument the removed-settings warning relies on, measured on the real framework: a key the
+     * file holds is reported present by {@code isPresentInFile} whether or not the entity declares it,
+     * and the framework leaves it in the file (it never deletes a key). Holds before and after the
+     * wealth-tax keys are deleted, so it is a control, not a red-when-reverted test.
+     */
+    @Test
+    @DisplayName("Control: a tax.wealth-tax.enabled left in the file stays there and isPresentInFile reports it")
+    void aLeftoverKeyStaysAndIsReportedPresent() throws Exception {
+        File file = writeOperatorFile("tax:\n  wealth-tax:\n    enabled: true\n");
+
+        EconomyConfig config = new EconomyConfig();
+        config.init(moduleWithConfigFolder(serverDir.toFile()));
+
+        assertThat(config.isPresentInFile("tax.wealth-tax.enabled")).isTrue();
+        assertThat(config.isPresentInFile("tax.wealth-tax.never-written")).isFalse();
+        assertThat(YamlConfiguration.loadConfiguration(file).getBoolean("tax.wealth-tax.enabled")).isTrue();
+    }
+
+    /**
      * {@code interest.interval} and {@code leaderboard.update-interval} are declared again, bound
      * to the two scheduled tasks through the framework's config-bound {@code @Scheduled}
      * (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531). A first boot writes both, with the

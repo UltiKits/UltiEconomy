@@ -11,10 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -26,12 +24,6 @@ class TaxServiceTest {
     @Mock private DataOperator<TreasuryEntity> treasuryDataOperator;
 
     private TaxService taxService;
-
-    private static final List<TaxService.TaxBracket> BRACKETS = Arrays.asList(
-            new TaxService.TaxBracket(0, 10000, 0.0),
-            new TaxService.TaxBracket(10000, 100000, 0.01),
-            new TaxService.TaxBracket(100000, -1, 0.02)
-    );
 
     @BeforeEach
     void setUp() {
@@ -134,52 +126,18 @@ class TaxServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("Wealth Tax")
-    class WealthTaxTests {
-
-        @Test
-        @DisplayName("progressive brackets: 0% below 10k, 1% on 10k-100k, 2% above")
-        void progressiveBrackets() {
-            // Player has 150,000 total wealth
-            // Bracket 1: 0-10,000 @ 0% = 0
-            // Bracket 2: 10,000-100,000 @ 1% = 900
-            // Bracket 3: 100,000-150,000 @ 2% = 1000
-            // Total tax = 1900
-            double tax = taxService.calculateWealthTax(150000.0, BRACKETS);
-            assertThat(tax).isCloseTo(1900.0, within(0.01));
-        }
-
-        @Test
-        @DisplayName("no tax below first bracket threshold")
-        void belowFirstBracket() {
-            double tax = taxService.calculateWealthTax(5000.0, BRACKETS);
-            assertThat(tax).isEqualTo(0.0);
-        }
-
-        @Test
-        @DisplayName("taxes only the amount within each bracket")
-        void partialSecondBracket() {
-            // Player has 50,000
-            // Bracket 1: 0-10,000 @ 0% = 0
-            // Bracket 2: 10,000-50,000 @ 1% = 400
-            double tax = taxService.calculateWealthTax(50000.0, BRACKETS);
-            assertThat(tax).isCloseTo(400.0, within(0.01));
-        }
-
-        @Test
-        @DisplayName("returns 0 for zero wealth")
-        void zeroWealth() {
-            double tax = taxService.calculateWealthTax(0.0, BRACKETS);
-            assertThat(tax).isEqualTo(0.0);
-        }
-
-        @Test
-        @DisplayName("returns 0 for empty brackets")
-        void emptyBrackets() {
-            double tax = taxService.calculateWealthTax(100000.0, Collections.emptyList());
-            assertThat(tax).isEqualTo(0.0);
-        }
+    /**
+     * UltiKits/UltiEconomy#27, maintainer decision 2026-09-29: the wealth tax was a calculation nothing
+     * called -- no schedule, no debit, no setting for its brackets. It is deleted with its settings, and
+     * implementing a wealth tax is the feature request UltiKits/UltiEconomy#38.
+     */
+    @Test
+    @DisplayName("TaxService has no wealth-tax calculation and no bracket type (UltiEconomy#27)")
+    void noWealthTaxCalculation() {
+        assertThat(Arrays.stream(TaxService.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName))
+                .contains("calculateTransactionTax")
+                .noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("wealth"));
+        assertThat(TaxService.class.getDeclaredClasses()).noneMatch(c -> c.getSimpleName().contains("Bracket"));
     }
 
     @Nested
