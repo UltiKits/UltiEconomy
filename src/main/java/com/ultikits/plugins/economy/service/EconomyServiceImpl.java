@@ -264,10 +264,11 @@ public class EconomyServiceImpl implements EconomyService {
             return true;
         }), true)) {
             boolean busy = isLastChangeBusy();
-            if (changeAccount(from, debited, s -> {
+            // A refund that throws is a refund not written, like one refused: it is named below.
+            if (!credited(() -> changeAccount(from, debited, s -> {
                 s.setCash(s.getCash() + amount);
                 return true;
-            }) == null) {
+            }), true)) {
                 logLostRefund(label(from, sender.getPlayerName()), label(to, receiver.getPlayerName()), amount,
                         currencyManager != null ? currencyManager.getPrimaryCurrencyId() : "coins");
             }
@@ -559,10 +560,11 @@ public class EconomyServiceImpl implements EconomyService {
             return true;
         }), false)) {
             boolean busy = isLastChangeBusy();
-            if (changeBalance(from, currencyId, debited, s -> {
+            // A refund that throws is a refund not written, like one refused: it is named below.
+            if (!credited(() -> changeBalance(from, currencyId, debited, s -> {
                 s.setCash(s.getCash() + amount);
                 return true;
-            }) == null) {
+            }), false)) {
                 logLostRefund(label(from, null), label(to, null), amount, currencyId);
             }
             lastChangeBusy.set(busy);
@@ -657,12 +659,13 @@ public class EconomyServiceImpl implements EconomyService {
     }
 
     /**
-     * Runs a transfer's credit after the debit committed. A storage error it throws (not only a refusal)
-     * counts as a failed credit, logged like any failed write, so the caller refunds the sender
-     * (gate-1 top-up F-E2, maintainer decision 2026-10-04); before, the exception left the transfer with
-     * the sender debited and nobody credited.
+     * Runs a transfer's credit, or its refund, after the debit committed. A storage error it throws (not
+     * only a refusal) counts as a write not made, logged like any failed write: a failed credit is
+     * refunded, and a failed refund is named for the operator (gate-1 top-up F-E2/F-E3, maintainer
+     * decision 2026-10-04); before, the exception left the transfer with the sender debited and nobody
+     * credited.
      *
-     * @return whether the credit was written
+     * @return whether the write was made
      */
     private boolean credited(Supplier<?> credit, boolean accountRow) {
         try {
