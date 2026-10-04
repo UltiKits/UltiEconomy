@@ -226,6 +226,31 @@ class ConcurrentBalanceChangeTest {
             assertThat(line.getAllValues()).anySatisfy(l -> assertThat(l)
                     .contains("Steve").contains("Alex").contains("100").contains("coins"));
         }
+
+        @Test
+        @DisplayName("when the credit and then the refund both throw a storage error, the transfer is refused, nothing is thrown, and the lost refund is named")
+        void aThrowingRefundIsNamedForTheOperator() {
+            EconomyTestWorld world = EconomyTestWorld.relational();
+            world.config.setTaxEnabled(false);
+            world.seedAccount(STEVE, "Steve", 1000.0, 0.0);
+            world.seedAccount(ALEX, "Alex", 0.0, 0.0);
+            int[] writes = new int[1];
+            // The debit is written; the database then goes away for the credit and the refund.
+            DataOperator<PlayerAccountEntity> failing = new SteppedOperator<>("economy_accounts", world.accounts, call -> {
+                if (call.startsWith("update") && ++writes[0] >= 2) {
+                    throw new DataAccessException(ErrorCode.DATA_OPERATION_FAILED, "connection reset");
+                }
+            });
+            EconomyServiceImpl a = EconomyServiceImpl.createForTest(world.plugin, failing, world.config, world.balances,
+                    world.currencies);
+
+            assertThat(a.transfer(STEVE, ALEX, 100.0)).isFalse();
+
+            ArgumentCaptor<String> line = ArgumentCaptor.forClass(String.class);
+            verify(world.logger, atLeastOnce()).error(line.capture());
+            assertThat(line.getAllValues()).anySatisfy(l -> assertThat(l)
+                    .contains("Steve").contains("Alex").contains("100").contains("coins"));
+        }
     }
 
     @Nested
