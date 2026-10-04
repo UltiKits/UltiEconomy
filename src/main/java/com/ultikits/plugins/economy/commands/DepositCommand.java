@@ -58,6 +58,9 @@ public class DepositCommand extends BaseCommandExecutor {
         if (success) {
             String formatted = economyService.formatAmount(amount);
             player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.deposit.success"), formatted));
+        } else if (economyService.isLastChangeBusy()) {
+            // Another server kept changing the balance on every attempt (UltiKits/UltiEconomy#41).
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.busy"));
         } else {
             // Could be insufficient cash or max bank balance exceeded
             double maxBalance = config.getMaxBankBalance();
@@ -101,7 +104,7 @@ public class DepositCommand extends BaseCommandExecutor {
             String formatted = economyService.formatAmount(amount, resolvedId);
             player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.deposit.success"), formatted));
         } else {
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_balance")));
         }
     }
 

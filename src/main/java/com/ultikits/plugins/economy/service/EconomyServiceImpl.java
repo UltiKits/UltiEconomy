@@ -252,14 +252,19 @@ public class EconomyServiceImpl implements EconomyService {
         if (debited == null) {
             return TransferReceipt.refused();
         }
-        if (changeAccount(to, receiver, r -> {
+        if (!credited(() -> changeAccount(to, receiver, r -> {
             r.setCash(r.getCash() + received);
             return true;
-        }) == null) {
-            changeAccount(from, debited, s -> {
+        }), true)) {
+            boolean busy = isLastChangeBusy();
+            if (changeAccount(from, debited, s -> {
                 s.setCash(s.getCash() + amount);
                 return true;
-            });
+            }) == null) {
+                logLostRefund(label(from, sender.getPlayerName()), label(to, receiver.getPlayerName()), amount,
+                        currencyManager != null ? currencyManager.getPrimaryCurrencyId() : "coins");
+            }
+            lastChangeBusy.set(busy);
             return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
@@ -533,14 +538,18 @@ public class EconomyServiceImpl implements EconomyService {
         if (debited == null) {
             return TransferReceipt.refused();
         }
-        if (changeBalance(to, currencyId, receiver, r -> {
+        if (!credited(() -> changeBalance(to, currencyId, receiver, r -> {
             r.setCash(r.getCash() + received);
             return true;
-        }) == null) {
-            changeBalance(from, currencyId, debited, s -> {
+        }), false)) {
+            boolean busy = isLastChangeBusy();
+            if (changeBalance(from, currencyId, debited, s -> {
                 s.setCash(s.getCash() + amount);
                 return true;
-            });
+            }) == null) {
+                logLostRefund(label(from, null), label(to, null), amount, currencyId);
+            }
+            lastChangeBusy.set(busy);
             return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
@@ -620,6 +629,59 @@ public class EconomyServiceImpl implements EconomyService {
 
     /** How many times one balance change is attempted when another writer keeps changing the row. */
     private static final int MAX_WRITE_ATTEMPTS = 3;
+
+    /** Whether the last change on this thread gave up under contention; see {@link #isLastChangeBusy()} (static: test instances skip field initialisers, and the flag is per thread anyway). */
+    private static final ThreadLocal<Boolean> lastChangeBusy = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    @Override
+    public boolean isLastChangeBusy() {
+        return lastChangeBusy.get();
+    }
+
+    /**
+     * Runs a transfer's credit after the debit committed. A storage error it throws (not only a refusal)
+     * counts as a failed credit, logged like any failed write, so the caller refunds the sender
+     * (gate-1 top-up F-E2, maintainer decision 2026-10-04); before, the exception left the transfer with
+     * the sender debited and nobody credited.
+     *
+     * @return whether the credit was written
+     */
+    private boolean credited(Supplier<?> credit, boolean accountRow) {
+        try {
+            return credit.get() != null;
+        } catch (RuntimeException e) {
+            lastChangeBusy.set(false);
+            logWriteFailed(accountRow, String.valueOf(e.getMessage()));
+            return false;
+        }
+    }
+
+    /**
+     * The refund of a failed transfer could not be written either: the sender has lost {@code amount}.
+     * One error line names both players, the amount and the currency, so an operator can restore it by
+     * hand (gate-1 top-up F-E3, maintainer decision 2026-10-04).
+     */
+    private void logLostRefund(String from, String to, double amount, String currencyId) {
+        plugin.getLogger().error(String.format(plugin.i18n("economy.log.transfer_refund_failed"),
+                from, to, formatAmount(amount, currencyId), currencyId, from));
+    }
+
+    /**
+     * A player as an operator should see them in that line: their name and UUID. {@code knownName} is
+     * the name read with the transfer (the row may be gone now); without it the account is asked.
+     */
+    private String label(UUID uuid, String knownName) {
+        String name = knownName;
+        if (name == null) {
+            try {
+                PlayerAccountEntity account = getAccount(uuid);
+                name = account != null ? account.getPlayerName() : null;
+            } catch (RuntimeException ignored) {
+                // the storage that just failed may fail again; the UUID still identifies the player
+            }
+        }
+        return name != null ? name + " (" + uuid + ")" : uuid.toString();
+    }
 
     /** One balance change, applied to a row as read; false refuses it (for example, not enough cash). */
     private interface Change<T> {
@@ -704,6 +766,7 @@ public class EconomyServiceImpl implements EconomyService {
     private <T extends BaseDataEntity<String>> T change(T read, Supplier<T> reread, DataOperator<T> operator,
                                                        Money<T> money, Change<T> change, boolean accountRow) {
         T row = read;
+        lastChangeBusy.set(false);
         for (int attempt = 1; ; attempt++) {
             if (row == null) {
                 if (attempt > 1) {
@@ -736,6 +799,7 @@ public class EconomyServiceImpl implements EconomyService {
             money.restore(row, cash, bank);
             if (attempt >= MAX_WRITE_ATTEMPTS) {
                 logWriteFailed(accountRow, plugin.i18n("economy.log.write_contended"));
+                lastChangeBusy.set(true);
                 return null;
             }
             row = reread.get();
@@ -753,15 +817,19 @@ public class EconomyServiceImpl implements EconomyService {
      * could not take (its row kept changing on every attempt, #41) is logged, not undone.
      */
     private void depositTax(double tax, String currencyId) {
-        boolean stored;
+        String reason = null;
         try {
-            stored = taxService.depositToTreasury(tax, currencyId);
-        } catch (IllegalAccessException e) {
-            stored = false;
+            if (!taxService.depositToTreasury(tax, currencyId)) {
+                reason = plugin.i18n("economy.log.write_contended");
+            }
+        } catch (IllegalAccessException | RuntimeException e) {
+            // A storage error here must not turn a completed transfer into an error for its caller,
+            // who might then retry it (gate-1 top-up F-E2).
+            reason = String.valueOf(e.getMessage());
         }
-        if (!stored && plugin.getLogger() != null) {
+        if (reason != null && plugin.getLogger() != null) {
             plugin.getLogger().error(String.format(plugin.i18n("economy.log.treasury_write_failed"),
-                    String.valueOf(tax), currencyId, plugin.i18n("economy.log.write_contended")));
+                    String.valueOf(tax), currencyId, reason));
         }
     }
 

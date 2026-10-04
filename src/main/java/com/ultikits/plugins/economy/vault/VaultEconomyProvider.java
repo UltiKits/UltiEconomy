@@ -177,7 +177,7 @@ public class VaultEconomyProvider implements Economy {
         if (success) {
             return new EconomyResponse(amount, balance, ResponseType.SUCCESS, "");
         }
-        return new EconomyResponse(amount, balance, ResponseType.FAILURE, plugin.i18n("economy.vault.insufficient_funds"));
+        return new EconomyResponse(amount, balance, ResponseType.FAILURE, (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.vault.insufficient_funds")));
     }
 
     @Override
@@ -209,7 +209,7 @@ public class VaultEconomyProvider implements Economy {
         if (success) {
             return new EconomyResponse(amount, balance, ResponseType.SUCCESS, "");
         }
-        return new EconomyResponse(amount, balance, ResponseType.FAILURE, plugin.i18n("economy.vault.deposit_failed"));
+        return new EconomyResponse(amount, balance, ResponseType.FAILURE, (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.vault.deposit_failed")));
     }
 
     @Override

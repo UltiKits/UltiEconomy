@@ -195,6 +195,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A balance change that gives up because another server kept changing the row now replies "The balance
+  is being changed on another server right now; please try again." (`/pay`, `/deposit`, `/withdraw`,
+  `/note`, `/eco give`/`take`/`set`, `/eco treasury withdraw`, and Vault as `FAILURE`) instead of
+  "insufficient funds". A transfer whose credit throws a storage error after the sender was debited now
+  refunds the sender, like a refused credit; if the refund cannot be written either, one error line names
+  both players, the amount and the currency so an operator can restore it. A storage error while adding a
+  completed transfer's tax to the treasury is logged instead of reported as a failed transfer. Known
+  limitation: a server stopping between a transfer's debit and its credit can lose that amount
+  (UltiKits/UltiEconomy#44). MariaDB is untested for these conditional writes (UltiKits/UltiEconomy#41).
+- 因其他服务器持续修改而放弃的余额变动，现在提示「该余额正在被另一台服务器修改，请稍后再试」（`/pay`、`/deposit`、`/withdraw`、
+  `/note`、`/eco give`/`take`/`set`、`/eco treasury withdraw`，Vault 返回 `FAILURE`），而不是「余额不足」。转账在扣除发送方后、接收方
+  写入抛出存储错误时，现在也会退款；若退款也无法写入，会记录一条错误日志，写明双方玩家、金额和货币，便于管理员手动恢复。已完成转账的
+  税款存入国库时出现存储错误，会记录日志而不是报告转账失败。已知限制：转账扣款后、入账前服务器中止可能丢失该笔金额
+  （UltiKits/UltiEconomy#44）。这些条件写入未在 MariaDB 上测试（UltiKits/UltiEconomy#41）。
+
 - Servers that share one database no longer overwrite each other's balance changes. Every cash, bank
   and treasury change — `/pay`, `/deposit`, `/withdraw`, `/eco give`/`take`/`set`, Vault, money notes,
   interest, the transfer tax and `/eco treasury withdraw` — now applies only if the balance is still the

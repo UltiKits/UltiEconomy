@@ -36,6 +36,20 @@ public class TaxService {
     /** How many times one treasury change is attempted when another writer keeps changing the row. */
     private static final int MAX_WRITE_ATTEMPTS = 3;
 
+    /** Whether the last treasury change on this thread gave up under contention. */
+    private final ThreadLocal<Boolean> lastWriteBusy = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    /**
+     * Whether the last treasury deposit or withdrawal on this thread failed only because another server
+     * kept changing the row on every attempt (UltiKits/UltiEconomy#41); a caller then replies "busy, try
+     * again" rather than "not enough in the treasury".
+     *
+     * @return true when the last change on this thread gave up under contention
+     */
+    public boolean isLastWriteBusy() {
+        return lastWriteBusy.get();
+    }
+
     /**
      * Adds {@code amount} to the treasury of {@code currencyId}. The write applies only while the row
      * still holds the balance read ({@code DataOperator#updateIf}), so a deposit another server made in
@@ -48,6 +62,7 @@ public class TaxService {
      * @return true when the amount was stored; false when the row kept changing on every attempt
      */
     public boolean depositToTreasury(double amount, String currencyId) throws IllegalAccessException {
+        lastWriteBusy.set(false);
         for (int attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
             List<TreasuryEntity> results = treasuryDataOperator.query()
                     .where("currency_id").eq(currencyId)
@@ -77,6 +92,7 @@ public class TaxService {
             }
             existing.setBalance(read);
         }
+        lastWriteBusy.set(true);
         return false;
     }
 
@@ -97,6 +113,7 @@ public class TaxService {
      * the row gone, UltiKits/UltiEconomy#42), at most {@link #MAX_WRITE_ATTEMPTS} times, then false.
      */
     public boolean withdrawFromTreasury(double amount, String currencyId) throws IllegalAccessException {
+        lastWriteBusy.set(false);
         for (int attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
             List<TreasuryEntity> results = treasuryDataOperator.query()
                     .where("currency_id").eq(currencyId)
@@ -115,6 +132,7 @@ public class TaxService {
             }
             entry.setBalance(read);
         }
+        lastWriteBusy.set(true);
         return false;
     }
 

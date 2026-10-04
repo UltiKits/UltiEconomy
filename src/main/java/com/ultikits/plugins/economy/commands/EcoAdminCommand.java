@@ -92,7 +92,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.gave"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.operation_failed")));
         }
     }
 
@@ -114,7 +114,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.took"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_balance")));
         }
     }
 
@@ -136,7 +136,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.set"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.operation_failed")));
         }
     }
 
@@ -188,7 +188,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.gave"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.operation_failed")));
         }
     }
 
@@ -217,7 +217,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.took"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_balance")));
         }
     }
 
@@ -246,7 +246,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
             sender.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.admin.set"), target.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
+            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.operation_failed")));
         }
     }
 
@@ -304,7 +304,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
                 sender.sendMessage(ChatColor.GREEN + String.format(
                         plugin.i18n("economy.treasury.withdrawn"), formatted));
             } else {
-                sender.sendMessage(ChatColor.RED + plugin.i18n("economy.treasury.insufficient"));
+                sender.sendMessage(ChatColor.RED + (taxService.isLastWriteBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.treasury.insufficient")));
             }
         } catch (IllegalAccessException e) {
             sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));
@@ -325,7 +325,7 @@ public class EcoAdminCommand extends BaseCommandExecutor {
                 sender.sendMessage(ChatColor.GREEN + String.format(
                         plugin.i18n("economy.treasury.withdrawn"), formatted));
             } else {
-                sender.sendMessage(ChatColor.RED + plugin.i18n("economy.treasury.insufficient"));
+                sender.sendMessage(ChatColor.RED + (taxService.isLastWriteBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.treasury.insufficient")));
             }
         } catch (IllegalAccessException e) {
             sender.sendMessage(ChatColor.RED + plugin.i18n("economy.error.operation_failed"));

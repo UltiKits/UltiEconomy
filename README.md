@@ -19,6 +19,7 @@ UltiTools-API 的完整 Vault 经济提供者模块。支持双钱包（现金 +
 - **Admin Commands** - Give, take, set, check player balances / 管理员经济管理命令
 - **Money notes** - `/note` turns cash into a tradeable item. A note whose currency has been removed from `config/currencies.yml` cannot be redeemed, by design: the player keeps the note and is told the currency no longer exists, and the console names the currency; adding the currency back makes such notes redeemable again / 纸币：`/note` 把现金换成可交易的物品。货币已从 `config/currencies.yml` 删除的纸币按设计无法兑换：玩家保留纸币并收到该货币已不存在的提示，控制台记录货币名；把该货币加回后即可再次兑换
 - **i18n** - Chinese and English language support / 中英文支持
+- **Shared database** - Several servers can share one economy database: every balance change is a conditional write that retries when another server changed the row, and replies "busy, please try again" if it keeps losing. Measured on SQLite, the JSON store and MySQL 8+/9; **MariaDB is untested** — older MariaDB versions may return fewer decimal digits for a `DOUBLE`, which would make such writes fail. A server stopping between a transfer's debit and credit can lose that amount (UltiKits/UltiEconomy#44) / 共用数据库：多台服务器可共用一个经济数据库，每次余额变动都是条件写入，被其他服务器抢先修改时重试，持续失败则提示「请稍后再试」。已在 SQLite、JSON 存储和 MySQL 8+/9 上验证；**MariaDB 未经测试**——较旧版本可能返回较少的小数位，导致此类写入失败。转账扣款后、入账前服务器中止可能丢失该笔金额（UltiKits/UltiEconomy#44）
 
 ## Commands / 命令
 

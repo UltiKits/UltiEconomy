@@ -64,7 +64,7 @@ public class NoteCommand extends BaseCommandExecutor {
 
         String currencyId = economyService.getPrimaryCurrencyId();
         if (!economyService.takeCash(player.getUniqueId(), amount)) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_balance")));
             return;
         }
 
@@ -91,7 +91,7 @@ public class NoteCommand extends BaseCommandExecutor {
         String resolvedId = currency.getId();
 
         if (!economyService.takeCash(player.getUniqueId(), amount, resolvedId)) {
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_balance"));
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_balance")));
             return;
         }
 

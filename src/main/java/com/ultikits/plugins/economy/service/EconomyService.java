@@ -95,4 +95,15 @@ public interface EconomyService {
     String formatAmount(double amount, String currencyId);
 
     String getPrimaryCurrencyId();
+
+    /**
+     * Whether the last balance change made on this thread failed only because another server kept
+     * changing the row on every attempt (UltiKits/UltiEconomy#41) -- the balance may well have been
+     * enough. A caller replies "busy, try again" instead of "insufficient funds" when this is true.
+     *
+     * @return true when the last change on this thread gave up under contention
+     */
+    default boolean isLastChangeBusy() {
+        return false;
+    }
 }
