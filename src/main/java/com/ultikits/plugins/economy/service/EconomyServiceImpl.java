@@ -128,6 +128,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount < 0) {
             return false;
         }
@@ -139,6 +140,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount < 0) {
             return false;
         }
@@ -150,6 +152,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -161,6 +164,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -172,6 +176,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -186,6 +191,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -227,6 +233,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0 || from.equals(to)) {
             return TransferReceipt.refused();
         }
@@ -275,6 +282,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean depositToBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -294,6 +302,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
@@ -416,6 +425,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return setCash(playerUuid, amount);
         }
@@ -430,6 +440,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return setBank(playerUuid, amount);
         }
@@ -444,6 +455,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return addCash(playerUuid, amount);
         }
@@ -458,6 +470,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean addBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return addBank(playerUuid, amount);
         }
@@ -472,6 +485,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return takeCash(playerUuid, amount);
         }
@@ -489,6 +503,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean takeBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return takeBank(playerUuid, amount);
         }
@@ -511,6 +526,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return transferWithReceipt(from, to, amount);
         }
@@ -560,6 +576,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean depositToBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             // config.yml governs the primary currency: bank.enabled here, bank.min-deposit and
             // bank.max-balance in depositToBank(UUID, double).
@@ -590,6 +607,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             // config.yml's bank.enabled governs the primary currency, as /withdraw <amount> applies it.
             return config.isBankEnabled() && withdrawFromBank(playerUuid, amount);
