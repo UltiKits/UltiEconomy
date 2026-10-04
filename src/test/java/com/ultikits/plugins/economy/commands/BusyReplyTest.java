@@ -167,4 +167,46 @@ class BusyReplyTest {
         assertThat(response.type).isEqualTo(EconomyResponse.ResponseType.FAILURE);
         assertThat(response.errorMessage).contains(BUSY);
     }
+
+    @Test
+    @DisplayName("/note redeem: a redeem that lost to another server says busy and keeps the note")
+    void noteRedeem() {
+        MoneyNoteFactory notes = mock(MoneyNoteFactory.class);
+        org.bukkit.inventory.ItemStack held = mock(org.bukkit.inventory.ItemStack.class);
+        PlayerInventory inventory = steve.getInventory();
+        org.mockito.Mockito.when(inventory.getItemInMainHand()).thenReturn(held);
+        org.mockito.Mockito.when(notes.isMoneyNote(held)).thenReturn(true);
+        org.mockito.Mockito.when(notes.getNoteValue(held)).thenReturn(100.0);
+        org.mockito.Mockito.when(notes.getNoteCurrency(held)).thenReturn(contended.getPrimaryCurrencyId());
+
+        NoteCommand.createForTest(plugin, contended, notes, world.currencies).onRedeem(steve);
+
+        assertThat(lastLine(steve)).contains(BUSY);
+        verify(inventory, org.mockito.Mockito.never()).setItemInMainHand(org.mockito.ArgumentMatchers.any());
+        verify(held, org.mockito.Mockito.never()).setAmount(org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    /**
+     * The busy answer belongs to the change that gave up, not to the thread: a later change on the same
+     * thread that is refused before it writes anything (here: not enough cash, decided up front) says
+     * its own reason, even though the change before it gave up under contention.
+     */
+    @Test
+    @DisplayName("a refusal after an earlier change gave up under contention says its own reason, not busy")
+    void aLaterRefusalIsNotReportedAsBusy() {
+        assertThat(contended.takeCash(STEVE, 100.0)).isFalse();
+        assertThat(contended.isLastChangeBusy()).isTrue();
+
+        new PayCommand(plugin, world.service).onPay(steve, "Alex", "5000");
+        assertThat(lastLine(steve)).containsIgnoringCase("insufficient").doesNotContain(BUSY);
+
+        assertThat(contended.takeCash(STEVE, 100.0)).isFalse();
+        assertThat(world.service.depositToBank(STEVE, -1.0)).isFalse();
+        assertThat(world.service.isLastChangeBusy()).isFalse();
+
+        assertThat(contended.takeCash(STEVE, 100.0)).isFalse();
+        OfflinePlayer offline = Bukkit.getOfflinePlayer("Steve");
+        EconomyResponse response = new VaultEconomyProvider(world.service, world.config, plugin).withdrawPlayer(offline, 5000.0);
+        assertThat(response.errorMessage).doesNotContain(BUSY);
+    }
 }
