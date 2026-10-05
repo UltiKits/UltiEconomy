@@ -17,13 +17,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   whose name does not start with an official language code and a hyphen is still read, but every message
   it lacks then shows in English, with one warning. An edit made directly in an official
   language file (`lang/en.json`, `lang/zh.json`) is not kept: the framework restores the official files at
-  every start and keeps the edited file as `.bak` (UltiKits/UltiTools-Reborn#616). A server that never
+  every start and on every module reload and keeps the edited file as `.bak` (UltiKits/UltiTools-Reborn#616). A server that never
   customised messages needs no action.
 - 语言键已从中文句子改为 ASCII 键（例如 `economy.money.header`）。如果你在自己的语言文件中自定义过本模块的消息——即把官方文件复制一份，文件名以该文件的语言代码加连字符开头
   （例如 `lang/zh-myserver.json`），并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver` 选择它——请把改动重新套到新键上；
   在此之前，改名的消息显示文件名开头那种官方语言的文本。文件名不以官方语言代码加连字符开头的副本仍会被读取，但其中缺少的消息
   都显示英文，并记录一条警告。
-  直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动时恢复官方文件，并把修改过的文件
+  直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动以及每次模块重载时恢复官方文件，并把修改过的文件
   保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
 - **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
