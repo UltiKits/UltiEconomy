@@ -110,6 +110,18 @@ public final class SteppedOperator<T extends BaseDataEntity<String>> implements 
     }
 
     @Override
+    public boolean updateIf(T obj, WhereCondition... expected) {
+        announce("update(if)");
+        return shared.updateIf(obj, expected);
+    }
+
+    @Override
+    public int updateCounted(T obj) {
+        announce("update(counted)");
+        return shared.updateCounted(obj);
+    }
+
+    @Override
     public void flush() {
         if (shared instanceof Cached) {
             announce("flush");

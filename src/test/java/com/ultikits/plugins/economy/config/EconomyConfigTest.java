@@ -21,14 +21,48 @@ class EconomyConfigTest {
         assertThat(config.isInterestEnabled()).isFalse();
         assertThat(config.getInterestRate()).isEqualTo(0.03);
         assertThat(config.getMaxInterest()).isEqualTo(10000.0);
-        assertThat(config.getLeaderboardDisplayCount()).isEqualTo(10);
         assertThat(config.isTaxEnabled()).isTrue();
         assertThat(config.isTransactionTaxEnabled()).isTrue();
         assertThat(config.getTransactionTaxRate()).isEqualTo(0.05);
         assertThat(config.getTransactionTaxExemptPermission()).isEqualTo("ultieconomy.tax.exempt");
-        assertThat(config.isWealthTaxEnabled()).isFalse();
-        assertThat(config.getWealthTaxInterval()).isEqualTo(3600);
-        assertThat(config.getWealthTaxExemptPermission()).isEqualTo("ultieconomy.wealthtax.exempt");
+    }
+
+    /**
+     * UltiKits/UltiEconomy#27, maintainer decision 2026-09-29: the wealth tax never collected anything
+     * -- nothing scheduled it, nothing debited a balance, no setting defined its brackets -- so its
+     * three settings are deleted in 6.3.0 and implementing it is the feature request
+     * UltiKits/UltiEconomy#38. Nothing may declare a {@code tax.wealth-tax.*} entry any more.
+     */
+    @Test
+    @DisplayName("no tax.wealth-tax.* setting is declared (UltiEconomy#27)")
+    void noWealthTaxSettingIsDeclared() {
+        assertThat(declaredPaths()).isNotEmpty().contains("tax.enabled")
+                .noneMatch(path -> path.startsWith("tax.wealth-tax"));
+    }
+
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} was written into every file and read
+     * by nothing -- no command or placeholder of this module shows a fixed number of leaderboard entries
+     * (each top-N placeholder names its own N). So the declaration is deleted rather than wired.
+     */
+    @Test
+    @DisplayName("leaderboard.display-count is not declared; leaderboard.update-interval still is (UltiEconomy#36)")
+    void noLeaderboardDisplayCountIsDeclared() {
+        assertThat(declaredPaths()).contains("leaderboard.update-interval")
+                .doesNotContain("leaderboard.display-count");
+    }
+
+    /** Every {@code @ConfigEntry} path {@link EconomyConfig} declares. */
+    static java.util.List<String> declaredPaths() {
+        java.util.List<String> paths = new java.util.ArrayList<>();
+        for (java.lang.reflect.Field field : EconomyConfig.class.getDeclaredFields()) {
+            com.ultikits.ultitools.annotations.ConfigEntry entry =
+                    field.getAnnotation(com.ultikits.ultitools.annotations.ConfigEntry.class);
+            if (entry != null) {
+                paths.add(entry.path());
+            }
+        }
+        return paths;
     }
 
     /**
@@ -56,7 +90,6 @@ class EconomyConfigTest {
         config.setInterestEnabled(true); // the declared default is false, so set the other value
         config.setInterestRate(0.05);
         config.setMaxInterest(5000.0);
-        config.setLeaderboardDisplayCount(20);
 
         assertThat(config.getInitialCash()).isEqualTo(500.0);
         assertThat(config.getCurrencyName()).isEqualTo("Gold");
@@ -67,6 +100,5 @@ class EconomyConfigTest {
         assertThat(config.isInterestEnabled()).isTrue();
         assertThat(config.getInterestRate()).isEqualTo(0.05);
         assertThat(config.getMaxInterest()).isEqualTo(5000.0);
-        assertThat(config.getLeaderboardDisplayCount()).isEqualTo(20);
     }
 }

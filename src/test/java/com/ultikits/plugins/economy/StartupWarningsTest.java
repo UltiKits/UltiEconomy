@@ -52,7 +52,7 @@ class StartupWarningsTest {
     class TaxMasterSwitch {
 
         @Test
-        @DisplayName("tax.enabled: false logs one warning that no transaction tax and no wealth tax is collected")
+        @DisplayName("tax.enabled: false logs one warning that no transaction tax is collected, promising no wealth tax (UltiEconomy#27)")
         void taxOffIsAnnounced() {
             EconomyConfig config = new EconomyConfig();
             config.setTaxEnabled(false);
@@ -65,7 +65,7 @@ class StartupWarningsTest {
                     .contains(CONFIG_FILE)
                     .contains("tax.enabled")
                     .contains("no transaction tax")
-                    .contains("no wealth tax")
+                    .doesNotContain("wealth")
                     .contains("tax.enabled: true");
         }
 
@@ -187,6 +187,84 @@ class StartupWarningsTest {
         }
     }
 
+    /**
+     * UltiKits/UltiEconomy#27: the wealth tax's three settings are deleted, and a file that still holds
+     * one gets the module's removed-settings warning at load, naming the key and the file and saying why
+     * it went -- the operator who set it would otherwise never learn it never did anything.
+     */
+    @Nested
+    @DisplayName("tax.wealth-tax.* left in the file (UltiEconomy#27)")
+    class RemovedWealthTaxKeys {
+
+        @Test
+        @DisplayName("each tax.wealth-tax.* key still in the file logs one warning naming the key, the file and why it went")
+        void eachLeftoverKeyIsNamed() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("tax.wealth-tax.enabled", true);
+            onDisk.set("tax.wealth-tax.interval", 3600);
+            onDisk.set("tax.wealth-tax.exempt-permission", "ultieconomy.wealthtax.exempt");
+
+            List<String> warnings = bootWith(new EconomyConfig(), onDisk);
+
+            for (String key : new String[] {"tax.wealth-tax.enabled", "tax.wealth-tax.interval", "tax.wealth-tax.exempt-permission"}) {
+                List<String> named = warningsMentioning("'" + key + "'", warnings);
+                assertThat(named).as("warnings naming %s", key).hasSize(1);
+                assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+                        .contains("no longer has any effect").contains("never collected").contains("UltiKits/UltiEconomy#38");
+            }
+        }
+
+        @Test
+        @DisplayName("under language: zh the warning is Chinese and keeps the key and the file")
+        void warningInChinese() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("tax.wealth-tax.enabled", true);
+
+            List<String> named = warningsMentioning("'tax.wealth-tax.enabled'", bootWith(new EconomyConfig(), onDisk, "zh"));
+
+            assertThat(named).hasSize(1);
+            assertThat(named.get(0)).contains(CONFIG_FILE).contains("\u8d22\u5bcc\u7a0e");
+        }
+
+        @Test
+        @DisplayName("Control: a file without them logs no tax.wealth-tax warning")
+        void noLeftoverNoWarning() {
+            assertThat(warningsMentioning("tax.wealth-tax", bootWith(new EconomyConfig()))).isEmpty();
+        }
+    }
+
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} was declared and read by nothing; it is
+     * deleted, and a file that still holds it gets the removed-settings warning at load.
+     */
+    @Nested
+    @DisplayName("leaderboard.display-count left in the file (UltiEconomy#36)")
+    class RemovedDisplayCountKey {
+
+        @Test
+        @DisplayName("leaderboard.display-count still in the file logs one warning naming the key, the file and why it went")
+        void leftoverKeyIsNamed() {
+            YamlConfiguration onDisk = new YamlConfiguration();
+            onDisk.set("leaderboard.display-count", 10);
+            onDisk.set("leaderboard.update-interval", 60);
+
+            List<String> warnings = bootWith(new EconomyConfig(), onDisk);
+
+            List<String> named = warningsMentioning("'leaderboard.display-count'", warnings);
+            assertThat(named).hasSize(1);
+            assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+                    .contains("no longer has any effect").contains("%ultieconomy_top_name_<N>%");
+            // Control: the live interval key beside it is not called dead.
+            assertThat(warningsMentioning("'leaderboard.update-interval'", warnings)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Control: a file without it logs no leaderboard.display-count warning")
+        void noLeftoverNoWarning() {
+            assertThat(warningsMentioning("leaderboard.display-count", bootWith(new EconomyConfig()))).isEmpty();
+        }
+    }
+
     @Nested
     @DisplayName("the warnings follow the language setting")
     class LanguageSetting {
@@ -300,9 +378,11 @@ class StartupWarningsTest {
 
     /**
      * As {@link #bootWith(EconomyConfig)}, with {@code onDisk} standing for the operator's parsed
-     * file. {@code AbstractConfigEntity#getConfig()} returns that parsed file, including keys the
-     * entity no longer declares, so a spy that returns {@code onDisk} is how a unit test presents
-     * "this key is still in your file".
+     * file. UltiTools-API 6.3.0 answers "is this key in your file?" through
+     * {@code AbstractConfigEntity#isPresentInFile(String)}, including keys the entity no longer
+     * declares, so a spy whose {@code isPresentInFile} answers from {@code onDisk} is how a unit test
+     * presents "this key is still in your file" (UltiKits/UltiEconomy#34: the 6.2 accessor that
+     * returned the parsed file is gone in 6.3.0).
      */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk) {
         return bootWith(config, onDisk, "en");
@@ -318,7 +398,7 @@ class StartupWarningsTest {
     /** As {@link #bootWith(EconomyConfig, YamlConfiguration, String)}, with {@code currenciesYaml} as {@code config/currencies.yml}. */
     static List<String> bootWith(EconomyConfig config, YamlConfiguration onDisk, String language, String currenciesYaml) {
         EconomyConfig effective = org.mockito.Mockito.spy(config);
-        when(effective.getConfig()).thenReturn(onDisk);
+        when(effective.isPresentInFile(anyString())).thenAnswer(ask -> onDisk.contains(ask.<String>getArgument(0)));
         when(effective.getConfigFilePath()).thenReturn(CONFIG_FILE);
 
         UltiEconomy plugin = mock(UltiEconomy.class);

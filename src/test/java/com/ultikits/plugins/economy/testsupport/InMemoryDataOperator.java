@@ -273,6 +273,47 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
         afterWrite();
     }
 
+    /**
+     * The framework's conditional write (UltiKits/UltiTools-Reborn#543): writes {@code obj} over the
+     * stored row with its id only if that row still matches every condition, checked and written as one
+     * step (here under the caller's thread, which is how the relational backends' single
+     * {@code UPDATE ... WHERE id = ? AND ...} behaves for the servers sharing a database). A condition
+     * with a null value is refused, as the framework refuses it on every backend.
+     */
+    @Override
+    public synchronized boolean updateIf(T obj, WhereCondition... expected) {
+        if (obj.getId() == null) {
+            throw new DataAccessException(ErrorCode.DATA_OPERATION_FAILED, "updateIf with a null id");
+        }
+        if (expected != null) {
+            for (WhereCondition c : expected) {
+                if (c != null && !c.isEmpty() && c.getValue() == null) {
+                    throw new DataAccessException(ErrorCode.DATA_OPERATION_FAILED, "updateIf condition with a null value");
+                }
+            }
+        }
+        T existing = cache.get(obj.getId());
+        if (existing == null || !matches(existing, expected)) {
+            return false;
+        }
+        write("update " + name + " " + obj.getId());
+        cache.put(obj.getId(), copy(obj));
+        afterWrite();
+        return true;
+    }
+
+    /** The framework's counted update (UltiKits/UltiTools-Reborn#558): 1 when a row with the id was written, else 0. */
+    @Override
+    public int updateCounted(T obj) {
+        if (obj.getId() == null || !cache.containsKey(obj.getId())) {
+            return 0;
+        }
+        write("update " + name + " " + obj.getId());
+        cache.put(obj.getId(), copy(obj));
+        afterWrite();
+        return 1;
+    }
+
     // ----- Cached -----
 
     @Override

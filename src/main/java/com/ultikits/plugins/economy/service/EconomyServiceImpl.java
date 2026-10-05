@@ -7,7 +7,10 @@ import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
 import com.ultikits.plugins.economy.entity.TreasuryEntity;
 import com.ultikits.plugins.economy.model.CurrencyDefinition;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.abstracts.data.BaseDataEntity;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.exceptions.DataAccessException;
+import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import org.bukkit.Bukkit;
@@ -16,6 +19,7 @@ import org.bukkit.entity.Player;
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Service
 public class EconomyServiceImpl implements EconomyService {
@@ -124,80 +128,80 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount < 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null) {
-            return false;
-        }
-        account.setCash(amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            a.setCash(amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean setBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount < 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null) {
-            return false;
-        }
-        account.setBank(amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            a.setBank(amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean addCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null) {
-            return false;
-        }
-        account.setCash(account.getCash() + amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            a.setCash(a.getCash() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean addBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null) {
-            return false;
-        }
-        account.setBank(account.getBank() + amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            a.setBank(a.getBank() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean takeCash(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null || account.getCash() < amount) {
-            return false;
-        }
-        account.setCash(account.getCash() - amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            if (a.getCash() < amount) {
+                return false;
+            }
+            a.setCash(a.getCash() - amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean takeBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null || account.getBank() < amount) {
-            return false;
-        }
-        account.setBank(account.getBank() - amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            if (a.getBank() < amount) {
+                return false;
+            }
+            a.setBank(a.getBank() - amount);
+            return true;
+        }) != null;
     }
 
     /**
@@ -229,6 +233,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0 || from.equals(to)) {
             return TransferReceipt.refused();
         }
@@ -242,59 +247,74 @@ public class EconomyServiceImpl implements EconomyService {
         }
         double tax = transactionTax(from, amount);
         double received = amount - tax;
-        sender.setCash(sender.getCash() - amount);
-        receiver.setCash(receiver.getCash() + received);
-        if (!updateAccount(sender)) {
-            sender.setCash(sender.getCash() + amount);
+        // Each side is a conditional write that re-reads and retries when another server changed the
+        // row (UltiKits/UltiEconomy#41); a receiver that cannot be credited gets the sender refunded.
+        PlayerAccountEntity debited = changeAccount(from, sender, s -> {
+            if (s.getCash() < amount) {
+                return false;
+            }
+            s.setCash(s.getCash() - amount);
+            return true;
+        });
+        if (debited == null) {
             return TransferReceipt.refused();
         }
-        if (!updateAccount(receiver)) {
-            sender.setCash(sender.getCash() + amount);
-            updateAccount(sender);
+        if (!credited(() -> changeAccount(to, receiver, r -> {
+            r.setCash(r.getCash() + received);
+            return true;
+        }), true)) {
+            boolean busy = isLastChangeBusy();
+            // A refund that throws is a refund not written, like one refused: it is named below.
+            if (!credited(() -> changeAccount(from, debited, s -> {
+                s.setCash(s.getCash() + amount);
+                return true;
+            }), true)) {
+                logLostRefund(label(from, sender.getPlayerName()), label(to, receiver.getPlayerName()), amount,
+                        currencyManager != null ? currencyManager.getPrimaryCurrencyId() : "coins");
+            }
+            lastChangeBusy.set(busy);
             return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
-            try {
-                taxService.depositToTreasury(tax, currencyManager.getPrimaryCurrency().getId());
-            } catch (IllegalAccessException ignored) {
-            }
+            depositTax(tax, currencyManager.getPrimaryCurrency().getId());
         }
         return TransferReceipt.completed(received, tax);
     }
 
     @Override
     public boolean depositToBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
         if (amount < config.getMinDeposit()) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null || account.getCash() < amount) {
-            return false;
-        }
         double maxBalance = config.getMaxBankBalance();
-        if (maxBalance > 0 && account.getBank() + amount > maxBalance) {
-            return false;
-        }
-        account.setCash(account.getCash() - amount);
-        account.setBank(account.getBank() + amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            if (a.getCash() < amount || (maxBalance > 0 && a.getBank() + amount > maxBalance)) {
+                return false;
+            }
+            a.setCash(a.getCash() - amount);
+            a.setBank(a.getBank() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (amount <= 0) {
             return false;
         }
-        PlayerAccountEntity account = getAccount(playerUuid);
-        if (account == null || account.getBank() < amount) {
-            return false;
-        }
-        account.setBank(account.getBank() - amount);
-        account.setCash(account.getCash() + amount);
-        return updateAccount(account);
+        return changeAccount(playerUuid, getAccount(playerUuid), a -> {
+            if (a.getBank() < amount) {
+                return false;
+            }
+            a.setBank(a.getBank() - amount);
+            a.setCash(a.getCash() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
@@ -406,98 +426,98 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public boolean setCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return setCash(playerUuid, amount);
         }
         if (amount < 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null) {
-            return false;
-        }
-        balance.setCash(amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            b.setCash(amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean setBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return setBank(playerUuid, amount);
         }
         if (amount < 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null) {
-            return false;
-        }
-        balance.setBank(amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            b.setBank(amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean addCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return addCash(playerUuid, amount);
         }
         if (amount <= 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null) {
-            return false;
-        }
-        balance.setCash(balance.getCash() + amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            b.setCash(b.getCash() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean addBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return addBank(playerUuid, amount);
         }
         if (amount <= 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null) {
-            return false;
-        }
-        balance.setBank(balance.getBank() + amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            b.setBank(b.getBank() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean takeCash(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return takeCash(playerUuid, amount);
         }
         if (amount <= 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null || balance.getCash() < amount) {
-            return false;
-        }
-        balance.setCash(balance.getCash() - amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            if (b.getCash() < amount) {
+                return false;
+            }
+            b.setCash(b.getCash() - amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean takeBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return takeBank(playerUuid, amount);
         }
         if (amount <= 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null || balance.getBank() < amount) {
-            return false;
-        }
-        balance.setBank(balance.getBank() - amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            if (b.getBank() < amount) {
+                return false;
+            }
+            b.setBank(b.getBank() - amount);
+            return true;
+        }) != null;
     }
 
     @Override
@@ -507,6 +527,7 @@ public class EconomyServiceImpl implements EconomyService {
 
     @Override
     public TransferReceipt transferWithReceipt(UUID from, UUID to, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             return transferWithReceipt(from, to, amount);
         }
@@ -523,28 +544,41 @@ public class EconomyServiceImpl implements EconomyService {
         }
         double tax = transactionTax(from, amount);
         double received = amount - tax;
-        sender.setCash(sender.getCash() - amount);
-        receiver.setCash(receiver.getCash() + received);
-        if (!updateBalance(sender)) {
-            sender.setCash(sender.getCash() + amount);
+        // As the primary transfer: conditional writes that retry, the sender refunded on failure (#41).
+        CurrencyBalanceEntity debited = changeBalance(from, currencyId, sender, s -> {
+            if (s.getCash() < amount) {
+                return false;
+            }
+            s.setCash(s.getCash() - amount);
+            return true;
+        });
+        if (debited == null) {
             return TransferReceipt.refused();
         }
-        if (!updateBalance(receiver)) {
-            sender.setCash(sender.getCash() + amount);
-            updateBalance(sender);
+        if (!credited(() -> changeBalance(to, currencyId, receiver, r -> {
+            r.setCash(r.getCash() + received);
+            return true;
+        }), false)) {
+            boolean busy = isLastChangeBusy();
+            // A refund that throws is a refund not written, like one refused: it is named below.
+            if (!credited(() -> changeBalance(from, currencyId, debited, s -> {
+                s.setCash(s.getCash() + amount);
+                return true;
+            }), false)) {
+                logLostRefund(label(from, null), label(to, null), amount, currencyId);
+            }
+            lastChangeBusy.set(busy);
             return TransferReceipt.refused();
         }
         if (tax > 0 && taxService != null) {
-            try {
-                taxService.depositToTreasury(tax, currencyId);
-            } catch (IllegalAccessException ignored) {
-            }
+            depositTax(tax, currencyId);
         }
         return TransferReceipt.completed(received, tax);
     }
 
     @Override
     public boolean depositToBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             // config.yml governs the primary currency: bank.enabled here, bank.min-deposit and
             // bank.max-balance in depositToBank(UUID, double).
@@ -562,23 +596,20 @@ public class EconomyServiceImpl implements EconomyService {
                 return false;
             }
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null || balance.getCash() < amount) {
-            return false;
-        }
-        if (def != null) {
-            double maxBalance = def.getMaxBankBalance();
-            if (maxBalance > 0 && balance.getBank() + amount > maxBalance) {
+        double maxBalance = def != null ? def.getMaxBankBalance() : -1;
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            if (b.getCash() < amount || (maxBalance > 0 && b.getBank() + amount > maxBalance)) {
                 return false;
             }
-        }
-        balance.setCash(balance.getCash() - amount);
-        balance.setBank(balance.getBank() + amount);
-        return updateBalance(balance);
+            b.setCash(b.getCash() - amount);
+            b.setBank(b.getBank() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
     public boolean withdrawFromBank(UUID playerUuid, double amount, String currencyId) {
+        lastChangeBusy.set(false); // the answer belongs to this change, not to an earlier one on this thread
         if (isPrimary(currencyId)) {
             // config.yml's bank.enabled governs the primary currency, as /withdraw <amount> applies it.
             return config.isBankEnabled() && withdrawFromBank(playerUuid, amount);
@@ -586,13 +617,14 @@ public class EconomyServiceImpl implements EconomyService {
         if (amount <= 0) {
             return false;
         }
-        CurrencyBalanceEntity balance = getBalance(playerUuid, currencyId);
-        if (balance == null || balance.getBank() < amount) {
-            return false;
-        }
-        balance.setBank(balance.getBank() - amount);
-        balance.setCash(balance.getCash() + amount);
-        return updateBalance(balance);
+        return changeBalance(playerUuid, currencyId, getBalance(playerUuid, currencyId), b -> {
+            if (b.getBank() < amount) {
+                return false;
+            }
+            b.setBank(b.getBank() - amount);
+            b.setCash(b.getCash() + amount);
+            return true;
+        }) != null;
     }
 
     @Override
@@ -615,23 +647,214 @@ public class EconomyServiceImpl implements EconomyService {
         return currencyManager;
     }
 
-    private boolean updateAccount(PlayerAccountEntity account) {
+    /** How many times one balance change is attempted when another writer keeps changing the row. */
+    private static final int MAX_WRITE_ATTEMPTS = 3;
+
+    /** Whether the last change on this thread gave up under contention; see {@link #isLastChangeBusy()} (static: test instances skip field initialisers, and the flag is per thread anyway). */
+    private static final ThreadLocal<Boolean> lastChangeBusy = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    @Override
+    public boolean isLastChangeBusy() {
+        return lastChangeBusy.get();
+    }
+
+    /**
+     * Runs a transfer's credit, or its refund, after the debit committed. A storage error it throws (not
+     * only a refusal) counts as a write not made, logged like any failed write: a failed credit is
+     * refunded, and a failed refund is named for the operator (gate-1 top-up F-E2/F-E3, maintainer
+     * decision 2026-10-04); before, the exception left the transfer with the sender debited and nobody
+     * credited.
+     *
+     * @return whether the write was made
+     */
+    private boolean credited(Supplier<?> credit, boolean accountRow) {
         try {
-            dataOperator.update(account);
-            return true;
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(String.format(plugin.i18n("economy.log.account_update_failed"), e.getMessage()));
+            return credit.get() != null;
+        } catch (RuntimeException e) {
+            lastChangeBusy.set(false);
+            logWriteFailed(accountRow, String.valueOf(e.getMessage()));
             return false;
         }
     }
 
-    private boolean updateBalance(CurrencyBalanceEntity balance) {
-        try {
-            currencyDataOperator.update(balance);
-            return true;
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(String.format(plugin.i18n("economy.log.balance_update_failed"), e.getMessage()));
-            return false;
+    /**
+     * The refund of a failed transfer could not be written either: the sender has lost {@code amount}.
+     * One error line names both players, the amount and the currency, so an operator can restore it by
+     * hand (gate-1 top-up F-E3, maintainer decision 2026-10-04).
+     */
+    private void logLostRefund(String from, String to, double amount, String currencyId) {
+        plugin.getLogger().error(String.format(plugin.i18n("economy.log.transfer_refund_failed"),
+                from, to, formatAmount(amount, currencyId), currencyId, from));
+    }
+
+    /**
+     * A player as an operator should see them in that line: their name and UUID. {@code knownName} is
+     * the name read with the transfer (the row may be gone now); without it the account is asked.
+     */
+    private String label(UUID uuid, String knownName) {
+        String name = knownName;
+        if (name == null) {
+            try {
+                PlayerAccountEntity account = getAccount(uuid);
+                name = account != null ? account.getPlayerName() : null;
+            } catch (RuntimeException ignored) {
+                // the storage that just failed may fail again; the UUID still identifies the player
+            }
         }
+        return name != null ? name + " (" + uuid + ")" : uuid.toString();
+    }
+
+    /** One balance change, applied to a row as read; false refuses it (for example, not enough cash). */
+    private interface Change<T> {
+        boolean apply(T row);
+    }
+
+    /** Reads and puts back a row's two balances. */
+    private interface Money<T> {
+        double cash(T row);
+
+        double bank(T row);
+
+        void restore(T row, double cash, double bank);
+    }
+
+    private static final Money<PlayerAccountEntity> ACCOUNT_MONEY = new Money<PlayerAccountEntity>() {
+        @Override
+        public double cash(PlayerAccountEntity row) {
+            return row.getCash();
+        }
+
+        @Override
+        public double bank(PlayerAccountEntity row) {
+            return row.getBank();
+        }
+
+        @Override
+        public void restore(PlayerAccountEntity row, double cash, double bank) {
+            row.setCash(cash);
+            row.setBank(bank);
+        }
+    };
+
+    private static final Money<CurrencyBalanceEntity> BALANCE_MONEY = new Money<CurrencyBalanceEntity>() {
+        @Override
+        public double cash(CurrencyBalanceEntity row) {
+            return row.getCash();
+        }
+
+        @Override
+        public double bank(CurrencyBalanceEntity row) {
+            return row.getBank();
+        }
+
+        @Override
+        public void restore(CurrencyBalanceEntity row, double cash, double bank) {
+            row.setCash(cash);
+            row.setBank(bank);
+        }
+    };
+
+    /** {@link #change} on a player's account row. */
+    private PlayerAccountEntity changeAccount(UUID playerUuid, PlayerAccountEntity read, Change<PlayerAccountEntity> change) {
+        return change(read, () -> getAccount(playerUuid), dataOperator, ACCOUNT_MONEY, change, true);
+    }
+
+    /** {@link #change} on a player's non-primary currency row. */
+    private CurrencyBalanceEntity changeBalance(UUID playerUuid, String currencyId, CurrencyBalanceEntity read,
+                                                Change<CurrencyBalanceEntity> change) {
+        return change(read, () -> getBalance(playerUuid, currencyId), currencyDataOperator, BALANCE_MONEY, change, false);
+    }
+
+    /**
+     * Applies one balance change to a row and writes it so that it applies only while the stored row
+     * still holds the cash and bank this change read ({@code DataOperator#updateIf},
+     * UltiKits/UltiEconomy#41). Servers sharing one database used to write absolute values read
+     * earlier, so a change another server made in between was overwritten -- money created or
+     * destroyed. When the write does not apply, the row is read again and the change decided again (it
+     * may now be refused, for example for lack of cash), at most {@link #MAX_WRITE_ATTEMPTS} times.
+     *
+     * <p>Failure is the path a failed write always took: the row object is given back the balances it
+     * was read with, one line is logged with the reason, and {@code null} comes back -- for a row that
+     * is gone on the re-read (another writer removed it, UltiKits/UltiEconomy#42), for a row that kept
+     * changing on every attempt, and for an entity whose fields could not be read. Any other storage
+     * failure propagates, as before. A change the row refuses (not enough cash, over the cap) logs
+     * nothing.
+     *
+     * @param read   the row as the caller read it; null when the player has no such row
+     * @param reread reads the row again, after a write that did not apply
+     * @return the row as written, or null when nothing was written
+     */
+    private <T extends BaseDataEntity<String>> T change(T read, Supplier<T> reread, DataOperator<T> operator,
+                                                       Money<T> money, Change<T> change, boolean accountRow) {
+        T row = read;
+        lastChangeBusy.set(false);
+        for (int attempt = 1; ; attempt++) {
+            if (row == null) {
+                if (attempt > 1) {
+                    logWriteFailed(accountRow, plugin.i18n("economy.log.row_gone"));
+                }
+                return null;
+            }
+            double cash = money.cash(row);
+            double bank = money.bank(row);
+            if (!change.apply(row)) {
+                money.restore(row, cash, bank);
+                return null;
+            }
+            boolean written;
+            try {
+                written = operator.updateIf(row, where("cash", cash), where("bank", bank));
+            } catch (DataAccessException e) {
+                money.restore(row, cash, bank);
+                // The framework wraps a failure to read the entity's fields in this exception; anything
+                // else is a storage failure and propagates as before.
+                if (!(e.getCause() instanceof IllegalAccessException)) {
+                    throw e;
+                }
+                logWriteFailed(accountRow, e.getCause().getMessage());
+                return null;
+            }
+            if (written) {
+                return row;
+            }
+            money.restore(row, cash, bank);
+            if (attempt >= MAX_WRITE_ATTEMPTS) {
+                logWriteFailed(accountRow, plugin.i18n("economy.log.write_contended"));
+                lastChangeBusy.set(true);
+                return null;
+            }
+            row = reread.get();
+        }
+    }
+
+    private void logWriteFailed(boolean accountRow, String reason) {
+        String line = accountRow ? plugin.i18n("economy.log.account_update_failed")
+                : plugin.i18n("economy.log.balance_update_failed");
+        plugin.getLogger().error(String.format(line, reason));
+    }
+
+    /**
+     * Adds a transfer's tax to the treasury. The transfer itself is done by then; a tax the treasury
+     * could not take (its row kept changing on every attempt, #41) is logged, not undone.
+     */
+    private void depositTax(double tax, String currencyId) {
+        String reason = null;
+        try {
+            if (!taxService.depositToTreasury(tax, currencyId)) {
+                reason = plugin.i18n("economy.log.write_contended");
+            }
+        } catch (IllegalAccessException | RuntimeException e) {
+            // A storage error here must not turn a completed transfer into an error for its caller,
+            // who might then retry it (gate-1 top-up F-E2).
+            reason = String.valueOf(e.getMessage());
+        }
+        if (reason != null && plugin.getLogger() != null) {
+            plugin.getLogger().error(String.format(plugin.i18n("economy.log.treasury_write_failed"),
+                    String.valueOf(tax), currencyId, reason));
+        }
+    }
+
+    private static WhereCondition where(String column, double value) {
+        return WhereCondition.builder().column(column).value(value).build();
     }
 }

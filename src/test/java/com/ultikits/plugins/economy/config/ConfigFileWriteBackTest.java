@@ -83,6 +83,45 @@ class ConfigFileWriteBackTest {
     }
 
     /**
+     * UltiKits/UltiEconomy#27: the wealth tax's settings are deleted, so a first boot no longer writes
+     * them into a new server's file (before, the framework wrote every declared key it found missing).
+     */
+    @Test
+    @DisplayName("A first boot writes no tax.wealth-tax.* key into the operator's file (UltiEconomy#27)")
+    void firstBootWritesNoWealthTaxKey() throws Exception {
+        File file = writeOperatorFile("");
+
+        new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
+
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
+        assertThat(onDisk.contains("tax.enabled"))
+                .withFailMessage("control: the first boot wrote nothing at all; file now reads:%n%s", read(file))
+                .isTrue();
+        assertThat(onDisk.contains("tax.wealth-tax"))
+                .withFailMessage("tax.wealth-tax was written; file now reads:%n%s", read(file))
+                .isFalse();
+    }
+
+    /**
+     * The instrument the removed-settings warning relies on, measured on the real framework: a key the
+     * file holds is reported present by {@code isPresentInFile} whether or not the entity declares it,
+     * and the framework leaves it in the file (it never deletes a key). Holds before and after the
+     * wealth-tax keys are deleted, so it is a control, not a red-when-reverted test.
+     */
+    @Test
+    @DisplayName("Control: a tax.wealth-tax.enabled left in the file stays there and isPresentInFile reports it")
+    void aLeftoverKeyStaysAndIsReportedPresent() throws Exception {
+        File file = writeOperatorFile("tax:\n  wealth-tax:\n    enabled: true\n");
+
+        EconomyConfig config = new EconomyConfig();
+        config.init(moduleWithConfigFolder(serverDir.toFile()));
+
+        assertThat(config.isPresentInFile("tax.wealth-tax.enabled")).isTrue();
+        assertThat(config.isPresentInFile("tax.wealth-tax.never-written")).isFalse();
+        assertThat(YamlConfiguration.loadConfiguration(file).getBoolean("tax.wealth-tax.enabled")).isTrue();
+    }
+
+    /**
      * {@code interest.interval} and {@code leaderboard.update-interval} are declared again, bound
      * to the two scheduled tasks through the framework's config-bound {@code @Scheduled}
      * (UltiKits/UltiEconomy#15, UltiKits/UltiTools-Reborn#531). A first boot writes both, with the
@@ -130,6 +169,32 @@ class ConfigFileWriteBackTest {
         assertThat(shipped.getInt("interest.interval")).isEqualTo(1800);
         assertThat(shipped.contains("leaderboard.update-interval")).isTrue();
         assertThat(shipped.getInt("leaderboard.update-interval")).isEqualTo(60);
+    }
+
+    /**
+     * UltiKits/UltiEconomy#36: {@code leaderboard.display-count} is deleted, so neither the shipped file
+     * a new server starts from nor a first boot puts it into the operator's file any more.
+     */
+    @Test
+    @DisplayName("Neither the shipped config.yml nor a first boot carries leaderboard.display-count (UltiEconomy#36)")
+    void displayCountIsNeitherShippedNorWritten() throws Exception {
+        YamlConfiguration shipped;
+        try (java.io.InputStream in = ConfigFileWriteBackTest.class.getClassLoader()
+                .getResourceAsStream("config/config.yml")) {
+            assertThat(in).as("shipped config/config.yml on the classpath").isNotNull();
+            shipped = YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        assertThat(shipped.contains("leaderboard.update-interval")).as("control: the shipped file was read").isTrue();
+        assertThat(shipped.contains("leaderboard.display-count")).as("shipped leaderboard.display-count").isFalse();
+
+        File file = writeOperatorFile("");
+        new EconomyConfig().init(moduleWithConfigFolder(serverDir.toFile()));
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(file);
+        assertThat(onDisk.contains("leaderboard.update-interval"))
+                .withFailMessage("control: the first boot wrote nothing; file now reads:%n%s", read(file)).isTrue();
+        assertThat(onDisk.contains("leaderboard.display-count"))
+                .withFailMessage("leaderboard.display-count was written; file now reads:%n%s", read(file)).isFalse();
     }
 
     private File writeOperatorFile(String content) throws Exception {

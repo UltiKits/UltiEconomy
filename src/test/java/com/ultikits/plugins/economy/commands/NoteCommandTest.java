@@ -47,6 +47,8 @@ class NoteCommandTest {
         lenient().when(economyService.getPrimaryCurrencyId()).thenReturn("coins");
         lenient().when(currencyManager.resolve("gems"))
                 .thenReturn(CurrencyDefinition.builder().id("gems").build());
+        lenient().when(currencyManager.hasCurrency("coins")).thenReturn(true);
+        lenient().when(currencyManager.hasCurrency("gems")).thenReturn(true);
         command = NoteCommand.createForTest(plugin, economyService, noteFactory, currencyManager);
     }
 
@@ -203,6 +205,29 @@ class NoteCommandTest {
             command.onRedeem(player);
 
             verify(economyService).addCash(PLAYER_UUID, 500.0, "gems");
+        }
+
+        /** UltiKits/UltiEconomy#37: the command path refuses a removed currency's note the same way. */
+        @Test
+        @DisplayName("/note redeem refuses a note of a currency no longer in currencies.yml: kept, the player told, the currency logged (UltiEconomy#37)")
+        void refusesANoteOfARemovedCurrency() {
+            com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger =
+                    mock(com.ultikits.ultitools.interfaces.impl.logger.PluginLogger.class);
+            when(plugin.getLogger()).thenReturn(logger);
+            when(inventory.getItemInMainHand()).thenReturn(heldItem);
+            when(noteFactory.isMoneyNote(heldItem)).thenReturn(true);
+            lenient().when(noteFactory.getNoteValue(heldItem)).thenReturn(500.0);
+            when(noteFactory.getNoteCurrency(heldItem)).thenReturn("rubies");
+            lenient().when(economyService.addCash(any(), anyDouble(), anyString())).thenReturn(true);
+            lenient().when(heldItem.getAmount()).thenReturn(1);
+
+            command.onRedeem(player);
+
+            verify(economyService, never()).addCash(any(), anyDouble(), anyString());
+            verify(inventory, never()).setItemInMainHand(any());
+            verify(heldItem, never()).setAmount(anyInt());
+            verify(player).sendMessage(contains("rubies"));
+            verify(logger).warn(contains("rubies"));
         }
 
         @Test

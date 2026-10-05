@@ -57,6 +57,11 @@ public class NoteRedeemListener implements Listener {
 
         double value = noteFactory.getNoteValue(held);
         String currencyId = noteFactory.getNoteCurrency(held);
+        if (!currencyId.equals(economyService.getPrimaryCurrencyId()) && !isConfigured(currencyId)) {
+            refuseRemovedCurrency(plugin, player, value, currencyId);
+            event.setCancelled(true);
+            return;
+        }
 
         boolean success;
         if (currencyId.equals(economyService.getPrimaryCurrencyId())) {
@@ -74,8 +79,35 @@ public class NoteRedeemListener implements Listener {
             String formatted = economyService.formatAmount(value, currencyId);
             player.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.note.redeemed"), formatted));
+        } else if (economyService.isLastChangeBusy()) {
+            // Another server kept changing the balance on every attempt (UltiKits/UltiEconomy#41): the note is kept.
+            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.busy"));
         }
 
         event.setCancelled(true);
+    }
+
+    /** Whether {@code currencyId} is still a currency of {@code currencies.yml}. */
+    private boolean isConfigured(String currencyId) {
+        com.ultikits.plugins.economy.service.CurrencyManager currencies = ((UltiEconomy) plugin).getCurrencyManager();
+        return currencies != null && currencies.hasCurrency(currencyId);
+    }
+
+    /**
+     * Refuses a money note whose currency an operator removed from {@code currencies.yml}
+     * (UltiKits/UltiEconomy#37, maintainer decision 2026-10-04): nothing is credited and the note is
+     * kept, the player is told the currency no longer exists, and an operator-facing line names it.
+     * Without this a player who still had a wallet row for that currency redeemed the note into a
+     * wallet no command shows. Shared with {@code /note redeem}.
+     *
+     * @param plugin     the module, for its catalogue and logger
+     * @param player     the player holding the note
+     * @param value      the note's face value
+     * @param currencyId the note's currency, no longer configured
+     */
+    public static void refuseRemovedCurrency(UltiToolsPlugin plugin, Player player, double value, String currencyId) {
+        player.sendMessage(ChatColor.RED + String.format(plugin.i18n("economy.note.currency_removed"), currencyId));
+        plugin.getLogger().warn(String.format(plugin.i18n("economy.log.note_currency_removed"),
+                player.getName(), String.valueOf(value), currencyId));
     }
 }

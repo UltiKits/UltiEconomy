@@ -53,7 +53,7 @@ public class WithdrawCommand extends BaseCommandExecutor {
             String formatted = economyService.formatAmount(amount);
             player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.withdraw.success"), formatted));
         } else {
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_bank_balance"));
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_bank_balance")));
         }
     }
 
@@ -88,7 +88,7 @@ public class WithdrawCommand extends BaseCommandExecutor {
             String formatted = economyService.formatAmount(amount, resolvedId);
             player.sendMessage(ChatColor.GREEN + String.format(plugin.i18n("economy.withdraw.success"), formatted));
         } else {
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.insufficient_bank_balance"));
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy() ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.insufficient_bank_balance")));
         }
     }
 

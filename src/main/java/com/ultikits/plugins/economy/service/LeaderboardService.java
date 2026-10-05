@@ -201,13 +201,6 @@ public class LeaderboardService {
         return -1;
     }
 
-    /**
-     * Returns the configured default display count.
-     */
-    public int getDefaultDisplayCount() {
-        return config.getLeaderboardDisplayCount();
-    }
-
     @Getter
     public static class LeaderboardEntry {
         private final String uuid;

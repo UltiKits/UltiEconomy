@@ -3,6 +3,7 @@ package com.ultikits.plugins.economy;
 import com.ultikits.plugins.economy.config.ConfigTextDefaults;
 import com.ultikits.plugins.economy.config.EconomyConfig;
 import com.ultikits.plugins.economy.config.ConfigRanges;
+import com.ultikits.plugins.economy.config.RemovedConfigKeys;
 import com.ultikits.plugins.economy.config.StartupWarnings;
 import com.ultikits.plugins.economy.entity.CurrencyBalanceEntity;
 import com.ultikits.plugins.economy.entity.PlayerAccountEntity;
@@ -110,6 +111,10 @@ public class UltiEconomy extends UltiToolsPlugin {
         // they may never have chosen; say so once per boot (maintainer decision 2026-09-23).
         StartupWarnings.log(config, getLogger(), this);
         StartupWarnings.logPrimaryCurrencyConflicts(config, getCurrencyManager(), getLogger(), this);
+        // A setting this module no longer reads that is still in the operator's file is named once per boot.
+        RemovedConfigKeys.warnIfStillPresent(config, getLogger(), this);
+        // A non-primary currency's bank cap that is neither -1 nor above 0 is refused (UltiKits/UltiEconomy#35).
+        StartupWarnings.logRefusedCurrencyBankCaps(getCurrencyManager(), getLogger(), this);
         vaultProvider = new VaultEconomyProvider(economyService, config, this);
 
         Plugin vaultPlugin = Bukkit.getPluginManager().getPlugin("Vault");
