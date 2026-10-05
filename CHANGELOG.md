@@ -10,11 +10,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `economy.money.header`).
-  An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
-  the new keys; until then the renamed messages show the new built-in text. A server whose language
-  files were never edited needs no action.
-- 语言键已从中文句子改为 ASCII 键（例如 `economy.money.header`）。改过本模块 `lang/en.json` 或
-  `lang/zh.json` 的运维需要把改动重新套到新键上；在此之前，这些消息显示新的内置文本。从未改过语言文件的服务器无需任何操作。
+  If you customised this module's messages in your own language file (a copy of an official file under a
+  new name, selected with `language` in `plugins/UltiTools/config.yml`), re-apply those edits to the new
+  keys; until then the renamed messages show the official text. An edit made directly in an official
+  language file (`lang/en.json`, `lang/zh.json`) is not kept: the framework restores the official files at
+  every start and keeps the edited file as `.bak` (UltiKits/UltiTools-Reborn#616). A server that never
+  customised messages needs no action.
+- 语言键已从中文句子改为 ASCII 键（例如 `economy.money.header`）。如果你在自己的语言文件中自定义过本模块的消息（把官方文件复制一份、
+  改名，并在 `plugins/UltiTools/config.yml` 的 `language` 中选择它），请把改动重新套到新键上；在此之前，改名的消息显示官方文本。
+  直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动时恢复官方文件，并把修改过的文件
+  保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
 - **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
   and the leaderboard refresh read their intervals from `interest.interval` and
