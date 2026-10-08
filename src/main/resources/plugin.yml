@@ -3,6 +3,7 @@ version: '${project.version}'
 main: com.ultikits.plugins.economy.UltiEconomy
 base-package: com.ultikits.plugins.economy
 api-version: 630
+identify-string: ultieconomy
 authors: [ wisdomme ]
 depend: [ Vault ]
 softdepend: [ PlaceholderAPI ]

@@ -1,7 +1,7 @@
 # UltiEconomy - 经济模块 / Economy Module
 
-[![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.2.1-blue)](https://github.com/UltiKits/UltiTools-Reborn)
-[![Java](https://img.shields.io/badge/Java-8%2B-orange)](https://openjdk.org/)
+[![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.3.0%2B-blue)](https://github.com/UltiKits/UltiTools-Reborn)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 [![License](https://img.shields.io/badge/License-MIT-green)](../../LICENSE)
 
 A full-featured Vault economy provider for UltiTools-API with dual-wallet (cash + bank), interest mechanics, leaderboard rankings, and PlaceholderAPI integration.
