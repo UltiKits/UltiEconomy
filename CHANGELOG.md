@@ -39,7 +39,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   declare it, so this module now takes part in both (UltiKits/UltiTools-Reborn#474).
 - `plugin.yml` 现在声明 `identify-string: ultieconomy`，即本模块在 UltiCloud 模块目录中的条目键。框架的更新检查和
   `/upm update` 会跳过未声明该键的模块，因此本模块现在会参与两者（UltiKits/UltiTools-Reborn#474）。
-- Why this module is at version 2.0.0 (UltiKits/UltiEconomy#3). The module version follows the rule in
+- Why the released 2.0.0 carries that number (UltiKits/UltiEconomy#3). The module version follows the rule in
   UltiKits/UltiTools-Dev-Doc#7 (the version-number specification) and its criteria list in
   UltiKits/UltiTools-Dev-Doc#12: the question is what the server owner has to do after swapping the JAR,
   and raising the `api-version` floor is a MAJOR change because the owner must upgrade UltiTools first.
@@ -47,14 +47,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`DataOperator.insert` and `DataOperator.update` take `BaseDataEntity` from 6.2.1; they take
   `AbstractDataEntity` in 6.2.0), so it effectively raised the floor above the `620` its `plugin.yml`
   declared. The multi-currency additions alone (defaulted config fields, an automatically created table,
-  an optional currency argument) would have been a MINOR change. The version therefore stays 2.0.0 and is
-  not lowered; the module version only ever increases.
-- 本模块为何是 2.0.0（UltiKits/UltiEconomy#3）。模块版本号遵循 UltiKits/UltiTools-Dev-Doc#7（版本号规范）及其在
+  an optional currency argument) would have been a MINOR change. The released 2.0.0 therefore keeps its
+  number and is not lowered; the module version only ever increases. The next published version raises
+  `api-version` from `620` (as 2.0.0 was released) to `630`, which is a MAJOR change by the same rule; its
+  number is chosen when it is released.
+- 已发布的 2.0.0 为何是这个版本号（UltiKits/UltiEconomy#3）。模块版本号遵循 UltiKits/UltiTools-Dev-Doc#7（版本号规范）及其在
   UltiKits/UltiTools-Dev-Doc#12 中的判据清单：看的是服主换 JAR 之后要做什么，而抬高 `api-version` 地板属于 MAJOR，
   因为服主必须先升级 UltiTools。2.0.0 的 JAR 已经引用了只存在于 UltiTools 6.2.1 起的框架符号
   （`DataOperator.insert` 与 `DataOperator.update` 自 6.2.1 起接收 `BaseDataEntity`，6.2.0 中接收 `AbstractDataEntity`），
   实际上把地板抬到了其 `plugin.yml` 所声明的 `620` 之上。仅就多货币的新增内容（带默认值的配置项、自动建表、可选的货币参数）
-  本应是 MINOR。因此版本号保持 2.0.0，不会降回；模块版本只增不减。
+  本应是 MINOR。因此已发布的 2.0.0 保留其版本号，不会降回；模块版本只增不减。下一个发布版本会把 `api-version` 从
+  `620`（2.0.0 发布时的声明）提高到 `630`，按同一规则属于 MAJOR 变更；其版本号在发布时确定。
 - **Upgrade consequence — interest may start being paid.** `interest.enabled` in
   `config/config.yml` now takes effect (UltiKits/UltiEconomy#15). Previously nothing ever scheduled
   the payment, so no interest was paid on any server whatever the key said. The shipped file said
