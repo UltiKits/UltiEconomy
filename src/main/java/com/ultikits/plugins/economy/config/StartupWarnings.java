@@ -27,8 +27,6 @@ import java.util.Map;
  */
 public final class StartupWarnings {
 
-    /** The module name each warning names. */
-    private static final String MODULE = "UltiEconomy";
 
     /** The file that defines the currencies, relative to the module's config folder. */
     private static final String CURRENCIES_FILE = "config/currencies.yml";
@@ -63,11 +61,11 @@ public final class StartupWarnings {
                     ? String.format(plugin.i18n("economy.warn.interest_cap"), cap)
                     : String.format(plugin.i18n("economy.warn.interest_no_cap"), cap);
             logger.warn(String.format(plugin.i18n("economy.warn.interest_enabled_one_wallet"),
-                    MODULE, file, config.getInterestInterval(), config.getInterestRate(), capText, file,
+                    file, config.getInterestInterval(), config.getInterestRate(), capText, file,
                     RUNTIME_NAME));
         }
         if (!config.isTaxEnabled()) {
-            logger.warn(String.format(plugin.i18n("economy.warn.tax_disabled"), MODULE, file, file, RUNTIME_NAME));
+            logger.warn(String.format(plugin.i18n("economy.warn.tax_disabled"), file, file, RUNTIME_NAME));
         }
     }
 
@@ -141,7 +139,7 @@ public final class StartupWarnings {
             return;
         }
         for (Map.Entry<String, Double> refused : currencies.getRefusedBankCaps()) {
-            logger.warn(String.format(plugin.i18n("economy.warn.currency_value_out_of_range"), MODULE,
+            logger.warn(String.format(plugin.i18n("economy.warn.currency_value_out_of_range"),
                     "currencies." + refused.getKey() + ".max-bank-balance", CURRENCIES_FILE, plain(refused.getValue()),
                     plugin.i18n("economy.warn.range_max_bank_balance"), plain(EconomyConfig.DEFAULT_MAX_BANK_BALANCE)));
         }
@@ -163,7 +161,7 @@ public final class StartupWarnings {
     private static void warnConflict(PluginLogger logger, UltiToolsPlugin plugin, String currenciesKey,
                                      String currenciesValue, String configFile, String configKey, String configValue) {
         logger.warn(String.format(plugin.i18n("economy.warn.primary_currency_setting"),
-                MODULE, CURRENCIES_FILE, currenciesKey, currenciesValue, configFile, configKey, configValue,
+                CURRENCIES_FILE, currenciesKey, currenciesValue, configFile, configKey, configValue,
                 currenciesKey, CURRENCIES_FILE));
     }
 }

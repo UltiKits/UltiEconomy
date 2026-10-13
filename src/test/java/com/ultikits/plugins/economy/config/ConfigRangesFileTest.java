@@ -42,7 +42,7 @@ class ConfigRangesFileTest {
         EconomyConfig config = new EconomyConfig();
         config.init(moduleWithConfigFolder(serverDir.toFile()));
         UltiToolsPlugin plugin = mock(UltiToolsPlugin.class);
-        when(plugin.i18n(anyString())).thenReturn("%s %s %s %s %s %s %s");
+        when(plugin.i18n(anyString())).thenReturn("%s %s %s %s %s %s");
 
         ConfigRanges.enforce(config, mock(PluginLogger.class), plugin);
         config.save();

@@ -9,6 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The start-up and reload warnings no longer begin with a second `UltiEconomy: ` of their own. The framework
+  already writes `[UltiTools-Economy] ` in front of every line this module logs, so a warning now reads
+  `[UltiTools-Economy] tax.enabled is false in config/config.yml, …` instead of
+  `[UltiTools-Economy] UltiEconomy: tax.enabled is false in config/config.yml, …`. A log filter that matched the old
+  `UltiEconomy: ` text should match `[UltiTools-Economy]` instead.
+  启动和重载时的警告不再自带第二个 `UltiEconomy: ` 前缀；框架已在本模块的每一行日志前写上 `[UltiTools-Economy] `。
+
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `economy.money.header`).
   If you customised this module's messages in your own language file -- a copy of an official file
   whose name starts with that file's language code and a hyphen (for example `lang/zh-myserver.json`),

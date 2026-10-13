@@ -23,8 +23,6 @@ import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
  */
 public final class RemovedConfigKeys {
 
-    /** The module name each warning names. */
-    private static final String MODULE = "UltiEconomy";
 
     /**
      * The removed keys, as each path appears in the file, in the order their warnings are logged. Why
@@ -82,7 +80,7 @@ public final class RemovedConfigKeys {
         String file = config.getConfigFilePath();
         for (String removed : REMOVED) {
             if (config.isPresentInFile(removed)) {
-                logger.warn(String.format(plugin.i18n("economy.warn.removed_key"), MODULE, removed, file,
+                logger.warn(String.format(plugin.i18n("economy.warn.removed_key"), removed, file,
                         reasonFor(removed, plugin)));
             }
         }
