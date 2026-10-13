@@ -25,7 +25,6 @@ import java.math.BigDecimal;
  */
 public final class ConfigRanges {
 
-    private static final String MODULE = "UltiEconomy";
     private static final String RUNTIME_NAME = "UltiTools-Economy";
 
     private ConfigRanges() {
@@ -76,7 +75,7 @@ public final class ConfigRanges {
 
     private static void warn(EconomyConfig config, PluginLogger logger, UltiToolsPlugin plugin, String key,
                              double written, String range, double fallback) {
-        logger.warn(String.format(plugin.i18n("economy.warn.value_out_of_range"), MODULE, key,
+        logger.warn(String.format(plugin.i18n("economy.warn.value_out_of_range"), key,
                 config.getConfigFilePath(), plain(written), range, plain(fallback), RUNTIME_NAME));
     }
 

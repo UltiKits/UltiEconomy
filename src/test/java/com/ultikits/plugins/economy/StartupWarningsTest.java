@@ -61,7 +61,7 @@ class StartupWarningsTest {
 
             assertThat(warnings).hasSize(1);
             assertThat(warnings.get(0))
-                    .contains("UltiEconomy")
+                    .doesNotStartWith("UltiEconomy")
                     .contains(CONFIG_FILE)
                     .contains("tax.enabled")
                     .contains("no transaction tax")
@@ -95,7 +95,7 @@ class StartupWarningsTest {
 
             assertThat(warnings).hasSize(1);
             assertThat(warnings.get(0))
-                    .contains("UltiEconomy")
+                    .doesNotStartWith("UltiEconomy")
                     .contains(CONFIG_FILE)
                     .contains("interest.rate = 0.03")
                     .contains("every interest.interval = 1800 seconds")
@@ -209,7 +209,7 @@ class StartupWarningsTest {
             for (String key : new String[] {"tax.wealth-tax.enabled", "tax.wealth-tax.interval", "tax.wealth-tax.exempt-permission"}) {
                 List<String> named = warningsMentioning("'" + key + "'", warnings);
                 assertThat(named).as("warnings naming %s", key).hasSize(1);
-                assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+                assertThat(named.get(0)).doesNotStartWith("UltiEconomy").contains(CONFIG_FILE)
                         .contains("no longer has any effect").contains("never collected").contains("UltiKits/UltiEconomy#38");
             }
         }
@@ -252,7 +252,7 @@ class StartupWarningsTest {
 
             List<String> named = warningsMentioning("'leaderboard.display-count'", warnings);
             assertThat(named).hasSize(1);
-            assertThat(named.get(0)).contains("UltiEconomy").contains(CONFIG_FILE)
+            assertThat(named.get(0)).doesNotStartWith("UltiEconomy").contains(CONFIG_FILE)
                     .contains("no longer has any effect").contains("%ultieconomy_top_name_<N>%");
             // Control: the live interval key beside it is not called dead.
             assertThat(warningsMentioning("'leaderboard.update-interval'", warnings)).isEmpty();
@@ -280,7 +280,7 @@ class StartupWarningsTest {
             for (String warning : warnings) {
                 assertThat(warning).as(warning).matches("(?s).*\\p{IsHan}.*")
                         .doesNotContain("so interest is paid").doesNotContain("so no tax is collected")
-                        .contains("UltiEconomy").contains(CONFIG_FILE);
+                        .doesNotStartWith("UltiEconomy").contains(CONFIG_FILE);
             }
             assertThat(warnings.get(0)).contains("interest.enabled: false").contains("/ul reload UltiTools-Economy");
             assertThat(warnings.get(1)).contains("tax.enabled: true").contains("/ul reload UltiTools-Economy");
@@ -312,13 +312,13 @@ class StartupWarningsTest {
 
             String text = CatalogueText.text("en", "economy.warn.primary_currency_setting");
             assertThat(warnings).containsExactly(
-                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.initial-cash", "250.0",
+                    String.format(text, "config/currencies.yml", "currencies.coins.initial-cash", "250.0",
                             CONFIG_FILE, "initial-cash", "1000.0", "currencies.coins.initial-cash", "config/currencies.yml"),
-                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.bank-enabled", "false",
+                    String.format(text, "config/currencies.yml", "currencies.coins.bank-enabled", "false",
                             CONFIG_FILE, "bank.enabled", "true", "currencies.coins.bank-enabled", "config/currencies.yml"),
-                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.min-deposit", "50.0",
+                    String.format(text, "config/currencies.yml", "currencies.coins.min-deposit", "50.0",
                             CONFIG_FILE, "bank.min-deposit", "100.0", "currencies.coins.min-deposit", "config/currencies.yml"),
-                    String.format(text, "UltiEconomy", "config/currencies.yml", "currencies.coins.max-bank-balance", "5000.0",
+                    String.format(text, "config/currencies.yml", "currencies.coins.max-bank-balance", "5000.0",
                             CONFIG_FILE, "bank.max-balance", "-1.0", "currencies.coins.max-bank-balance", "config/currencies.yml"));
             assertThat(warnings.get(2)).contains("bank.min-deposit = 100.0 applies");
         }
