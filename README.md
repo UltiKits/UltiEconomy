@@ -84,7 +84,7 @@ tax:
 - `@CmdExecutor` / `@CmdMapping` command system
 - `@ConfigEntity` / `@ConfigEntry` config management
 - Config-bound `@Scheduled` (UltiTools 6.3.0) for the interest payment and the leaderboard refresh
-- `AbstractDataEntity` + `@Table` / `@Column` ORM
+- `BaseDataEntity<String>` + `@Table` / `@Column` ORM
 - Query DSL (`operator.query().where("x").eq(y).list()`)
 - `DataOperator<T>` for account persistence
 - `UltiToolsPlugin.i18n()` for translations
