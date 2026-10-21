@@ -5,7 +5,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
-## [Unreleased]
+## [3.0.0] - 2026-10-21
 
 ### Changed
 
@@ -15,6 +15,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `[UltiTools-Economy] UltiEconomy: tax.enabled is false in config/config.yml, …`. A log filter that matched the old
   `UltiEconomy: ` text should match `[UltiTools-Economy]` instead.
   启动和重载时的警告不再自带第二个 `UltiEconomy: ` 前缀；框架已在本模块的每一行日志前写上 `[UltiTools-Economy] `。
+  匹配旧 `UltiEconomy: ` 文本的日志过滤器应改为匹配 `[UltiTools-Economy]`。
 
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `economy.money.header`).
   If you customised this module's messages in your own language file -- a copy of an official file
@@ -33,12 +34,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动以及每次模块重载时恢复官方文件，并把修改过的文件
   保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
-- **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
+- **Requires UltiTools 6.3.0.** `plugin.yml` raises `api-version` from `620` in the released 2.0.0
+  to `630`. The interest payment
   and the leaderboard refresh read their intervals from `interest.interval` and
   `leaderboard.update-interval` through a framework feature added in UltiTools 6.3.0
   (UltiKits/UltiTools-Reborn#531). UltiTools 6.2.x refuses to load this module because of that
   `api-version`.
-- **需要 UltiTools 6.3.0。** `plugin.yml` 现声明 `api-version: 630`。利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
+- **需要 UltiTools 6.3.0。** `plugin.yml` 将 `api-version` 从已发布的 2.0.0 中的 `620` 提高到 `630`。
+  利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
   （UltiKits/UltiTools-Reborn#531）从 `interest.interval` 与 `leaderboard.update-interval` 读取间隔。UltiTools 6.2.x
   会因该 `api-version` 拒绝加载本模块。
 - `plugin.yml` now declares `identify-string: ultieconomy`, the key of this module's entry in the
@@ -55,16 +58,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `AbstractDataEntity` in 6.2.0), so it effectively raised the floor above the `620` its `plugin.yml`
   declared. The multi-currency additions alone (defaulted config fields, an automatically created table,
   an optional currency argument) would have been a MINOR change. The released 2.0.0 therefore keeps its
-  number and is not lowered; the module version only ever increases. The next published version raises
-  `api-version` from `620` (as 2.0.0 was released) to `630`, which is a MAJOR change by the same rule; its
-  number is chosen when it is released.
+  number and is not lowered; the module version only ever increases. Version 3.0.0 raises
+  `api-version` from `620` (as 2.0.0 was released) to `630`, which is a MAJOR change by the same rule.
 - 已发布的 2.0.0 为何是这个版本号（UltiKits/UltiEconomy#3）。模块版本号遵循 UltiKits/UltiTools-Dev-Doc#7（版本号规范）及其在
   UltiKits/UltiTools-Dev-Doc#12 中的判据清单：看的是服主换 JAR 之后要做什么，而抬高 `api-version` 地板属于 MAJOR，
   因为服主必须先升级 UltiTools。2.0.0 的 JAR 已经引用了只存在于 UltiTools 6.2.1 起的框架符号
   （`DataOperator.insert` 与 `DataOperator.update` 自 6.2.1 起接收 `BaseDataEntity`，6.2.0 中接收 `AbstractDataEntity`），
   实际上把地板抬到了其 `plugin.yml` 所声明的 `620` 之上。仅就多货币的新增内容（带默认值的配置项、自动建表、可选的货币参数）
-  本应是 MINOR。因此已发布的 2.0.0 保留其版本号，不会降回；模块版本只增不减。下一个发布版本会把 `api-version` 从
-  `620`（2.0.0 发布时的声明）提高到 `630`，按同一规则属于 MAJOR 变更；其版本号在发布时确定。
+  本应是 MINOR。因此已发布的 2.0.0 保留其版本号，不会降回；模块版本只增不减。3.0.0 将 `api-version` 从
+  `620`（2.0.0 发布时的声明）提高到 `630`，按同一规则属于 MAJOR 变更。
 - **Upgrade consequence — interest may start being paid.** `interest.enabled` in
   `config/config.yml` now takes effect (UltiKits/UltiEconomy#15). Previously nothing ever scheduled
   the payment, so no interest was paid on any server whatever the key said. The shipped file said
@@ -223,16 +225,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   从未收取过任何税款：从未被调度、从未扣款，也没有定义税率档位的设置。仍含有这些键的 `config.yml` 会在启动时每个键给出一条
   警告，说明它已不再起作用、可以删除；文件不会被修改。财富税本身作为功能请求排到以后的版本（UltiKits/UltiEconomy#38；
   维护者 2026-09-29 的决定，UltiKits/UltiEconomy#27）。
-
-- Twenty-two language entries that no code displayed were removed from both language files: thirteen
-  near-duplicates of the command messages above that carried one `%s` too many (the reason those
-  messages never matched), and nine that no version of this module ever referenced (a leaderboard
-  line and title, a transaction-tax, a wealth-tax and a wealth-tax-exemption message, a current
-  currency line, a bank-not-supported message, a players-only message and an `/eco` usage line).
-  Nothing an operator or player sees changes.
-- 从两份语言文件中删除了二十二条从未被显示的条目：十三条是上述命令消息多带一个 `%s` 的近似副本（正是这些消息从未匹配的原因），
-  另外九条从未被本模块任何版本引用（排行榜行与标题、交易税、财富税与财富税豁免消息、当前货币行、货币不支持银行功能、仅限玩家执行的提示、
-  `/eco` 用法行）。运维和玩家看到的内容没有任何变化。
 
 ### Fixed
 
