@@ -5,7 +5,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
-## [Unreleased]
+## [3.0.0] - 2026-10-21
 
 ### Changed
 
@@ -15,6 +15,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `[UltiTools-Economy] UltiEconomy: tax.enabled is false in config/config.yml, …`. A log filter that matched the old
   `UltiEconomy: ` text should match `[UltiTools-Economy]` instead.
   启动和重载时的警告不再自带第二个 `UltiEconomy: ` 前缀；框架已在本模块的每一行日志前写上 `[UltiTools-Economy] `。
+  匹配旧 `UltiEconomy: ` 文本的日志过滤器应改为匹配 `[UltiTools-Economy]`。
 
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `economy.money.header`).
   If you customised this module's messages in your own language file -- a copy of an official file
@@ -33,12 +34,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动以及每次模块重载时恢复官方文件，并把修改过的文件
   保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
-- **Requires UltiTools 6.3.0.** `plugin.yml` now declares `api-version: 630`. The interest payment
+- **Requires UltiTools 6.3.0.** `plugin.yml` raises `api-version` from `620` in the released 2.0.0
+  to `630`. The interest payment
   and the leaderboard refresh read their intervals from `interest.interval` and
   `leaderboard.update-interval` through a framework feature added in UltiTools 6.3.0
   (UltiKits/UltiTools-Reborn#531). UltiTools 6.2.x refuses to load this module because of that
   `api-version`.
-- **需要 UltiTools 6.3.0。** `plugin.yml` 现声明 `api-version: 630`。利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
+- **需要 UltiTools 6.3.0。** `plugin.yml` 将 `api-version` 从已发布的 2.0.0 中的 `620` 提高到 `630`。
+  利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
   （UltiKits/UltiTools-Reborn#531）从 `interest.interval` 与 `leaderboard.update-interval` 读取间隔。UltiTools 6.2.x
   会因该 `api-version` 拒绝加载本模块。
 - `plugin.yml` now declares `identify-string: ultieconomy`, the key of this module's entry in the
@@ -55,26 +58,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `AbstractDataEntity` in 6.2.0), so it effectively raised the floor above the `620` its `plugin.yml`
   declared. The multi-currency additions alone (defaulted config fields, an automatically created table,
   an optional currency argument) would have been a MINOR change. The released 2.0.0 therefore keeps its
-  number and is not lowered; the module version only ever increases. The next published version raises
-  `api-version` from `620` (as 2.0.0 was released) to `630`, which is a MAJOR change by the same rule; its
-  number is chosen when it is released.
+  number and is not lowered; the module version only ever increases. Version 3.0.0 raises
+  `api-version` from `620` (as 2.0.0 was released) to `630`, which is a MAJOR change by the same rule.
 - 已发布的 2.0.0 为何是这个版本号（UltiKits/UltiEconomy#3）。模块版本号遵循 UltiKits/UltiTools-Dev-Doc#7（版本号规范）及其在
   UltiKits/UltiTools-Dev-Doc#12 中的判据清单：看的是服主换 JAR 之后要做什么，而抬高 `api-version` 地板属于 MAJOR，
   因为服主必须先升级 UltiTools。2.0.0 的 JAR 已经引用了只存在于 UltiTools 6.2.1 起的框架符号
   （`DataOperator.insert` 与 `DataOperator.update` 自 6.2.1 起接收 `BaseDataEntity`，6.2.0 中接收 `AbstractDataEntity`），
   实际上把地板抬到了其 `plugin.yml` 所声明的 `620` 之上。仅就多货币的新增内容（带默认值的配置项、自动建表、可选的货币参数）
-  本应是 MINOR。因此已发布的 2.0.0 保留其版本号，不会降回；模块版本只增不减。下一个发布版本会把 `api-version` 从
-  `620`（2.0.0 发布时的声明）提高到 `630`，按同一规则属于 MAJOR 变更；其版本号在发布时确定。
+  本应是 MINOR。因此已发布的 2.0.0 保留其版本号，不会降回；模块版本只增不减。3.0.0 将 `api-version` 从
+  `620`（2.0.0 发布时的声明）提高到 `630`，按同一规则属于 MAJOR 变更。
 - **Upgrade consequence — interest may start being paid.** `interest.enabled` in
   `config/config.yml` now takes effect (UltiKits/UltiEconomy#15). Previously nothing ever scheduled
   the payment, so no interest was paid on any server whatever the key said. The shipped file said
   `interest.enabled: true` in both 1.0.0 and 2.0.0, so every server that has run either holds `true`
   unless its operator changed it — **on such a server, upgrading starts paying interest, which creates money**:
   every `interest.interval` seconds (the first payment one interval after the module loads), a player's primary-currency bank balance — the one `/bank`, `/money`, `/eco check <player>`
-  and Vault show, paid once per player and not also on the separate per-currency row that
-  `/bank <primary currency>` shows (UltiKits/UltiEconomy#25) — and their bank balance in every other
+  and Vault show, also when `/bank <primary currency>` names it, paid once per player and not
+  also on any remaining old primary-currency row (UltiKits/UltiEconomy#25) — and their bank balance in every other
   currency with `bank-enabled: true` in `config/currencies.yml` each earn `interest.rate` of itself (`0.03`, 3%, by
-  default), capped at `interest.max-interest` per payment (`10000.0` by default; `-1` means no cap)
+  default), capped per payment only when `interest.max-interest` is above 0 (`10000.0` by default;
+  both `0` and `-1` mean no per-payment cap, not disabled interest)
   and never taking a balance above its bank maximum (`bank.max-balance`, or the currency's own
   `max-bank-balance`, when set above 0 — a balance already at the maximum earns nothing), and an
   online player is told in chat once the credit has been written. **If several servers share one
@@ -99,10 +102,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （UltiKits/UltiEconomy#15）。此前从未有任何代码调度利息发放，因此无论该键如何设置，任何服务器上都从未发放过利息。
   1.0.0 与 2.0.0 的出厂文件都写的是 `interest.enabled: true`，所以所有运行过其中任一版本的服务器，除非运维改过，文件里都是 `true`——
   **这样的服务器升级后开始发放利息，这会凭空产生货币**：每 `interest.interval` 秒（模块加载后满一个间隔首次发放），
-  玩家的主货币银行余额——即 `/bank`、`/money`、`/eco check <玩家>` 与 Vault 显示的那一个，每名玩家只计一次，
-  不会再对 `/bank <主货币>` 显示的那一行单独货币余额重复计息（UltiKits/UltiEconomy#25）——以及其在 `config/currencies.yml`
+  玩家的主货币银行余额——即 `/bank`、`/money`、`/eco check <玩家>` 与 Vault 显示的那一个，`/bank <主货币>` 显示的也是它；
+  每名玩家只计一次，不会再对任何残留的旧主货币记录重复计息（UltiKits/UltiEconomy#25）——以及其在 `config/currencies.yml`
   中其他所有 `bank-enabled: true` 货币的银行余额，各自获得其自身
-  `interest.rate`（默认 `0.03`，即 3%）的利息，单次上限为 `interest.max-interest`（默认 `10000.0`；`-1` 表示无上限），
+  `interest.rate`（默认 `0.03`，即 3%）的利息，仅在 `interest.max-interest` 大于 0 时按其限制单次利息（默认 `10000.0`；
+  `0` 与 `-1` 均表示不设单次上限，而不是停发利息），
   且不会使余额超过其银行上限（`bank.max-balance`，或该货币自己的 `max-bank-balance`，大于 0 时生效——已达上限的余额不再获得利息），
   利息写入成功后在线玩家才会收到聊天提示。**若多台服务器共用同一个数据库，每台开启利息的服务器都会对其中每个余额按全额利率发放：
   请只在其中一台上开启利息。** 以文件中的值为准。该值为 `true` 时，本模块每次启动都会记录一条 WARNING，点名利率、间隔、上限与共用数据库的规则。
@@ -145,20 +149,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   given `initial-cash` once. The primary currency's starting cash, bank switch (for deposits and
   withdrawals alike), minimum deposit and maximum bank balance are read from `config/config.yml`; the primary entry's `initial-cash`,
   `bank-enabled`, `min-deposit` and `max-bank-balance` in `config/currencies.yml` are no longer read
-  (its `display-name` and `symbol` still are). Every other currency keeps its own wallet.
+  (its display name and symbol also come from `config/config.yml`'s `currency-name` and
+  `currency-symbol`, not that entry's `display-name` and `symbol`). Every other currency keeps its own wallet.
 - **主货币现在只有一个钱包**（UltiKits/UltiEconomy#25）。自 2.0.0 起，每位玩家还有第二个主货币钱包，首次进服时按其自身的
   初始金额入账。带货币名的命令与占位符——`/money coins`、`/bank coins`、`/pay <玩家> <金额> coins`、`/deposit <金额> coins`、
   `/withdraw <金额> coins`、`/eco give|take|set|check <玩家> … coins`、`/note <金额> coins`、`%ultieconomy_coins_*%` 以及
   `coins` 排行榜——使用的是这第二个钱包，而 Vault、`/money`、`/pay`、`/bank` 使用账户钱包。现在它们全部使用账户钱包，
   新玩家首次进服只获得一次 `initial-cash`。主货币的初始金额、银行开关（存款与取款都受其约束）、最低存款与银行上限读取 `config/config.yml`；
   `config/currencies.yml` 中主货币条目的 `initial-cash`、`bank-enabled`、`min-deposit`、`max-bank-balance` 不再被读取
-  （其 `display-name` 与 `symbol` 仍被读取）。其他货币仍各自拥有独立的钱包。
+  （显示名称和符号也取自 `config/config.yml` 的 `currency-name` 与 `currency-symbol`，而非该条目的 `display-name` 与 `symbol`）。
+  其他货币仍各自拥有独立的钱包。
 
-- **Upgrade consequence — the second wallet is merged once** (UltiKits/UltiEconomy#25). On the first
-  start after upgrading, before anything can read or move a balance, each player's second
-  primary-currency wallet is added to their account wallet — its cash to their cash, its bank balance
-  to their bank balance — and then removed. The server log gets one line per merged player with the
-  amounts and the new balances, and one total line. A later start finds nothing to merge. Nobody's
+- **Upgrade consequence — the second wallet is merged where possible** (UltiKits/UltiEconomy#25). On the first
+  start after upgrading, before anything can read or move a balance, the module attempts to add each
+  player's second primary-currency wallet to their account wallet — its cash to their cash, its bank
+  balance to their bank balance — and removes each successfully merged second wallet. If the sum cannot
+  be stored exactly, nothing is moved for that player: a warning is logged and the second wallet is
+  kept for an operator to settle. The module still starts, and primary-currency commands and Vault
+  use the account wallet, not the unmerged second wallet. The server log gets one line per merged
+  player with the amounts and the new balances, and one total line including the unmerged count.
+  A later start can still find unmerged wallets; it finds nothing to merge only if none remain. Nobody's
   balance goes down: an amount below zero in a second wallet (which no command of this module can
   produce) is not taken from the account, and is logged. A merged bank balance may end above
   `bank.max-balance`; deposits and interest then stop at the cap as before. **Known trade-off:** the
@@ -179,9 +189,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   servers at all (each keeps its own copy of the records). While a player's merge is in progress,
   their second-wallet rows carry a `currency_id` starting with `~merging-into-account.marker:`, which
   no currency can have (a `.` in a `currencies.yml` key nests the key).
-- **升级后果——第二钱包一次性并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，每位玩家的
-  第二个主货币钱包会并入其账户钱包——现金并入现金，存款并入存款——随后删除。服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），
-  并记录一行总计。之后的启动不会再合并任何内容。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
+- **升级后果——第二钱包在可合并时并入**（UltiKits/UltiEconomy#25）。升级后首次启动时，在任何余额可以被读取或变动之前，模块会尝试将每位玩家的
+  第二个主货币钱包并入其账户钱包——现金并入现金，存款并入存款——成功合并的第二钱包随后删除。若总和无法被精确存储，该玩家的金额不会被转移：
+  模块记录警告，保留第二钱包等待运维处理。模块仍会启动，主货币命令与 Vault 使用账户钱包，而非未合并的第二钱包。
+  服务器日志为每位被合并的玩家记录一行（含金额与合并后余额），并记录包含未合并人数的一行总计。
+  之后的启动仍可能发现未合并的钱包；只有没有残留时才无内容可合并。没有人的余额会减少：第二钱包中低于零的金额（本模块的任何命令都无法产生）不会从账户扣除，
   并会记入日志。合并后的存款可能高于 `bank.max-balance`；此后存款与利息照旧在上限处停止。**已知取舍：** 2.0.0 重复发放的初始金额会继续流通——
   在一台 103 名玩家的测试服务器上，共并入 103,588.95，其中 101,000 是从未动用的重复初始金额。若合并过程中存储出错，模块不会启动
   （因此任何余额都不会变化）；修复存储后重启，合并会从中断处继续，不会重复并入。使用 SQLite 与 MySQL 时，
@@ -223,16 +235,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   从未收取过任何税款：从未被调度、从未扣款，也没有定义税率档位的设置。仍含有这些键的 `config.yml` 会在启动时每个键给出一条
   警告，说明它已不再起作用、可以删除；文件不会被修改。财富税本身作为功能请求排到以后的版本（UltiKits/UltiEconomy#38；
   维护者 2026-09-29 的决定，UltiKits/UltiEconomy#27）。
-
-- Twenty-two language entries that no code displayed were removed from both language files: thirteen
-  near-duplicates of the command messages above that carried one `%s` too many (the reason those
-  messages never matched), and nine that no version of this module ever referenced (a leaderboard
-  line and title, a transaction-tax, a wealth-tax and a wealth-tax-exemption message, a current
-  currency line, a bank-not-supported message, a players-only message and an `/eco` usage line).
-  Nothing an operator or player sees changes.
-- 从两份语言文件中删除了二十二条从未被显示的条目：十三条是上述命令消息多带一个 `%s` 的近似副本（正是这些消息从未匹配的原因），
-  另外九条从未被本模块任何版本引用（排行榜行与标题、交易税、财富税与财富税豁免消息、当前货币行、货币不支持银行功能、仅限玩家执行的提示、
-  `/eco` 用法行）。运维和玩家看到的内容没有任何变化。
 
 ### Fixed
 
@@ -332,12 +334,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   显示它们的地方都是如此。`currencies.yml` 中主货币那一条跟随它，若在那里写了不同的 `display-name` 或 `symbol`，启动
   时会发出警告。`currency-name` 仍为出厂的 `Coins` 时，会按服务器语言写入（`language: zh` 下为 `金币`）。此前两个文件由
   不同代码路径读取，只改其中一个只会影响一半的输出（UltiKits/UltiEconomy#32）。
-- `interest.rate` must now be from 0 to 1 and `interest.max-interest` must be -1 (no cap) or at least 0.
+- `interest.rate` must now be from 0 to 1 and `interest.max-interest` must be -1 or at least 0.
+  Both `0` and `-1` mean no per-payment cap; only a positive value caps the payment. To stop paying
+  interest, set `interest.enabled: false` and run `/ul reload UltiTools-Economy`.
   A value outside its range is not used: the default (`0.03`, `10000`) is, with a warning naming the
   key, the value as written and the default, at start-up and after every reload. Previously any value
   was used, so a typo such as `rate: 3` paid 300% per payment (UltiKits/UltiEconomy#29).
-- `interest.rate` 现在必须在 0 到 1 之间，`interest.max-interest` 必须为 -1（不设上限）或不小于 0。超出范围的值不会被
-  使用，而是改用默认值（`0.03`、`10000`），并在启动与每次重载后发出警告，写明配置项、原值和默认值。此前任何值都会被
+- `interest.rate` 现在必须在 0 到 1 之间，`interest.max-interest` 必须为 -1 或不小于 0。
+  `0` 与 `-1` 均表示不设单次上限；只有正值会限制单次利息。要停发利息，请设置 `interest.enabled: false` 并执行 `/ul reload UltiTools-Economy`。
+  超出范围的值不会被使用，而是改用默认值（`0.03`、`10000`），并在启动与每次重载后发出警告，写明配置项、原值和默认值。此前任何值都会被
   直接使用，`rate: 3` 这样的笔误会让每次付息 300%（UltiKits/UltiEconomy#29）。
 - Unloading this module (`/upm uninstall UltiTools-Economy`) now also unregisters its PlaceholderAPI
   expansion; `%ultieconomy_...%` placeholders used to keep answering from the unloaded module until a
