@@ -30,13 +30,15 @@ If the database connection fails during commit, both wallets may already have ch
 
 数据库连接在提交时失败，可能出现双方余额已改变、调用方却收到错误的情况。重试前请先核对双方余额；模块不会对提交结果未知的事务自动重试或退款。
 
-## Transfer failure limitations / 转账失败限制
+## Transfer and redemption failure feedback / 转账与兑换失败提示
 
-A failed `/pay` receiver credit with an acknowledged refund reports `Operation failed`, or the existing busy message when another server keeps changing the receiver's balance. If the refund also fails, the sender instead sees `Transfer not completed. Please contact an administrator to check your balance.` (`转账未完成。请联系管理员核查你的余额。` under `language: zh`), even if the credit or refund failed through contention. This warning does not claim a refund or that an administrator was notified. The server still logs both players (names and UUIDs), the amount, the currency and the failed refund for an operator to reconcile. A non-busy failed note redemption reports `Operation failed` and keeps the note. Failure replies do not prove the storage outcome: **check both balances and the server log before paying again** (#45).
+A failed `/pay` receiver credit rolls back both wallets and reports `Operation failed`, or the existing busy message when the credit exhausts conditional-write retries. An unaffordable debit still reports `Insufficient balance`. There is no compensating refund or refund-failed state. A non-busy failed note redemption reports `Operation failed` and keeps the note (#45).
 
-Transfers are separate conditional debit and credit writes, not a cross-row transaction (#44). Besides a process stopping between them, a database connection can fail **after a credit or refund committed but before its acknowledgement arrived**. The module cannot tell that apart from a write that failed before committing. Its attempted compensation can then duplicate money, or a refund's outcome can be uncertain. After such a storage error, operators should compare the sender's and receiver's balances with the database's transaction/audit records and reconcile once before allowing a retry; do not blindly repeat the payment or apply another refund (#45).
+These replies do not redefine the transaction limits above: tax collection is separate, independent Vault calls are not atomic transfers, and a JDBC commit acknowledgement failure can leave both wallets committed despite an error. Operators should check both balances and database transaction/audit records before retrying an uncertain commit; do not blindly repeat the payment or apply a manual refund.
 
-接收方入账失败、退款收到写入成功确认时，`/pay` 提示“操作失败”；若入账失败是其他服务器持续修改收款方余额所致，则仍提示稍后再试。退款也失败时，付款人改为收到“转账未完成。请联系管理员核查你的余额。”，即使入账或退款因争用失败也优先显示此警告，不承诺已退款或已通知管理员。控制台继续记录双方姓名与 UUID、金额、货币及退款失败步骤，供管理员人工核对。纸币兑换非繁忙失败时仍提示“操作失败”，并保留纸币。失败提示不代表存储结果确定：**再次付款前先核对双方余额及服务器日志**。转账扣款与入账不是同一个事务；若数据库已提交入账或退款、但确认响应丢失，程序无法区分是否提交，补偿可能造成重复金额或退款结果不确定。遇到这类存储错误，管理员应结合数据库事务或审计记录核对并只补偿一次，不要盲目重付或再次退款。
+`/pay` 的接收方入账失败会回滚双方钱包，并提示“操作失败”；条件写入重试耗尽时保留繁忙提示。余额确实不足时仍提示“余额不足”。不再执行补偿退款，也没有退款失败状态。纸币兑换非繁忙失败时提示“操作失败”，并保留纸币（#45）。
+
+这些提示不改变上文的事务限制：国库税款另行入账，独立的 Vault 调用不构成原子转账，JDBC 提交确认失败时双方钱包仍可能已提交。提交结果未知时，管理员应结合数据库事务或审计记录核对双方余额，再决定是否重试；不要盲目重付或人工退款。
 
 ## Commands / 命令
 
