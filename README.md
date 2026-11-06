@@ -30,6 +30,14 @@ If the database connection fails during commit, both wallets may already have ch
 
 数据库连接在提交时失败，可能出现双方余额已改变、调用方却收到错误的情况。重试前请先核对双方余额；模块不会对提交结果未知的事务自动重试或退款。
 
+## Transfer failure limitations / 转账失败限制
+
+A failed `/pay` receiver credit reports `Operation failed`, or the existing busy message when another server keeps changing the balance. A non-busy failed note redemption also reports `Operation failed` and keeps the note. These messages do not prove that a transfer was refunded: **check both balances and the server log before paying again**. If a refund cannot be written, the server logs both players, the amount and the currency for an operator to reconcile manually; there is not yet a separate player message for that case (#45).
+
+Transfers are separate conditional debit and credit writes, not a cross-row transaction (#44). Besides a process stopping between them, a database connection can fail **after a credit or refund committed but before its acknowledgement arrived**. The module cannot tell that apart from a write that failed before committing. Its attempted compensation can then duplicate money, or a refund's outcome can be uncertain. After such a storage error, operators should compare the sender's and receiver's balances with the database's transaction/audit records and reconcile once before allowing a retry; do not blindly repeat the payment or apply another refund (#45).
+
+接收方入账失败时，`/pay` 提示“操作失败”；若其他服务器持续修改余额，则仍提示稍后再试。纸币兑换非繁忙失败时也提示“操作失败”，并保留纸币。这些提示不代表转账一定已退款：**再次付款前先核对双方余额及服务器日志**。退款写入失败会记录双方、金额和货币，供管理员人工核对，目前没有单独的玩家提示。转账扣款与入账不是同一个事务；若数据库已提交入账或退款、但确认响应丢失，程序无法区分是否提交，补偿可能造成重复金额或退款结果不确定。遇到这类存储错误，管理员应结合数据库事务或审计记录核对并只补偿一次，不要盲目重付或再次退款。
+
 ## Commands / 命令
 
 | Command | Description | Permission |

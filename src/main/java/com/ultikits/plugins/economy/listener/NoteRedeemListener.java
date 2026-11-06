@@ -79,9 +79,10 @@ public class NoteRedeemListener implements Listener {
             String formatted = economyService.formatAmount(value, currencyId);
             player.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.note.redeemed"), formatted));
-        } else if (economyService.isLastChangeBusy()) {
-            // Another server kept changing the balance on every attempt (UltiKits/UltiEconomy#41): the note is kept.
-            player.sendMessage(ChatColor.RED + plugin.i18n("economy.error.busy"));
+        } else {
+            // Failed credits keep the note, whether busy or refused for another reason (#45).
+            player.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy()
+                    ? plugin.i18n("economy.error.busy") : plugin.i18n("economy.error.operation_failed")));
         }
 
         event.setCancelled(true);
