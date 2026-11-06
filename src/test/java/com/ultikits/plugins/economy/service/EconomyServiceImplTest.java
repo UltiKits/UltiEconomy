@@ -68,7 +68,9 @@ class EconomyServiceImplTest {
             "    primary: false\n";
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        lenient().when(dataOperator.transaction(any(java.util.concurrent.Callable.class))).thenCallRealMethod();
+        lenient().when(currencyDataOperator.transaction(any(java.util.concurrent.Callable.class))).thenCallRealMethod();
         config = new EconomyConfig();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new StringReader(CURRENCIES_YAML));
         currencyManager = new CurrencyManager(yaml);
@@ -594,8 +596,8 @@ class EconomyServiceImplTest {
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 300);
 
             assertThat(result).isFalse();
-            assertThat(sender.getCash()).isEqualTo(1000.0);
-            verify(dataOperator, times(2)).updateIf(eq(sender), any(WhereCondition[].class));
+            // The transaction owns rollback; detached mock entities are not the stored state.
+            verify(dataOperator, times(1)).updateIf(eq(sender), any(WhereCondition[].class));
         }
 
         @Test
@@ -698,8 +700,8 @@ class EconomyServiceImplTest {
             boolean result = service.transfer(PLAYER_UUID, OTHER_UUID, 200.0, "gems");
 
             assertThat(result).isFalse();
-            assertThat(sender.getCash()).isEqualTo(500.0);
-            verify(currencyDataOperator, times(2)).updateIf(eq(sender), any(WhereCondition[].class));
+            // No compensating write; AtomicTransferTest asserts real persisted rollback.
+            verify(currencyDataOperator, times(1)).updateIf(eq(sender), any(WhereCondition[].class));
         }
 
         @Test
@@ -1306,8 +1308,8 @@ class EconomyServiceImplTest {
             when(dataOperator.updateIf(eq(receiver), any(WhereCondition[].class))).thenReturn(false);
 
             assertThat(service.transfer(PLAYER_UUID, OTHER_UUID, 300)).isFalse();
-            assertThat(sender.getCash()).isEqualTo(1000.0);
-            verify(dataOperator, times(2)).updateIf(eq(sender), any(WhereCondition[].class));
+            // The transaction owns rollback; detached mock entities are not the stored state.
+            verify(dataOperator, times(1)).updateIf(eq(sender), any(WhereCondition[].class));
         }
 
         @Test

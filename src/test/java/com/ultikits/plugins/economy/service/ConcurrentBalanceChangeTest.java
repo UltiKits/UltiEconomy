@@ -169,12 +169,7 @@ class ConcurrentBalanceChangeTest {
         }
     }
 
-    /**
-     * Gate-1 top-up F-E2 and F-E3 (maintainer decision 2026-10-04). A transfer debits first and credits
-     * second. When the credit throws a storage error (not just is refused) after the debit committed, the
-     * same conditional refund runs; and when the refund itself cannot be written, one error line names
-     * both players, the amount and the currency, so an operator can restore it by hand.
-     */
+    /** Transfer faults abort the transaction; no compensating refund is needed (#44). */
     @Nested
     @DisplayName("transfer faults after the debit")
     class TransferFaults {
@@ -207,29 +202,23 @@ class ConcurrentBalanceChangeTest {
         }
 
         @Test
-        @DisplayName("when the credit and then the refund both cannot be written, one error line names both players, the amount and the currency")
-        void aLostRefundIsNamedForTheOperator() {
+        @DisplayName("a receiver removed before credit aborts the debit")
+        void aMissingReceiverRollsBackTheDebit() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.config.setTaxEnabled(false);
             world.seedAccount(STEVE, "Steve", 1000.0, 0.0);
             world.seedAccount(ALEX, "Alex", 0.0, 0.0);
-            // Before the credit, Alex's row is removed by another writer; before the refund, Steve's is.
             EconomyServiceImpl a = EconomyServiceImpl.createForTest(world.plugin, faultyAt(world, 2, () -> {
                 world.accounts.delById(world.account(ALEX).getId());
-                world.accounts.delById(world.account(STEVE).getId());
             }), world.config, world.balances, world.currencies);
 
             assertThat(a.transfer(STEVE, ALEX, 100.0)).isFalse();
-
-            ArgumentCaptor<String> line = ArgumentCaptor.forClass(String.class);
-            verify(world.logger, atLeastOnce()).error(line.capture());
-            assertThat(line.getAllValues()).anySatisfy(l -> assertThat(l)
-                    .contains("Steve").contains("Alex").contains("100").contains("coins"));
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1000.0);
         }
 
         @Test
-        @DisplayName("when the credit and then the refund both throw a storage error, the transfer is refused, nothing is thrown, and the lost refund is named")
-        void aThrowingRefundIsNamedForTheOperator() {
+        @DisplayName("a persistent credit error rolls back without a third write")
+        void aPersistentCreditErrorNeedsNoRefund() {
             EconomyTestWorld world = EconomyTestWorld.relational();
             world.config.setTaxEnabled(false);
             world.seedAccount(STEVE, "Steve", 1000.0, 0.0);
@@ -246,10 +235,9 @@ class ConcurrentBalanceChangeTest {
 
             assertThat(a.transfer(STEVE, ALEX, 100.0)).isFalse();
 
-            ArgumentCaptor<String> line = ArgumentCaptor.forClass(String.class);
-            verify(world.logger, atLeastOnce()).error(line.capture());
-            assertThat(line.getAllValues()).anySatisfy(l -> assertThat(l)
-                    .contains("Steve").contains("Alex").contains("100").contains("coins"));
+            assertThat(writes[0]).isEqualTo(2);
+            assertThat(world.account(STEVE).getCash()).isEqualTo(1000.0);
+            assertThat(world.account(ALEX).getCash()).isEqualTo(0.0);
         }
     }
 

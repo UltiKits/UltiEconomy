@@ -157,6 +157,30 @@ public final class InMemoryDataOperator<T extends BaseDataEntity<String>> implem
         return out;
     }
 
+    /**
+     * Callback rollback for single-threaded service tests. This snapshot helper is not an isolation
+     * or crash-durability model; AtomicTransferTest uses the actual framework JSON transaction.
+     */
+    @Override
+    public <R> R transaction(java.util.concurrent.Callable<R> action) throws Exception {
+        Map<String, T> beforeCache = snapshot(cache);
+        Map<String, T> beforeDisk = snapshot(disk);
+        try {
+            return action.call();
+        } catch (Throwable failure) {
+            cache = beforeCache;
+            disk.clear();
+            disk.putAll(beforeDisk);
+            throw failure;
+        }
+    }
+
+    private Map<String, T> snapshot(Map<String, T> source) {
+        Map<String, T> result = new LinkedHashMap<>();
+        source.forEach((key, value) -> result.put(key, copy(value)));
+        return result;
+    }
+
     // ----- DataOperator -----
 
     @Override

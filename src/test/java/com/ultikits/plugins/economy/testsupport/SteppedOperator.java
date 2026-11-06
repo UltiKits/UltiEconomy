@@ -122,6 +122,11 @@ public final class SteppedOperator<T extends BaseDataEntity<String>> implements 
     }
 
     @Override
+    public <R> R transaction(java.util.concurrent.Callable<R> action) throws Exception {
+        return shared.transaction(action);
+    }
+
+    @Override
     public void flush() {
         if (shared instanceof Cached) {
             announce("flush");
