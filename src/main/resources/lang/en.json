@@ -32,6 +32,7 @@
   "economy.pay.sent": "Successfully transferred %s to %s",
   "economy.pay.received": "%s transferred %s to you",
   "economy.pay.self": "You cannot pay yourself",
+  "economy.pay.refund_failed": "Transfer not completed. Please contact an administrator to check your balance.",
   "economy.deposit.success": "Successfully deposited %s to bank",
   "economy.withdraw.success": "Successfully withdrew %s from bank",
   "economy.admin.gave": "Gave %s %s",

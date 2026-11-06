@@ -67,7 +67,8 @@ public class PayCommand extends BaseCommandExecutor {
             target.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.pay.received"), sender.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy()
+            sender.sendMessage(ChatColor.RED + (receipt.isRefundFailed()
+                    ? plugin.i18n("economy.pay.refund_failed") : economyService.isLastChangeBusy()
                     ? plugin.i18n("economy.error.busy") : receipt.isCreditFailed()
                     ? plugin.i18n("economy.error.operation_failed") : plugin.i18n("economy.error.insufficient_balance")));
         }
@@ -120,7 +121,8 @@ public class PayCommand extends BaseCommandExecutor {
             target.sendMessage(ChatColor.GREEN + String.format(
                     plugin.i18n("economy.pay.received"), sender.getName(), formatted));
         } else {
-            sender.sendMessage(ChatColor.RED + (economyService.isLastChangeBusy()
+            sender.sendMessage(ChatColor.RED + (receipt.isRefundFailed()
+                    ? plugin.i18n("economy.pay.refund_failed") : economyService.isLastChangeBusy()
                     ? plugin.i18n("economy.error.busy") : receipt.isCreditFailed()
                     ? plugin.i18n("economy.error.operation_failed") : plugin.i18n("economy.error.insufficient_balance")));
         }
