@@ -40,10 +40,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `leaderboard.update-interval` through a framework feature added in UltiTools 6.3.0
   (UltiKits/UltiTools-Reborn#531). UltiTools 6.2.x refuses to load this module because of that
   `api-version`.
+  Upgrade UltiTools to 6.3.0 or later before replacing this module's JAR.
 - **需要 UltiTools 6.3.0。** `plugin.yml` 将 `api-version` 从已发布的 2.0.0 中的 `620` 提高到 `630`。
   利息发放与排行榜刷新通过 UltiTools 6.3.0 新增的框架功能
   （UltiKits/UltiTools-Reborn#531）从 `interest.interval` 与 `leaderboard.update-interval` 读取间隔。UltiTools 6.2.x
   会因该 `api-version` 拒绝加载本模块。
+  请先将 UltiTools 升级到 6.3.0 或更高版本，再替换本模块的 JAR。
 - `plugin.yml` now declares `identify-string: ultieconomy`, the key of this module's entry in the
   UltiCloud catalogue. The framework's update check and `/upm update` skip a module that does not
   declare it, so this module now takes part in both (UltiKits/UltiTools-Reborn#474).
