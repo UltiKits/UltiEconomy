@@ -10,6 +10,7 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.abstracts.data.BaseDataEntity;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.exceptions.DataAccessException;
+import com.ultikits.ultitools.exceptions.ErrorCode;
 import com.ultikits.ultitools.entities.WhereCondition;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
@@ -237,6 +238,14 @@ public class EconomyServiceImpl implements EconomyService {
         if (amount <= 0 || from.equals(to)) {
             return TransferReceipt.refused();
         }
+        TransferReceipt receipt = inTransaction(dataOperator, () -> transferAccounts(from, to, amount));
+        if (receipt.isSuccess() && receipt.getTax() > 0 && taxService != null) {
+            depositTax(receipt.getTax(), getPrimaryCurrencyId());
+        }
+        return receipt;
+    }
+
+    private TransferReceipt transferAccounts(UUID from, UUID to, double amount) {
         PlayerAccountEntity sender = getAccount(from);
         if (sender == null || sender.getCash() < amount) {
             return TransferReceipt.refused();
@@ -247,8 +256,8 @@ public class EconomyServiceImpl implements EconomyService {
         }
         double tax = transactionTax(from, amount);
         double received = amount - tax;
-        // Each side is a conditional write that re-reads and retries when another server changed the
-        // row (UltiKits/UltiEconomy#41); a receiver that cannot be credited gets the sender refunded.
+        // Both conditional writes belong to one storage transaction (#44). A refused credit must
+        // abort the callback, not return normally and commit the debit.
         PlayerAccountEntity debited = changeAccount(from, sender, s -> {
             if (s.getCash() < amount) {
                 return false;
@@ -263,20 +272,7 @@ public class EconomyServiceImpl implements EconomyService {
             r.setCash(r.getCash() + received);
             return true;
         }), true)) {
-            boolean busy = isLastChangeBusy();
-            // A refund that throws is a refund not written, like one refused: it is named below.
-            if (!credited(() -> changeAccount(from, debited, s -> {
-                s.setCash(s.getCash() + amount);
-                return true;
-            }), true)) {
-                logLostRefund(label(from, sender.getPlayerName()), label(to, receiver.getPlayerName()), amount,
-                        currencyManager != null ? currencyManager.getPrimaryCurrencyId() : "coins");
-            }
-            lastChangeBusy.set(busy);
-            return TransferReceipt.refused();
-        }
-        if (tax > 0 && taxService != null) {
-            depositTax(tax, currencyManager.getPrimaryCurrency().getId());
+            throw new TransferAborted();
         }
         return TransferReceipt.completed(received, tax);
     }
@@ -534,6 +530,15 @@ public class EconomyServiceImpl implements EconomyService {
         if (amount <= 0 || from.equals(to)) {
             return TransferReceipt.refused();
         }
+        TransferReceipt receipt = inTransaction(currencyDataOperator,
+                () -> transferBalances(from, to, amount, currencyId));
+        if (receipt.isSuccess() && receipt.getTax() > 0 && taxService != null) {
+            depositTax(receipt.getTax(), currencyId);
+        }
+        return receipt;
+    }
+
+    private TransferReceipt transferBalances(UUID from, UUID to, double amount, String currencyId) {
         CurrencyBalanceEntity sender = getBalance(from, currencyId);
         if (sender == null || sender.getCash() < amount) {
             return TransferReceipt.refused();
@@ -544,7 +549,7 @@ public class EconomyServiceImpl implements EconomyService {
         }
         double tax = transactionTax(from, amount);
         double received = amount - tax;
-        // As the primary transfer: conditional writes that retry, the sender refunded on failure (#41).
+        // The same transaction boundary as the primary wallet: no compensating third write.
         CurrencyBalanceEntity debited = changeBalance(from, currencyId, sender, s -> {
             if (s.getCash() < amount) {
                 return false;
@@ -559,19 +564,7 @@ public class EconomyServiceImpl implements EconomyService {
             r.setCash(r.getCash() + received);
             return true;
         }), false)) {
-            boolean busy = isLastChangeBusy();
-            // A refund that throws is a refund not written, like one refused: it is named below.
-            if (!credited(() -> changeBalance(from, currencyId, debited, s -> {
-                s.setCash(s.getCash() + amount);
-                return true;
-            }), false)) {
-                logLostRefund(label(from, null), label(to, null), amount, currencyId);
-            }
-            lastChangeBusy.set(busy);
-            return TransferReceipt.refused();
-        }
-        if (tax > 0 && taxService != null) {
-            depositTax(tax, currencyId);
+            throw new TransferAborted();
         }
         return TransferReceipt.completed(received, tax);
     }
@@ -659,13 +652,36 @@ public class EconomyServiceImpl implements EconomyService {
     }
 
     /**
-     * Runs a transfer's credit, or its refund, after the debit committed. A storage error it throws (not
-     * only a refusal) counts as a write not made, logged like any failed write: a failed credit is
-     * refunded, and a failed refund is named for the operator (gate-1 top-up F-E2/F-E3, maintainer
-     * decision 2026-10-04); before, the exception left the transfer with the sender debited and nobody
-     * credited.
+     * Runs a wallet transfer in the framework's storage transaction (#44). Every shipped backend
+     * rolls back a callback that throws; JSON also journals the complete commit for crash recovery.
+     * A refused credit throws the private abort signal so returning a refusal cannot commit a debit.
+     * Commit errors are deliberately not caught as refusals or retried: on JDBC their outcome may be
+     * unknown, and compensation could create money. An ambient transaction keeps the framework's
+     * join semantics; the caller still owns its final commit.
+     */
+    private <T extends BaseDataEntity<String>> TransferReceipt inTransaction(
+            DataOperator<T> operator, Supplier<TransferReceipt> transfer) {
+        try {
+            return operator.transaction((java.util.concurrent.Callable<TransferReceipt>) transfer::get);
+        } catch (TransferAborted aborted) {
+            return TransferReceipt.refused();
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new DataAccessException(ErrorCode.TRANSACTION_FAILED, "Transfer transaction failed", failure);
+        }
+    }
+
+    /** Internal callback failure, caught only after the storage transaction rolled back. */
+    private static final class TransferAborted extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    /**
+     * Attempts the credit inside the wallet transaction. A refusal or a throwing write aborts the
+     * whole transaction, including a write that applied before throwing. No refund is written.
      *
-     * @return whether the write was made
+     * @return whether the credit was staged successfully
      */
     private boolean credited(Supplier<?> credit, boolean accountRow) {
         try {
@@ -675,33 +691,6 @@ public class EconomyServiceImpl implements EconomyService {
             logWriteFailed(accountRow, String.valueOf(e.getMessage()));
             return false;
         }
-    }
-
-    /**
-     * The refund of a failed transfer could not be written either: the sender has lost {@code amount}.
-     * One error line names both players, the amount and the currency, so an operator can restore it by
-     * hand (gate-1 top-up F-E3, maintainer decision 2026-10-04).
-     */
-    private void logLostRefund(String from, String to, double amount, String currencyId) {
-        plugin.getLogger().error(String.format(plugin.i18n("economy.log.transfer_refund_failed"),
-                from, to, formatAmount(amount, currencyId), currencyId, from));
-    }
-
-    /**
-     * A player as an operator should see them in that line: their name and UUID. {@code knownName} is
-     * the name read with the transfer (the row may be gone now); without it the account is asked.
-     */
-    private String label(UUID uuid, String knownName) {
-        String name = knownName;
-        if (name == null) {
-            try {
-                PlayerAccountEntity account = getAccount(uuid);
-                name = account != null ? account.getPlayerName() : null;
-            } catch (RuntimeException ignored) {
-                // the storage that just failed may fail again; the UUID still identifies the player
-            }
-        }
-        return name != null ? name + " (" + uuid + ")" : uuid.toString();
     }
 
     /** One balance change, applied to a row as read; false refuses it (for example, not enough cash). */
