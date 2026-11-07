@@ -30,6 +30,16 @@ If the database connection fails during commit, both wallets may already have ch
 
 数据库连接在提交时失败，可能出现双方余额已改变、调用方却收到错误的情况。重试前请先核对双方余额；模块不会对提交结果未知的事务自动重试或退款。
 
+## Transfer and redemption failure feedback / 转账与兑换失败提示
+
+A failed `/pay` receiver credit rolls back both wallets and reports `Operation failed`, or the existing busy message when the credit exhausts conditional-write retries. An unaffordable debit still reports `Insufficient balance`. There is no compensating refund or refund-failed state. A non-busy failed note redemption reports `Operation failed` and keeps the note (#45).
+
+These replies do not redefine the transaction limits above: tax collection is separate, independent Vault calls are not atomic transfers, and a JDBC commit acknowledgement failure can leave both wallets committed despite an error. Operators should check both balances and database transaction/audit records before retrying an uncertain commit; do not blindly repeat the payment or apply a manual refund.
+
+`/pay` 的接收方入账失败会回滚双方钱包，并提示“操作失败”；条件写入重试耗尽时保留繁忙提示。余额确实不足时仍提示“余额不足”。不再执行补偿退款，也没有退款失败状态。纸币兑换非繁忙失败时提示“操作失败”，并保留纸币（#45）。
+
+这些提示不改变上文的事务限制：国库税款另行入账，独立的 Vault 调用不构成原子转账，JDBC 提交确认失败时双方钱包仍可能已提交。提交结果未知时，管理员应结合数据库事务或审计记录核对双方余额，再决定是否重试；不要盲目重付或人工退款。
+
 ## Commands / 命令
 
 | Command | Description | Permission |

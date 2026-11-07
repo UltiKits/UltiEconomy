@@ -34,6 +34,37 @@ class NoteRedeemBusyReplyTest {
 
     private static final UUID STEVE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"coins,en,Operation failed", "gems,en,Operation failed",
+            "coins,zh,操作失败", "gems,zh,操作失败"})
+    void missingWalletRedeemReportsFailureAndKeepsTheNote(String currency, String language, String expected) {
+        com.ultikits.plugins.economy.service.EconomyTestWorld world =
+                com.ultikits.plugins.economy.service.EconomyTestWorld.relational();
+        UltiEconomy plugin = mock(UltiEconomy.class);
+        when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer(language));
+        lenient().when(plugin.getCurrencyManager()).thenReturn(world.currencies);
+        MoneyNoteFactory notes = mock(MoneyNoteFactory.class);
+        ItemStack held = mock(ItemStack.class);
+        when(notes.isMoneyNote(held)).thenReturn(true);
+        when(notes.getNoteValue(held)).thenReturn(100.0);
+        when(notes.getNoteCurrency(held)).thenReturn(currency);
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(player.getUniqueId()).thenReturn(STEVE);
+        when(player.getInventory()).thenReturn(inventory);
+        when(inventory.getItemInMainHand()).thenReturn(held);
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_AIR, held, null, null);
+
+        NoteRedeemListener.createForTest(plugin, world.service, notes).onInteract(event);
+
+        verify(player).sendMessage(org.bukkit.ChatColor.RED + expected);
+        verify(inventory, never()).setItemInMainHand(any());
+        verify(held, never()).setAmount(anyInt());
+        assertThat(event.isCancelled()).isTrue();
+        assertThat(world.account(STEVE)).isNull();
+        assertThat(world.balanceRows("gems")).isEmpty();
+    }
+
     @Test
     @DisplayName("right-click redeem under contention: busy reply, note kept, event cancelled")
     void busyRedeemKeepsTheNote() {

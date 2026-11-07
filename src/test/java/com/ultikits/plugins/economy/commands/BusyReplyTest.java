@@ -186,6 +186,30 @@ class BusyReplyTest {
         verify(held, org.mockito.Mockito.never()).setAmount(org.mockito.ArgumentMatchers.anyInt());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"coins,en,Operation failed", "gems,en,Operation failed",
+            "coins,zh,操作失败", "gems,zh,操作失败"})
+    void missingWalletRedeemReportsFailureAndKeepsTheNote(String currency, String language, String expected) {
+        org.mockito.Mockito.when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer(language));
+        // Configured currency, but no wallet: this is a refused credit, not contention.
+        world.accounts.delById(world.account(STEVE).getId());
+        MoneyNoteFactory notes = mock(MoneyNoteFactory.class);
+        org.bukkit.inventory.ItemStack held = mock(org.bukkit.inventory.ItemStack.class);
+        PlayerInventory inventory = steve.getInventory();
+        org.mockito.Mockito.when(inventory.getItemInMainHand()).thenReturn(held);
+        org.mockito.Mockito.when(notes.isMoneyNote(held)).thenReturn(true);
+        org.mockito.Mockito.when(notes.getNoteValue(held)).thenReturn(100.0);
+        org.mockito.Mockito.when(notes.getNoteCurrency(held)).thenReturn(currency);
+
+        NoteCommand.createForTest(plugin, world.service, notes, world.currencies).onRedeem(steve);
+
+        org.mockito.Mockito.verify(steve).sendMessage(org.bukkit.ChatColor.RED + expected);
+        verify(inventory, org.mockito.Mockito.never()).setItemInMainHand(org.mockito.ArgumentMatchers.any());
+        verify(held, org.mockito.Mockito.never()).setAmount(org.mockito.ArgumentMatchers.anyInt());
+        assertThat(world.account(STEVE)).isNull();
+        assertThat(world.balanceRows("gems")).isEmpty();
+    }
+
     /**
      * The busy answer belongs to the change that gave up, not to the thread: a later change on the same
      * thread that is refused before it writes anything (here: not enough cash, decided up front) says

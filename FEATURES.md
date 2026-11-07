@@ -127,7 +127,7 @@ primary-currency mapping only, the same asymmetry as Deposit above.
 
 `PayCommand` — class-level `@CmdExecutor(permission = "ultieconomy.pay", alias = {"pay"})`.
 Refuses a zero/negative amount, an offline target, and self-payment; the transfer itself is
-atomic across sender-deduct and receiver-credit on the framework's shipped storage backends (see `EconomyServiceImpl#inTransaction` and `ultieconomy.persistence.atomic-transfers`). Transaction tax is a separate post-wallet write; third-party plugins' separate Vault calls are not one transfer.
+atomic across sender-deduct and receiver-credit on the framework's shipped storage backends (see `EconomyServiceImpl#inTransaction` and `ultieconomy.persistence.atomic-transfers`). A failed receiver credit rolls back both wallets and reports `Operation failed`, unless conditional-write retries were exhausted, which retains the busy reply. A genuinely unaffordable debit still reports `Insufficient balance` (#45). No compensating refund is issued. Transaction tax is a separate post-wallet write; third-party plugins' separate Vault calls are not one transfer. Unknown commit outcomes retain the documented transaction limits below.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|

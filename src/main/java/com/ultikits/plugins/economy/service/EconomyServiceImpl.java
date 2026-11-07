@@ -664,7 +664,7 @@ public class EconomyServiceImpl implements EconomyService {
         try {
             return operator.transaction((java.util.concurrent.Callable<TransferReceipt>) transfer::get);
         } catch (TransferAborted aborted) {
-            return TransferReceipt.refused();
+            return TransferReceipt.creditFailed();
         } catch (RuntimeException failure) {
             throw failure;
         } catch (Exception failure) {
